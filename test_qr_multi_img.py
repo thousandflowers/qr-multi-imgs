@@ -406,3 +406,209 @@ class TestVersionConsistency:
             f"Version mismatch: docstring says '{docstring_version.group(1)}' "
             f"but VERSION constant is '{constant_version}'"
         )
+
+
+class TestActionDecode:
+    """Test action_decode functionality"""
+
+    def test_decode_with_no_qr_results(self):
+        """Should handle no QR results gracefully"""
+        from qr_multi_img import QRMultiIMG
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            scanner = QRMultiIMG(folder_path=tmpdir)
+            scanner.results = []  # No results
+
+            result = scanner.action_decode(output_format="text")
+            assert result == []
+
+    def test_decode_returns_list_with_qr(self):
+        """Should return list of results when QR codes found"""
+        from qr_multi_img import QRMultiIMG, QRCodeResult
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            scanner = QRMultiIMG(folder_path=tmpdir)
+            scanner.results = [
+                QRCodeResult(
+                    "/fake/image1.jpg",
+                    has_qr=True,
+                    qr_contents=["test1", "test2"],
+                ),
+                QRCodeResult(
+                    "/fake/image2.jpg",
+                    has_qr=True,
+                    qr_contents=["test3"],
+                ),
+            ]
+
+            result = scanner.action_decode(output_format="text")
+            assert len(result) == 2
+            assert result[0].qr_contents == ["test1", "test2"]
+            assert result[1].qr_contents == ["test3"]
+
+
+class TestActionFilter:
+    """Test action_filter functionality"""
+
+    def test_filter_no_qr_results(self):
+        """Should handle no QR results gracefully"""
+        from qr_multi_img import QRMultiIMG
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            scanner = QRMultiIMG(folder_path=tmpdir)
+            scanner.results = []
+
+            result = scanner.action_filter(pattern="test")
+            assert result == []
+
+    def test_filter_matching_pattern(self):
+        """Should return images matching pattern"""
+        from qr_multi_img import QRMultiIMG, QRCodeResult
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            scanner = QRMultiIMG(folder_path=tmpdir)
+            scanner.results = [
+                QRCodeResult(
+                    "/fake/image1.jpg",
+                    has_qr=True,
+                    qr_contents=["hello world"],
+                ),
+                QRCodeResult(
+                    "/fake/image2.jpg",
+                    has_qr=True,
+                    qr_contents=["foo bar"],
+                ),
+            ]
+
+            result = scanner.action_filter(pattern="hello")
+            assert len(result) == 1
+            assert result[0].file_path == "/fake/image1.jpg"
+
+    def test_filter_exclude_mode(self):
+        """Should return non-matching images when exclude is True"""
+        from qr_multi_img import QRMultiIMG, QRCodeResult
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            scanner = QRMultiIMG(folder_path=tmpdir)
+            scanner.results = [
+                QRCodeResult(
+                    "/fake/image1.jpg",
+                    has_qr=True,
+                    qr_contents=["hello world"],
+                ),
+                QRCodeResult(
+                    "/fake/image2.jpg",
+                    has_qr=True,
+                    qr_contents=["foo bar"],
+                ),
+            ]
+
+            result = scanner.action_filter(pattern="hello", exclude=True)
+            assert len(result) == 1
+            assert result[0].file_path == "/fake/image2.jpg"
+
+
+class TestActionBatchRename:
+    """Test action_batch_rename functionality"""
+
+    def test_batch_rename_no_qr_results(self):
+        """Should handle no QR results gracefully"""
+        from qr_multi_img import QRMultiIMG
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            scanner = QRMultiIMG(folder_path=tmpdir)
+            scanner.results = []
+
+            result = scanner.action_batch_rename(prefix="qr_")
+            assert result["renamed"] == 0
+
+    def test_batch_rename_dry_run(self):
+        """Should show dry run without actually renaming"""
+        from qr_multi_img import QRMultiIMG, QRCodeResult
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            test_file = Path(tmpdir) / "test.jpg"
+            test_file.write_bytes(b"fake image")
+
+            scanner = QRMultiIMG(folder_path=tmpdir)
+            scanner.results = [
+                QRCodeResult(
+                    str(test_file),
+                    has_qr=True,
+                    qr_contents=["test_content"],
+                ),
+            ]
+
+            result = scanner.action_batch_rename(prefix="qr_", dry_run=True)
+
+            # File should still exist with original name
+            assert test_file.exists()
+            assert result["renamed"] == 1
+
+    def test_batch_rename_returns_changes(self):
+        """Should return list of changes"""
+        from qr_multi_img import QRMultiIMG, QRCodeResult
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a real file
+            test_file = Path(tmpdir) / "original.jpg"
+            test_file.write_bytes(b"fake image")
+
+            scanner = QRMultiIMG(folder_path=tmpdir)
+            scanner.results = [
+                QRCodeResult(
+                    str(test_file),
+                    has_qr=True,
+                    qr_contents=["test123"],
+                ),
+            ]
+
+            result = scanner.action_batch_rename(
+                prefix="pre_", suffix="_suf", dry_run=True
+            )
+            assert result["renamed"] == 1
+            assert len(result["changes"]) == 1
+
+
+class TestActionVerify:
+    """Test action_verify functionality"""
+
+    def test_verify_invalid_folder(self):
+        """Should handle invalid recreated folder"""
+        from qr_multi_img import QRMultiIMG
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            scanner = QRMultiIMG(folder_path=tmpdir)
+
+            result = scanner.action_verify(
+                originals_folder=tmpdir, recreated_folder="/nonexistent_folder_12345"
+            )
+            # Should handle error gracefully
+            assert "errors" in result
+
+    def test_verify_empty_folder(self):
+        """Should handle empty recreated folder"""
+        from qr_multi_img import QRMultiIMG
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            empty_folder = Path(tmpdir) / "empty"
+            empty_folder.mkdir()
+
+            scanner = QRMultiIMG(folder_path=tmpdir)
+
+            result = scanner.action_verify(
+                originals_folder=tmpdir, recreated_folder=str(empty_folder)
+            )
+            # No matches expected
+            assert result["matched"] == 0
