@@ -166,37 +166,32 @@ class QRMultiIMG:
             image = image.convert("RGB")
         return image
 
+    def _extract_qr_data(self, decoded: list) -> tuple[list, list]:
+        contents = [d.data.decode("utf-8", errors="ignore") for d in decoded]
+        bboxes = [
+            (d.rect.left, d.rect.top, d.rect.width, d.rect.height) for d in decoded
+        ]
+        return contents, bboxes
+
     def _detect_qr_method1(self, image: Image.Image) -> tuple[list, list]:
         decoded = pyzbar.decode(image)
-        contents = [d.data.decode("utf-8", errors="ignore") for d in decoded]
-        bboxes = []
-        for d in decoded:
-            bbox = d.rect
-            bboxes.append((bbox.left, bbox.top, bbox.width, bbox.height))
-        return contents, bboxes
+        return self._extract_qr_data(decoded)
 
     def _detect_qr_method2(self, image: Image.Image) -> tuple[list, list]:
         gray = image.convert("L")
         decoded = pyzbar.decode(gray)
-        contents = [d.data.decode("utf-8", errors="ignore") for d in decoded]
-        bboxes = []
-        for d in decoded:
-            bbox = d.rect
-            bboxes.append((bbox.left, bbox.top, bbox.width, bbox.height))
-        return contents, bboxes
+        return self._extract_qr_data(decoded)
 
     def _detect_qr_method3(
         self, img: Image.Image, attempt: int = 0
     ) -> tuple[list, list, str]:
         methods = []
 
-        # Reuse the already opened image instead of reopening
-        methods.append(lambda i: i)  # Original as-is
-        methods.append(lambda i: i.convert("RGB"))  # Convert to RGB
-        methods.append(lambda i: self._preprocess_image(i))  # Preprocess
+        methods.append(lambda i: i)
+        methods.append(lambda i: i.convert("RGB"))
+        methods.append(lambda i: self._preprocess_image(i))
 
         try:
-            # For resize, we need a new image
             methods.append(
                 lambda i: i.resize((i.width * 2, i.height * 2), Image.LANCZOS)
             )
@@ -209,11 +204,7 @@ class QRMultiIMG:
         try:
             processed_img = methods[attempt](img)
             decoded = pyzbar.decode(processed_img)
-            contents = [d.data.decode("utf-8", errors="ignore") for d in decoded]
-            bboxes = []
-            for d in decoded:
-                bbox = d.rect
-                bboxes.append((bbox.left, bbox.top, bbox.width, bbox.height))
+            contents, bboxes = self._extract_qr_data(decoded)
             return contents, bboxes, None
         except Exception as e:
             return [], [], str(e)
@@ -221,7 +212,6 @@ class QRMultiIMG:
     def detect_qr(self, image_path: Path) -> QRCodeResult:
         import signal
         import platform
-        import functools
 
         contents = []
         bboxes = []
@@ -484,30 +474,44 @@ class QRMultiIMG:
                 qr.make(fit=True)
 
                 img = qr.make_image(fill_color="black", back_color="white")
-
-                if naming == "sequential":
-                    filename = f"qr_{qr_count:04d}.{self.qr_format}"
-                elif naming == "content":
-                    # Handle empty content gracefully
-                    safe_content = (
-                        content[:50].replace("/", "_").replace(":", "_")
-                        if content
-                        else "empty_qr"
-                    )
-                    filename = f"{safe_content}.{self.qr_format}"
-                else:
-                    suffix = (
-                        f"_qr{i + 1}.{self.qr_format}"
-                        if len(r.qr_contents) > 1
-                        else f"_qr.{self.qr_format}"
-                    )
-                    filename = f"{base_name}{suffix}"
+                filename = self._get_output_filename(
+                    base_name,
+                    f".{self.qr_format}",
+                    naming,
+                    content,
+                    i,
+                    len(r.qr_contents),
+                    qr_count,
+                )
 
                 img.save(str(output_path / filename))
                 qr_count += 1
 
         print(f"Created {qr_count} QR code images in {output_path}")
         return qr_count
+
+    def _get_output_filename(
+        self,
+        base_name: str,
+        extension: str,
+        naming: str,
+        content: str,
+        index: int,
+        total: int,
+        qr_index: int,
+    ) -> str:
+        if naming == "sequential":
+            return f"qr_{qr_index:04d}{extension}"
+        elif naming == "content":
+            safe_content = (
+                content[:50].replace("/", "_").replace(":", "_")
+                if content
+                else "empty_qr"
+            )
+            return f"{safe_content}{extension}"
+        else:
+            suffix = f"_qr{index + 1}{extension}" if total > 1 else f"_qr{extension}"
+            return f"{base_name}{suffix}"
 
     def action_extract(
         self,
@@ -561,22 +565,9 @@ class QRMultiIMG:
 
                 cropped = src_img.crop((x1, y1, x2, y2))
 
-                if naming == "sequential":
-                    filename = f"qr_{qr_count:04d}{src_ext}"
-                elif naming == "content":
-                    safe_content = (
-                        content[:50].replace("/", "_").replace(":", "_")
-                        if content
-                        else "empty_qr"
-                    )
-                    filename = f"{safe_content}{src_ext}"
-                else:
-                    suffix = (
-                        f"_qr{i + 1}{src_ext}"
-                        if len(r.qr_contents) > 1
-                        else f"_qr{src_ext}"
-                    )
-                    filename = f"{base_name}{suffix}"
+                filename = self._get_output_filename(
+                    base_name, src_ext, naming, content, i, len(r.qr_contents), qr_count
+                )
 
                 cropped.save(str(output_path / filename))
                 qr_count += 1
