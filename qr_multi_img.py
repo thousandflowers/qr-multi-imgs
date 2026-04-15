@@ -640,6 +640,46 @@ class QRMultiIMG:
             for r in without_qr:
                 print(f"  {r.file_path}")
 
+    def action_decode(self, output_format: str = "text") -> list:
+        """
+        Decode QR codes and display content without creating files.
+
+        Args:
+            output_format: Output format - 'text' or 'json'
+
+        Returns:
+            List of QRCodeResult with QR codes
+        """
+        with_qr = self._get_with_qr()
+
+        if not with_qr:
+            print("No QR codes found to decode.")
+            return []
+
+        if output_format == "json":
+            results = []
+            for r in with_qr:
+                results.append(
+                    {
+                        "file": r.file_path,
+                        "qr_codes": r.qr_contents,
+                        "count": len(r.qr_contents),
+                    }
+                )
+            print(json.dumps(results, indent=2))
+        else:
+            for r in with_qr:
+                for i, content in enumerate(r.qr_contents):
+                    if len(r.qr_contents) > 1:
+                        print(f"{r.file_path} [{i + 1}]: {content}")
+                    else:
+                        print(f"{r.file_path}: {content}")
+
+        print(
+            f"\nTotal: {len(with_qr)} images with {sum(len(r.qr_contents) for r in with_qr)} QR codes"
+        )
+        return with_qr
+
 
 def _validate_path(path: str, base_dir: str = None) -> tuple[bool, str]:
     """
@@ -730,6 +770,9 @@ def run_cli(args):
         scanner.action_extract(
             output_folder=args.output, naming=args.naming, padding=args.padding
         )
+
+    elif args.action == "decode":
+        scanner.action_decode(output_format=args.export_format)
 
 
 if TEXTUAL_AVAILABLE:
@@ -886,7 +929,15 @@ def main():
     parser.add_argument(
         "--action",
         "-a",
-        choices=["list", "export", "delete", "organize", "recreate", "extract"],
+        choices=[
+            "list",
+            "export",
+            "delete",
+            "organize",
+            "recreate",
+            "extract",
+            "decode",
+        ],
         default="list",
         help="Action to perform",
     )
