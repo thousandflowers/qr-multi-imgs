@@ -384,3 +384,25 @@ class TestActionExtract:
                 output_folder=output_folder, naming="original", padding=1000
             )
             assert count >= 0
+
+
+class TestVersionConsistency:
+    """Test version consistency between docstring and VERSION constant"""
+
+    def test_version_docstring_matches_constant(self):
+        """Docstring version should match VERSION constant"""
+        import qr_multi_img
+
+        with open(qr_multi_img.__file__, "r") as f:
+            content = f.read()
+
+        import re
+
+        docstring_version = re.search(r"Version:\s*(v[\d.]+)", content)
+        constant_version = qr_multi_img.VERSION
+
+        assert docstring_version is not None, "Version not found in docstring"
+        assert docstring_version.group(1) == constant_version, (
+            f"Version mismatch: docstring says '{docstring_version.group(1)}' "
+            f"but VERSION constant is '{constant_version}'"
+        )

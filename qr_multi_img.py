@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 QR Multi IMG - QR Code Scanner for Images
-Version: v0.1.0 (beta)
+Version: v0.2.0
 Author: QR Multi IMG Team
 License: MIT
 """
