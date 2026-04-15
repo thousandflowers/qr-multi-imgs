@@ -34,6 +34,8 @@ import pyzbar.pyzbar as pyzbar
 
 SUPPORTED_FORMATS = {".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp", ".tiff", ".tif"}
 DEFAULT_QR_FORMAT = "png"
+DEFAULT_PADDING = 20
+DEFAULT_TIMEOUT = 30
 VERSION = "v0.1.0"
 
 
@@ -108,7 +110,7 @@ class QRMultiIMG:
         parallel: bool = False,
         log_file: bool = False,
         qr_format: str = "png",
-        timeout: int = 30,
+        timeout: int = DEFAULT_TIMEOUT,
     ):
         self.folder_path = Path(folder_path)
         self.recursive = recursive
@@ -508,7 +510,10 @@ class QRMultiIMG:
         return qr_count
 
     def action_extract(
-        self, output_folder: str = None, naming: str = "original", padding: int = 20
+        self,
+        output_folder: str = None,
+        naming: str = "original",
+        padding: int = DEFAULT_PADDING,
     ) -> int:
         output_path = (
             Path(output_folder) if output_folder else self.folder_path / "extracted_qr"
@@ -673,7 +678,7 @@ def run_cli(args):
         parallel=args.parallel,
         log_file=args.log,
         qr_format=args.qr_format or "png",
-        timeout=args.timeout or 30,
+        timeout=args.timeout or DEFAULT_TIMEOUT,
     )
 
     print(f"Scanning folder: {args.path}")
@@ -793,7 +798,9 @@ if TEXTUAL_AVAILABLE:
 
             self.folder_path = folder_input.value or ""
             self.naming = naming_input.value or "original"
-            self.padding = int(padding_input.value) if padding_input.value else 20
+            self.padding = (
+                int(padding_input.value) if padding_input.value else DEFAULT_PADDING
+            )
 
             if not self.folder_path:
                 self._show_error("Please enter a folder path")
@@ -817,7 +824,7 @@ if TEXTUAL_AVAILABLE:
                 progress=True,
                 log=False,
                 naming=self.naming,
-                timeout=30,
+                timeout=DEFAULT_TIMEOUT,
                 padding=self.padding,
             )
 
@@ -898,7 +905,11 @@ def main():
         help="File naming for recreate action",
     )
     parser.add_argument(
-        "--timeout", "-t", type=int, default=30, help="Timeout per image in seconds"
+        "--timeout",
+        "-t",
+        type=int,
+        default=DEFAULT_TIMEOUT,
+        help="Timeout per image in seconds",
     )
     parser.add_argument(
         "--padding",
