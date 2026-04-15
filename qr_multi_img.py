@@ -804,6 +804,95 @@ class QRMultiIMG:
 
         return {"renamed": len(changes), "errors": errors, "changes": changes}
 
+    def action_verify(
+        self, originals_folder: str = None, recreated_folder: str = None
+    ) -> dict:
+        """
+        Verify that recreated QR codes match the original content.
+
+        Args:
+            originals_folder: Folder with original images (default: scanned folder)
+            recreated_folder: Folder with recreated QR codes
+
+        Returns:
+            Dict with verification results
+        """
+        if not originals_folder:
+            originals_folder = str(self.folder_path)
+
+        if not recreated_folder:
+            print("Error: --output folder is required for verify action")
+            return {"matched": 0, "mismatched": 0, "errors": 0}
+
+        originals_path = Path(originals_folder)
+        recreated_path = Path(recreated_folder)
+
+        if not recreated_path.exists():
+            print(f"Error: Recreated folder not found: {recreated_folder}")
+            return {"matched": 0, "mismatched": 0, "errors": 0}
+
+        matched = 0
+        mismatched = 0
+        errors = 0
+
+        print(f"\n--- Verify QR Codes ---")
+        print(f"Originals: {originals_folder}")
+        print(f"Recreated: {recreated_folder}")
+        print()
+
+        recreated_files = list(recreated_path.glob("*"))
+
+        for recreated_file in recreated_files:
+            if recreated_file.suffix.lower() not in SUPPORTED_FORMATS:
+                continue
+
+            try:
+                decoded = pyzbar.decode(Image.open(recreated_file))
+                if not decoded:
+                    print(f"  ❌ {recreated_file.name}: No QR code found")
+                    errors += 1
+                    continue
+
+                recreated_content = decoded[0].data.decode("utf-8")
+
+                original_matched = False
+                for original_img in originals_path.glob("*"):
+                    if original_img.suffix.lower() not in SUPPORTED_FORMATS:
+                        continue
+
+                    try:
+                        orig_decoded = pyzbar.decode(Image.open(original_img))
+                        if orig_decoded:
+                            original_content = orig_decoded[0].data.decode("utf-8")
+                            if original_content == recreated_content:
+                                print(f"  ✅ {recreated_file.name}: MATCH")
+                                matched += 1
+                                original_matched = True
+                                break
+                    except Exception:
+                        continue
+
+                if not original_matched:
+                    print(f"  ❌ {recreated_file.name}: MISMATCH")
+                    print(f"     Content: {recreated_content[:50]}...")
+                    mismatched += 1
+
+            except Exception as e:
+                print(f"  ❌ {recreated_file.name}: Error - {e}")
+                errors += 1
+
+        print(f"\n--- Results ---")
+        print(f"  Matched: {matched}")
+        print(f"  Mismatched: {mismatched}")
+        print(f"  Errors: {errors}")
+
+        if mismatched == 0 and errors == 0:
+            print(f"\n  ✅ All QR codes verified successfully!")
+        else:
+            print(f"\n  ⚠️ Verification issues found!")
+
+        return {"matched": matched, "mismatched": mismatched, "errors": errors}
+
 
 def _validate_path(path: str, base_dir: str = None) -> tuple[bool, str]:
     """
@@ -916,6 +1005,9 @@ def run_cli(args):
         )
         if not args.confirm:
             print("\nNo files were renamed (dry run). Use --confirm to apply changes.")
+
+    elif args.action == "verify":
+        scanner.action_verify(originals_folder=args.path, recreated_folder=args.output)
 
 
 if TEXTUAL_AVAILABLE:
@@ -1082,6 +1174,7 @@ def main():
             "decode",
             "filter",
             "batch-rename",
+            "verify",
         ],
         default="list",
         help="Action to perform",
