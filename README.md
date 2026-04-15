@@ -77,12 +77,12 @@ When you run the program without any arguments, you'll see the interactive menu:
 ├─────────────────────────────────────┤
 │                                     │
 │   > List all images                 │
-│     Export results                 │
-│     Delete without QR              │
-│     Organize into folders         │
-│     Recreate QR codes             │
+│     Export results                  │
+│     Delete without QR               │
+│     Organize into folders           │
+│     Recreate QR codes               │
 │                                     │
-│   Press q to quit                  │
+│   Press q to quit                   │
 └─────────────────────────────────────┘
 ```
 
