@@ -36,7 +36,9 @@ SUPPORTED_FORMATS = {".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp", ".tiff", 
 DEFAULT_QR_FORMAT = "png"
 DEFAULT_PADDING = 20
 DEFAULT_TIMEOUT = 30
-VERSION = "v0.1.0"
+CONTRAST_FACTOR = 1.5
+SHARPNESS_FACTOR = 1.5
+VERSION = "v0.2.0"
 
 
 class QRCodeResult:
@@ -141,6 +143,17 @@ class QRMultiIMG:
             self.logger.info(message)
         print(message)
 
+    def _get_with_qr(self) -> list:
+        return [r for r in self.results if r.has_qr]
+
+    def _get_without_qr(self) -> list:
+        return [r for r in self.results if not r.has_qr and not r.error]
+
+    def _get_total_qr_count(self, with_qr_list: list = None) -> int:
+        if with_qr_list is None:
+            with_qr_list = self._get_with_qr()
+        return sum(len(r.qr_contents) for r in with_qr_list)
+
     def _normalize_format(self, ext: str) -> str:
         ext = ext.lower()
         if not ext.startswith("."):
@@ -159,9 +172,9 @@ class QRMultiIMG:
 
     def _preprocess_image(self, image: Image.Image) -> Image.Image:
         enhancer = ImageEnhance.Contrast(image)
-        image = enhancer.enhance(1.5)
+        image = enhancer.enhance(CONTRAST_FACTOR)
         enhancer = ImageEnhance.Sharpness(image)
-        image = enhancer.enhance(1.5)
+        image = enhancer.enhance(SHARPNESS_FACTOR)
         if image.mode not in ("RGB", "L"):
             image = image.convert("RGB")
         return image
@@ -365,7 +378,7 @@ class QRMultiIMG:
         return output_path
 
     def action_delete(self, output_folder: str = None, confirm: bool = False) -> int:
-        without_qr = [r for r in self.results if not r.has_qr and not r.error]
+        without_qr = self._get_without_qr()
 
         if not confirm:
             print(f"\nFound {len(without_qr)} images without QR codes.")
@@ -397,8 +410,8 @@ class QRMultiIMG:
         with_qr_folder.mkdir(parents=True, exist_ok=True)
         without_qr_folder.mkdir(parents=True, exist_ok=True)
 
-        with_qr = [r for r in self.results if r.has_qr]
-        without_qr = [r for r in self.results if not r.has_qr and not r.error]
+        with_qr = self._get_with_qr()
+        without_qr = self._get_without_qr()
 
         if not confirm:
             print(f"\nWith QR: {len(with_qr)}, Without QR: {len(without_qr)}")
@@ -450,15 +463,14 @@ class QRMultiIMG:
 
         output_path.mkdir(parents=True, exist_ok=True)
 
-        with_qr = [r for r in self.results if r.has_qr]
+        with_qr = self._get_with_qr()
 
         if not with_qr:
             print("No QR codes found to recreate.")
             return 0
 
-        print(
-            f"Recreating {sum(len(r.qr_contents) for r in with_qr)} QR code images..."
-        )
+        total_qr = self._get_total_qr_count(with_qr)
+        print(f"Recreating {total_qr} QR code images...")
 
         qr_count = 0
 
@@ -530,15 +542,14 @@ class QRMultiIMG:
 
         output_path.mkdir(parents=True, exist_ok=True)
 
-        with_qr = [r for r in self.results if r.has_qr]
+        with_qr = self._get_with_qr()
 
         if not with_qr:
             print("No QR codes found to extract.")
             return 0
 
-        print(
-            f"Extracting {sum(len(r.qr_contents) for r in with_qr)} QR code regions..."
-        )
+        total_qr = self._get_total_qr_count(with_qr)
+        print(f"Extracting {total_qr} QR code regions...")
 
         qr_count = 0
 
