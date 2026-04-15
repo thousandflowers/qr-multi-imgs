@@ -8,7 +8,7 @@ class QrMultiImg < Formula
   license "MIT"
 
   depends_on "zbar"
-  depends_on python: "3.12"
+  depends_on "python@3.12"
 
   def install
     python = Formula["python@3.12"]

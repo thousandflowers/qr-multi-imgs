@@ -2,7 +2,7 @@
 
 > QR Code Scanner for Images - Scan a folder of images and detect QR codes
 
-![Version](https://img.shields.io/badge/version-v0.1.0-blue)
+![Version](https://img.shields.io/badge/version-v0.2.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Python](https://img.shields.io/badge/python-3.12+-blue)
 
@@ -24,10 +24,17 @@
 
 ## Installation
 
-### Recommended: Homebrew (1 Command)
+### Recommended: Homebrew
 
+#### Option 1: From official tap (once published)
 ```bash
 brew install thousandflowers/qr-multi-img/qr-multi-img
+```
+
+#### Option 2: From local tap (for development/testing)
+```bash
+cd /path/to/qr-multi-img
+brew install ./Formula/qr-multi-img.rb
 ```
 
 Then run with:
@@ -267,6 +274,12 @@ qr-multi-img --path /images --action list --parallel --progress
 For very large images, a timeout of 30 seconds per image is applied. Use `--progress` to see progress.
 
 ## Version History
+
+- **v0.2.0** - Bug fixes and improvements
+  - Fixed version docstring consistency
+  - Added helper methods for code reuse
+  - Added path validation for delete/organize actions
+  - Fixed zbar library path resolution on macOS
 
 - **v0.1.0** (beta) - Initial release
   - 6 actions (list, export, delete, organize, recreate, extract)
