@@ -2,7 +2,7 @@
 
 > QR Code Scanner for Images - Scan a folder of images and detect QR codes
 
-![Version](https://img.shields.io/badge/version-v0.2.0-blue)
+![Version](https://img.shields.io/badge/version-v0.3.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Python](https://img.shields.io/badge/python-3.12+-blue)
 
@@ -329,6 +329,12 @@ qr-multi-img --path /images --action list --parallel --progress
 For very large images, a timeout of 30 seconds per image is applied. Use `--progress` to see progress.
 
 ## Version History
+
+- **v0.3.0** - New features and performance improvements
+  - Added 4 new actions: decode, filter, batch-rename, verify
+  - Added test coverage for new actions
+  - Optimized verify action with pre-scanning
+  - Updated documentation with new features
 
 - **v0.2.0** - Bug fixes and improvements
   - Fixed version docstring consistency

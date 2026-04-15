@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 QR Multi IMG - QR Code Scanner for Images
-Version: v0.2.0
+Version: v0.3.0
 Author: QR Multi IMG Team
 License: MIT
 """
@@ -54,7 +54,7 @@ DEFAULT_PADDING = 20
 DEFAULT_TIMEOUT = 30
 CONTRAST_FACTOR = 1.5
 SHARPNESS_FACTOR = 1.5
-VERSION = "v0.2.0"
+VERSION = "v0.3.0"
 
 
 class QRCodeResult:
