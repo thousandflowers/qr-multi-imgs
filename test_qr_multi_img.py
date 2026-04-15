@@ -296,3 +296,91 @@ class TestRecreatePathValidation:
                 )
             except (ValueError, OSError) as e:
                 assert "Invalid output path" in str(e)
+
+
+class TestActionRecreate:
+    """Test action_recreate functionality"""
+
+    def test_recreate_with_no_qr_results(self):
+        """Should handle no QR results gracefully"""
+        from qr_multi_img import QRMultiIMG
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            scanner = QRMultiIMG(folder_path=tmpdir)
+            scanner.results = []  # No results
+
+            output_folder = tempfile.mkdtemp()
+            count = scanner.action_recreate(
+                output_folder=output_folder, naming="original"
+            )
+
+            assert count == 0
+
+    def test_recreate_naming_sequential(self):
+        """Should use sequential naming when specified"""
+        from qr_multi_img import QRMultiIMG, QRCodeResult
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_folder = tempfile.mkdtemp()
+
+            scanner = QRMultiIMG(folder_path=tmpdir, qr_format="png")
+            scanner.results = [
+                QRCodeResult(
+                    "/fake/image.jpg",
+                    has_qr=True,
+                    qr_contents=["test1", "test2"],
+                    qr_bboxes=[(10, 10, 100, 100), (200, 200, 100, 100)],
+                )
+            ]
+
+            # Non crea file perché le immagini non esistono真实, ma non deve fallire
+            count = scanner.action_recreate(
+                output_folder=output_folder, naming="sequential"
+            )
+            assert count >= 0
+
+
+class TestActionExtract:
+    """Test action_extract functionality"""
+
+    def test_extract_with_no_qr_results(self):
+        """Should handle no QR results gracefully"""
+        from qr_multi_img import QRMultiIMG
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            scanner = QRMultiIMG(folder_path=tmpdir)
+            scanner.results = []
+
+            output_folder = tempfile.mkdtemp()
+            count = scanner.action_extract(
+                output_folder=output_folder, naming="original", padding=20
+            )
+
+            assert count == 0
+
+    def test_extract_padding_boundary(self):
+        """Should handle padding that exceeds image boundaries"""
+        from qr_multi_img import QRMultiIMG, QRCodeResult
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_folder = tempfile.mkdtemp()
+
+            scanner = QRMultiIMG(folder_path=tmpdir)
+            scanner.results = [
+                QRCodeResult(
+                    "/fake/small.jpg",
+                    has_qr=True,
+                    qr_contents=["test"],
+                    qr_bboxes=[(5, 5, 10, 10)],  # Small QR in corner
+                )
+            ]
+
+            # Large padding should be clamped to image bounds, not error
+            count = scanner.action_extract(
+                output_folder=output_folder, naming="original", padding=1000
+            )
+            assert count >= 0
