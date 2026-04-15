@@ -680,6 +680,61 @@ class QRMultiIMG:
         )
         return with_qr
 
+    def action_filter(
+        self, pattern: str, case_sensitive: bool = False, exclude: bool = False
+    ) -> list:
+        """
+        Filter images by QR code content pattern.
+
+        Args:
+            pattern: String or regex pattern to match
+            case_sensitive: Whether to match case-sensitive
+            exclude: If True, show images that DON'T match the pattern
+
+        Returns:
+            List of matching QRCodeResult
+        """
+        import re
+
+        with_qr = self._get_with_qr()
+
+        if case_sensitive:
+            regex = re.compile(pattern)
+        else:
+            regex = re.compile(pattern, re.IGNORECASE)
+
+        matching = []
+        non_matching = []
+
+        for r in with_qr:
+            matched = any(regex.search(content) for content in r.qr_contents)
+            if matched:
+                matching.append(r)
+            else:
+                non_matching.append(r)
+
+        if exclude:
+            results = non_matching
+            print(f"\n--- Images NOT matching '{pattern}' ---")
+        else:
+            results = matching
+            print(f"\n--- Images matching '{pattern}' ---")
+
+        if results:
+            for r in results:
+                print(f"  {r.file_path}")
+                for content in r.qr_contents:
+                    match = regex.search(content)
+                    if match:
+                        highlight = f"  → {match.group()[:80]}"
+                        print(highlight)
+        else:
+            print("  No images match the filter.")
+
+        print(f"\nTotal: {len(results)} images")
+
+        return results
+
 
 def _validate_path(path: str, base_dir: str = None) -> tuple[bool, str]:
     """
@@ -773,6 +828,16 @@ def run_cli(args):
 
     elif args.action == "decode":
         scanner.action_decode(output_format=args.export_format)
+
+    elif args.action == "filter":
+        if not args.filter_pattern:
+            print("Error: --filter-pattern is required for filter action")
+            sys.exit(1)
+        scanner.action_filter(
+            pattern=args.filter_pattern,
+            case_sensitive=args.filter_case_sensitive,
+            exclude=args.filter_exclude,
+        )
 
 
 if TEXTUAL_AVAILABLE:
@@ -937,6 +1002,7 @@ def main():
             "recreate",
             "extract",
             "decode",
+            "filter",
         ],
         default="list",
         help="Action to perform",
@@ -946,6 +1012,17 @@ def main():
     )
     parser.add_argument("--formats", "-f", help="Image formats (comma-separated)")
     parser.add_argument("--output", "-o", help="Output folder path")
+    parser.add_argument(
+        "--filter-pattern", help="Pattern to filter QR codes (for filter action)"
+    )
+    parser.add_argument(
+        "--filter-case-sensitive", action="store_true", help="Case sensitive filter"
+    )
+    parser.add_argument(
+        "--filter-exclude",
+        action="store_true",
+        help="Exclude matching (show non-matching)",
+    )
     parser.add_argument(
         "--export-format",
         choices=["txt", "json", "csv"],
