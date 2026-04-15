@@ -45,17 +45,24 @@ class QRCodeResult:
         file_path: Path to the image file
         has_qr: True if at least one QR code was found
         qr_contents: List of decoded QR code strings
+        qr_bboxes: List of bounding boxes (x, y, width, height) for each QR
         error: Error message if processing failed
         file_size: Size in bytes
         timestamp: ISO format timestamp
     """
 
     def __init__(
-        self, file_path: str, has_qr: bool, qr_contents: list = None, error: str = None
+        self,
+        file_path: str,
+        has_qr: bool,
+        qr_contents: list = None,
+        qr_bboxes: list = None,
+        error: str = None,
     ):
         self.file_path = file_path
         self.has_qr = has_qr
         self.qr_contents = qr_contents or []
+        self.qr_bboxes = qr_bboxes or []
         self.error = error
         self.file_size = 0
         self.timestamp = datetime.now().isoformat()
@@ -68,6 +75,7 @@ class QRCodeResult:
             "file_path": self.file_path,
             "has_qr": self.has_qr,
             "qr_contents": self.qr_contents,
+            "qr_bboxes": self.qr_bboxes,
             "file_size": self.file_size,
             "timestamp": self.timestamp,
             "error": self.error,
@@ -156,18 +164,28 @@ class QRMultiIMG:
             image = image.convert("RGB")
         return image
 
-    def _detect_qr_method1(self, image: Image.Image) -> list:
+    def _detect_qr_method1(self, image: Image.Image) -> tuple[list, list]:
         decoded = pyzbar.decode(image)
-        return [d.data.decode("utf-8", errors="ignore") for d in decoded]
+        contents = [d.data.decode("utf-8", errors="ignore") for d in decoded]
+        bboxes = []
+        for d in decoded:
+            bbox = d.rect
+            bboxes.append((bbox.left, bbox.top, bbox.width, bbox.height))
+        return contents, bboxes
 
-    def _detect_qr_method2(self, image: Image.Image) -> list:
+    def _detect_qr_method2(self, image: Image.Image) -> tuple[list, list]:
         gray = image.convert("L")
         decoded = pyzbar.decode(gray)
-        return [d.data.decode("utf-8", errors="ignore") for d in decoded]
+        contents = [d.data.decode("utf-8", errors="ignore") for d in decoded]
+        bboxes = []
+        for d in decoded:
+            bbox = d.rect
+            bboxes.append((bbox.left, bbox.top, bbox.width, bbox.height))
+        return contents, bboxes
 
     def _detect_qr_method3(
         self, img: Image.Image, attempt: int = 0
-    ) -> tuple[list, str]:
+    ) -> tuple[list, list, str]:
         methods = []
 
         # Reuse the already opened image instead of reopening
@@ -184,14 +202,19 @@ class QRMultiIMG:
             pass
 
         if attempt >= len(methods):
-            return [], "all_methods_exhausted"
+            return [], [], "all_methods_exhausted"
 
         try:
             processed_img = methods[attempt](img)
             decoded = pyzbar.decode(processed_img)
-            return [d.data.decode("utf-8", errors="ignore") for d in decoded], None
+            contents = [d.data.decode("utf-8", errors="ignore") for d in decoded]
+            bboxes = []
+            for d in decoded:
+                bbox = d.rect
+                bboxes.append((bbox.left, bbox.top, bbox.width, bbox.height))
+            return contents, bboxes, None
         except Exception as e:
-            return [], str(e)
+            return [], [], str(e)
 
     def detect_qr(self, image_path: Path) -> QRCodeResult:
         import signal
@@ -199,6 +222,7 @@ class QRMultiIMG:
         import functools
 
         contents = []
+        bboxes = []
 
         # Check if signal is available (not on Windows)
         use_signal = self.timeout > 0 and platform.system() != "Windows"
@@ -214,14 +238,14 @@ class QRMultiIMG:
                 signal.alarm(self.timeout)
 
             img = Image.open(image_path)
-            contents = self._detect_qr_method1(img)
+            contents, bboxes = self._detect_qr_method1(img)
 
             if not contents:
-                contents = self._detect_qr_method2(img)
+                contents, bboxes = self._detect_qr_method2(img)
 
             if not contents:
                 for attempt in range(4):
-                    contents, error = self._detect_qr_method3(img, attempt)
+                    contents, bboxes, error = self._detect_qr_method3(img, attempt)
                     if contents:
                         break
                     if error == "all_methods_exhausted":
@@ -235,7 +259,10 @@ class QRMultiIMG:
             img.close()
 
             return QRCodeResult(
-                str(image_path), has_qr=len(contents) > 0, qr_contents=contents
+                str(image_path),
+                has_qr=len(contents) > 0,
+                qr_contents=contents,
+                qr_bboxes=bboxes,
             )
 
         except TimeoutError as e:
@@ -474,6 +501,74 @@ class QRMultiIMG:
         print(f"Created {qr_count} QR code images in {output_path}")
         return qr_count
 
+    def action_extract(
+        self, output_folder: str = None, naming: str = "original", padding: int = 20
+    ) -> int:
+        output_path = (
+            Path(output_folder) if output_folder else self.folder_path / "extracted_qr"
+        )
+        output_path.mkdir(parents=True, exist_ok=True)
+
+        with_qr = [r for r in self.results if r.has_qr]
+
+        if not with_qr:
+            print("No QR codes found to extract.")
+            return 0
+
+        print(
+            f"Extracting {sum(len(r.qr_contents) for r in with_qr)} QR code regions..."
+        )
+
+        qr_count = 0
+
+        for r in with_qr:
+            src_path = Path(r.file_path)
+            base_name = src_path.stem
+            src_ext = src_path.suffix
+
+            try:
+                src_img = Image.open(r.file_path)
+                img_width, img_height = src_img.size
+            except Exception as e:
+                if self.log_file:
+                    self._log(f"Error opening {r.file_path}: {e}")
+                continue
+
+            for i, (content, bbox) in enumerate(zip(r.qr_contents, r.qr_bboxes)):
+                x, y, w, h = bbox
+
+                x1 = max(0, x - padding)
+                y1 = max(0, y - padding)
+                x2 = min(img_width, x + w + padding)
+                y2 = min(img_height, y + h + padding)
+
+                cropped = src_img.crop((x1, y1, x2, y2))
+
+                if naming == "sequential":
+                    filename = f"qr_{qr_count:04d}{src_ext}"
+                elif naming == "content":
+                    safe_content = (
+                        content[:50].replace("/", "_").replace(":", "_")
+                        if content
+                        else "empty_qr"
+                    )
+                    filename = f"{safe_content}{src_ext}"
+                else:
+                    suffix = (
+                        f"_qr{i + 1}{src_ext}"
+                        if len(r.qr_contents) > 1
+                        else f"_qr{src_ext}"
+                    )
+                    filename = f"{base_name}{suffix}"
+
+                cropped.save(str(output_path / filename))
+                qr_count += 1
+
+            src_img.close()
+
+        print(f"Extracted {qr_count} QR code regions in {output_path}")
+        return qr_count
+
     def action_list(self) -> None:
         with_qr = [r for r in self.results if r.has_qr]
         without_qr = [r for r in self.results if not r.has_qr]
@@ -589,6 +684,11 @@ def run_cli(args):
     elif args.action == "recreate":
         scanner.action_recreate(output_folder=args.output, naming=args.naming)
 
+    elif args.action == "extract":
+        scanner.action_extract(
+            output_folder=args.output, naming=args.naming, padding=args.padding
+        )
+
 
 if TEXTUAL_AVAILABLE:
 
@@ -613,6 +713,7 @@ if TEXTUAL_AVAILABLE:
                 Button("Delete without QR", id="btn-delete"),
                 Button("Organize into folders", id="btn-organize"),
                 Button("Recreate QR codes", id="btn-recreate"),
+                Button("Extract QR regions", id="btn-extract"),
                 Static("", id="footer"),
                 Static("Press q or escape to quit", id="footer-text"),
             )
@@ -734,7 +835,7 @@ def main():
     parser.add_argument(
         "--action",
         "-a",
-        choices=["list", "export", "delete", "organize", "recreate"],
+        choices=["list", "export", "delete", "organize", "recreate", "extract"],
         default="list",
         help="Action to perform",
     )
@@ -779,6 +880,12 @@ def main():
     )
     parser.add_argument(
         "--timeout", "-t", type=int, default=30, help="Timeout per image in seconds"
+    )
+    parser.add_argument(
+        "--padding",
+        type=int,
+        default=20,
+        help="Padding around QR region for extract action",
     )
 
     args = parser.parse_args()
