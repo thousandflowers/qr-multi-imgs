@@ -507,6 +507,12 @@ class QRMultiIMG:
         output_path = (
             Path(output_folder) if output_folder else self.folder_path / "extracted_qr"
         )
+
+        if output_folder:
+            is_valid, error = _validate_path(output_folder)
+            if not is_valid:
+                raise ValueError(f"Invalid output path: {error}")
+
         output_path.mkdir(parents=True, exist_ok=True)
 
         with_qr = [r for r in self.results if r.has_qr]

@@ -175,3 +175,69 @@ class TestQRCodeEdgeCases:
 
         # Should have 3 QR codes
         assert len(result.qr_contents) == 3
+
+
+class TestExtractPathValidation:
+    """Test path validation for extract action"""
+
+    def test_extract_with_valid_output_folder(self):
+        """Should accept valid output folder in extract action"""
+        from qr_multi_img import QRMultiIMG, QRCodeResult
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Crea una cartella di output valida
+            output_folder = tempfile.mkdtemp()
+
+            scanner = QRMultiIMG(folder_path=tmpdir)
+            scanner.results = [
+                QRCodeResult(
+                    "/fake/image.jpg",
+                    has_qr=True,
+                    qr_contents=["test content"],
+                    qr_bboxes=[(10, 10, 100, 100)],
+                )
+            ]
+
+            # Questo dovrebbe funzionare senza errori
+            count = scanner.action_extract(
+                output_folder=output_folder, naming="original", padding=20
+            )
+
+            # Il risultato potrebbe essere 0 perché l'immagine non esiste, ma non deve sollevare errore di path
+            # Il test verifica che non ci sia un errore di validazione path
+            assert count >= 0  # Non deve sollevare ValidationError
+
+    def test_extract_with_malicious_output_path(self):
+        """Should reject malicious output path (path traversal) in extract action"""
+        from qr_multi_img import QRMultiIMG, QRCodeResult
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Simula percorso malevolo
+            malicious_output = os.path.join(tmpdir, "..", "..", "..", "etc")
+
+            scanner = QRMultiIMG(folder_path=tmpdir)
+            scanner.results = [
+                QRCodeResult(
+                    "/fake/image.jpg",
+                    has_qr=True,
+                    qr_contents=["test content"],
+                    qr_bboxes=[(10, 10, 100, 100)],
+                )
+            ]
+
+            # Dovrebbe sollevare errore di validazione
+            try:
+                scanner.action_extract(
+                    output_folder=malicious_output, naming="original", padding=20
+                )
+                # Se arriva qui senza errore, il bug esiste!
+                assert False, (
+                    "SECURITY BUG: Path traversal NOT blocked in extract action!"
+                )
+            except (ValueError, OSError) as e:
+                # Questo è il comportamento corretto
+                assert "outside" in str(e).lower() or "not exist" in str(e).lower(), (
+                    f"Wrong error: {e}"
+                )
