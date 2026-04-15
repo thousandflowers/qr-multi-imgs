@@ -239,9 +239,6 @@ class QRMultiIMG:
             return [], [], str(e)
 
     def detect_qr(self, image_path: Path) -> QRCodeResult:
-        import signal
-        import platform
-
         contents = []
         bboxes = []
 
