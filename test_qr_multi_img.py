@@ -241,3 +241,58 @@ class TestExtractPathValidation:
                 assert "outside" in str(e).lower() or "not exist" in str(e).lower(), (
                     f"Wrong error: {e}"
                 )
+
+
+class TestRecreatePathValidation:
+    """Test path validation for recreate action"""
+
+    def test_recreate_with_valid_output_folder(self):
+        """Should accept valid output folder in recreate action"""
+        from qr_multi_img import QRMultiIMG, QRCodeResult
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_folder = tempfile.mkdtemp()
+
+            scanner = QRMultiIMG(folder_path=tmpdir)
+            scanner.results = [
+                QRCodeResult(
+                    "/fake/image.jpg",
+                    has_qr=True,
+                    qr_contents=["test content"],
+                    qr_bboxes=[(10, 10, 100, 100)],
+                )
+            ]
+
+            count = scanner.action_recreate(
+                output_folder=output_folder, naming="original"
+            )
+            assert count >= 0
+
+    def test_recreate_with_malicious_output_path(self):
+        """Should reject malicious output path (path traversal) in recreate action"""
+        from qr_multi_img import QRMultiIMG, QRCodeResult
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            malicious_output = os.path.join(tmpdir, "..", "..", "..", "etc")
+
+            scanner = QRMultiIMG(folder_path=tmpdir)
+            scanner.results = [
+                QRCodeResult(
+                    "/fake/image.jpg",
+                    has_qr=True,
+                    qr_contents=["test content"],
+                    qr_bboxes=[(10, 10, 100, 100)],
+                )
+            ]
+
+            try:
+                scanner.action_recreate(
+                    output_folder=malicious_output, naming="original"
+                )
+                assert False, (
+                    "SECURITY BUG: Path traversal NOT blocked in recreate action!"
+                )
+            except (ValueError, OSError) as e:
+                assert "Invalid output path" in str(e)
