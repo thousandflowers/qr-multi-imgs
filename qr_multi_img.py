@@ -13,9 +13,25 @@ import csv
 import logging
 import argparse
 import signal
+import platform
 from pathlib import Path
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+if platform.system() == "Darwin":
+    import ctypes.util
+
+    possible_paths = [
+        "/opt/homebrew/lib",
+        "/usr/local/lib",
+        "/usr/lib",
+    ]
+    for lib_path in possible_paths:
+        if os.path.exists(lib_path):
+            if hasattr(os, "add_dll_directory"):
+                os.add_dll_directory(lib_path)
+            else:
+                os.environ.setdefault("DYLD_LIBRARY_PATH", lib_path)
 
 try:
     from textual.app import App, ComposeResult
