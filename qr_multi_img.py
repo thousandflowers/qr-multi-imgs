@@ -735,6 +735,75 @@ class QRMultiIMG:
 
         return results
 
+    def action_batch_rename(
+        self, prefix: str = "", suffix: str = "", dry_run: bool = True
+    ) -> dict:
+        """
+        Rename images based on QR code content.
+
+        Args:
+            prefix: Prefix to add to filename
+            suffix: Suffix to add to filename (before extension)
+            dry_run: If True, only show what would be renamed
+
+        Returns:
+            Dict with renamed count and list of changes
+        """
+        import re
+
+        with_qr = self._get_with_qr()
+
+        if not with_qr:
+            print("No QR codes found for renaming.")
+            return {"renamed": 0, "errors": 0, "changes": []}
+
+        safe_pattern = re.compile(r"[^\w\-]")
+
+        changes = []
+        errors = 0
+
+        print(f"\n--- Batch Rename {'(DRY RUN)' if dry_run else ''} ---")
+
+        for r in with_qr:
+            src = Path(r.file_path)
+            content = r.qr_contents[0] if r.qr_contents else "unknown"
+
+            safe_name = safe_pattern.sub("_", content[:50])
+
+            if prefix:
+                safe_name = prefix + safe_name
+            if suffix:
+                safe_name = safe_name + suffix
+
+            new_name = f"{safe_name}{src.suffix}"
+            dst = src.parent / new_name
+
+            if src.exists():
+                if dry_run:
+                    print(f"  {src.name} → {new_name}")
+                else:
+                    try:
+                        src.rename(dst)
+                        print(f"  Renamed: {src.name} → {new_name}")
+                    except Exception as e:
+                        print(f"  Error renaming {src.name}: {e}")
+                        errors += 1
+                        continue
+
+                changes.append({"from": str(src), "to": str(dst)})
+            else:
+                print(f"  File not found: {src}")
+                errors += 1
+
+        print(
+            f"\nTotal: {len(changes)} files would be renamed{'' if dry_run else ' (applied)'}"
+        )
+
+        if dry_run:
+            print("\nNote: This was a dry run. Use --confirm to actually rename.")
+
+        return {"renamed": len(changes), "errors": errors, "changes": changes}
+
 
 def _validate_path(path: str, base_dir: str = None) -> tuple[bool, str]:
     """
@@ -838,6 +907,15 @@ def run_cli(args):
             case_sensitive=args.filter_case_sensitive,
             exclude=args.filter_exclude,
         )
+
+    elif args.action == "batch-rename":
+        result = scanner.action_batch_rename(
+            prefix=args.rename_prefix or "",
+            suffix=args.rename_suffix or "",
+            dry_run=not args.confirm,
+        )
+        if not args.confirm:
+            print("\nNo files were renamed (dry run). Use --confirm to apply changes.")
 
 
 if TEXTUAL_AVAILABLE:
@@ -1003,6 +1081,7 @@ def main():
             "extract",
             "decode",
             "filter",
+            "batch-rename",
         ],
         default="list",
         help="Action to perform",
@@ -1012,6 +1091,8 @@ def main():
     )
     parser.add_argument("--formats", "-f", help="Image formats (comma-separated)")
     parser.add_argument("--output", "-o", help="Output folder path")
+    parser.add_argument("--rename-prefix", help="Prefix for batch-rename action")
+    parser.add_argument("--rename-suffix", help="Suffix for batch-rename action")
     parser.add_argument(
         "--filter-pattern", help="Pattern to filter QR codes (for filter action)"
     )
