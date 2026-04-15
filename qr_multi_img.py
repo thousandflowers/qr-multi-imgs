@@ -778,7 +778,8 @@ class QRMultiIMG:
             new_name = f"{safe_name}{src.suffix}"
             dst = src.parent / new_name
 
-            if src.exists():
+            # Use os.path.exists for faster file existence check
+            if os.path.exists(src):
                 if dry_run:
                     print(f"  {src.name} → {new_name}")
                 else:
@@ -800,7 +801,7 @@ class QRMultiIMG:
         )
 
         if dry_run:
-            print("\nNote: This was a dry run. Use --confirm to actually rename.")
+            print("\nNote: This was a dry run. Use --confirm to apply changes.")
 
         return {"renamed": len(changes), "errors": errors, "changes": changes}
 
