@@ -840,6 +840,22 @@ class QRMultiIMG:
         print(f"Recreated: {recreated_folder}")
         print()
 
+        # Pre-scan all original images once (O(n) instead of O(n*m))
+        original_qr_contents = {}
+        for original_img in originals_path.glob("*"):
+            if original_img.suffix.lower() not in SUPPORTED_FORMATS:
+                continue
+            try:
+                orig_decoded = pyzbar.decode(Image.open(original_img))
+                if orig_decoded:
+                    content = orig_decoded[0].data.decode("utf-8")
+                    original_qr_contents[content] = str(original_img)
+            except Exception:
+                continue
+
+        print(f"Pre-scanned {len(original_qr_contents)} original images")
+
+        # Now verify each recreated QR against pre-scanned originals (O(m))
         recreated_files = list(recreated_path.glob("*"))
 
         for recreated_file in recreated_files:
@@ -855,24 +871,10 @@ class QRMultiIMG:
 
                 recreated_content = decoded[0].data.decode("utf-8")
 
-                original_matched = False
-                for original_img in originals_path.glob("*"):
-                    if original_img.suffix.lower() not in SUPPORTED_FORMATS:
-                        continue
-
-                    try:
-                        orig_decoded = pyzbar.decode(Image.open(original_img))
-                        if orig_decoded:
-                            original_content = orig_decoded[0].data.decode("utf-8")
-                            if original_content == recreated_content:
-                                print(f"  ✅ {recreated_file.name}: MATCH")
-                                matched += 1
-                                original_matched = True
-                                break
-                    except Exception:
-                        continue
-
-                if not original_matched:
+                if recreated_content in original_qr_contents:
+                    print(f"  ✅ {recreated_file.name}: MATCH")
+                    matched += 1
+                else:
                     print(f"  ❌ {recreated_file.name}: MISMATCH")
                     print(f"     Content: {recreated_content[:50]}...")
                     mismatched += 1
