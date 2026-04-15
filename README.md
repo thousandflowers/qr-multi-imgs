@@ -136,6 +136,11 @@ python3 qr_multi_img.py --nomenu --path /path/to/images --action recreate --qr-f
 | `--log` | | Save log to file | `false` |
 | `--nomenu` | | Skip interactive menu | `false` |
 | `--naming` | | File naming (original/content/sequential) | `original` |
+| `--filter-pattern` | | Pattern for filter action | - |
+| `--filter-case-sensitive` | | Case sensitive filter | `false` |
+| `--filter-exclude` | | Exclude matching for filter | `false` |
+| `--rename-prefix` | | Prefix for batch-rename | - |
+| `--rename-suffix` | | Suffix for batch-rename | - |
 
 ## Actions
 
@@ -190,6 +195,56 @@ Options:
 - `--padding` - Safe area around QR code (default: 20px)
 - `--naming` - File naming: original/content/sequential
 - `--output` - Output folder path
+
+### 7. decode
+Decodes QR codes and displays content without creating any files.
+
+```bash
+qr-multi-img --path /images --action decode
+qr-multi-img --path /images --action decode --export-format json
+```
+
+Options:
+- `--export-format` - Output format: txt (default) or json
+
+### 8. filter
+Filters images by QR code content pattern (supports regex).
+
+```bash
+qr-multi-img --path /images --action filter --filter-pattern "mcdonalds"
+qr-multi-img --path /images --action filter --filter-pattern "https?://.*\.it" --filter-case-sensitive
+qr-multi-img --path /images --action filter --filter-pattern "http" --filter-exclude
+```
+
+Options:
+- `--filter-pattern` - Pattern to match (required)
+- `--filter-case-sensitive` - Enable case-sensitive matching
+- `--filter-exclude` - Show images that DON'T match the pattern
+
+### 9. batch-rename
+Renames images based on their QR code content.
+
+```bash
+qr-multi-img --path /images --action batch-rename
+qr-multi-img --path /images --action batch-rename --rename-prefix "qr_"
+qr-multi-img --path /images --action batch-rename --rename-suffix "_code"
+qr-multi-img --path /images --action batch-rename --confirm
+```
+
+Options:
+- `--rename-prefix` - Prefix to add to filename
+- `--rename-suffix` - Suffix to add to filename
+- `--confirm` - Actually apply rename (default is dry-run)
+
+### 10. verify
+Verifies that recreated QR codes match the original content.
+
+```bash
+qr-multi-img --path /images --action verify --output ./recreated_qr
+```
+
+Options:
+- `--output` - Folder containing recreated QR codes (required)
 
 ## Supported Image Formats
 
