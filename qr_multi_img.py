@@ -314,8 +314,8 @@ class QRMultiIMG:
         if not output_path:
             output_path = f"qr_results.{format}"
 
-        with_qr = [r for r in self.results if r.has_qr]
-        without_qr = [r for r in self.results if not r.has_qr]
+        with_qr = self._get_with_qr()
+        without_qr = self._get_without_qr()
 
         os.makedirs(
             os.path.dirname(output_path) if os.path.dirname(output_path) else ".",
@@ -378,6 +378,11 @@ class QRMultiIMG:
         return output_path
 
     def action_delete(self, output_folder: str = None, confirm: bool = False) -> int:
+        if output_folder:
+            is_valid, error = _validate_path(output_folder)
+            if not is_valid:
+                raise ValueError(f"Invalid output path: {error}")
+
         without_qr = self._get_without_qr()
 
         if not confirm:
@@ -402,6 +407,11 @@ class QRMultiIMG:
     def action_organize(
         self, output_folder: str = None, move: bool = False, confirm: bool = False
     ) -> dict:
+        if output_folder:
+            is_valid, error = _validate_path(output_folder)
+            if not is_valid:
+                raise ValueError(f"Invalid output path: {error}")
+
         base_path = Path(output_folder) if output_folder else self.folder_path
 
         with_qr_folder = base_path / "with_qr"
@@ -589,8 +599,8 @@ class QRMultiIMG:
         return qr_count
 
     def action_list(self) -> None:
-        with_qr = [r for r in self.results if r.has_qr]
-        without_qr = [r for r in self.results if not r.has_qr]
+        with_qr = self._get_with_qr()
+        without_qr = self._get_without_qr()
 
         print(f"\n{'=' * 50}")
         print(f"QR Multi IMG - Scan Results")
