@@ -6,11 +6,12 @@
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Python](https://img.shields.io/badge/python-3.12+-blue)
 
-**QR Multi IMG** is a powerful tool that scans folders of images, detects QR codes, extracts their content, and offers multiple actions like listing, exporting, organizing, and recreating QR code images.
+**QR Multi IMG** is a powerful tool that scans folders of images, detects QR codes, extracts their content, and offers multiple actions like listing, exporting, organizing, recreating, and extracting QR code regions from original images.
 
 ## Features
 
-- **5 Actions**: list, export, delete, organize, recreate
+- **6 Actions**: list, export, delete, organize, recreate, extract
+- **Extract QR Regions**: Crop actual QR code regions from images with padding
 - **Interactive TUI**: Menu-based interface (default)
 - **CLI Mode**: Use `--nomenu` for command-line only
 - **Recursive Scanning**: Scan subfolders with `-r` flag
@@ -19,6 +20,7 @@
 - **UTF-8 Encoding**: Supports special characters and emoji
 - **Custom Formats**: Support for txt, json, csv export
 - **Case-Insensitive**: Works with .JPG, .jpg, .Png, etc.
+- **Path Validation**: Security against path traversal attacks
 
 ## Installation
 
@@ -168,6 +170,20 @@ qr-multi-img --path /images --action recreate --qr-format png
 qr-multi-img --path /images --action recreate --qr-format svg --naming content
 ```
 
+### 6. extract
+Extracts QR code regions from original images with padding.
+
+```bash
+qr-multi-img --path /images --action extract
+qr-multi-img --path /images --action extract --padding 30 --output ./extracted
+qr-multi-img --path /images --action extract --naming sequential
+```
+
+Options:
+- `--padding` - Safe area around QR code (default: 20px)
+- `--naming` - File naming: original/content/sequential
+- `--output` - Output folder path
+
 ## Supported Image Formats
 
 - JPG / JPEG
@@ -253,7 +269,7 @@ For very large images, a timeout of 30 seconds per image is applied. Use `--prog
 ## Version History
 
 - **v0.1.0** (beta) - Initial release
-  - 5 actions (list, export, delete, organize, recreate)
+  - 6 actions (list, export, delete, organize, recreate, extract)
   - Interactive TUI menu
   - Multiple retry methods for difficult QR codes
   - Homebrew tap support
