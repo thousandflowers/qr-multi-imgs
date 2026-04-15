@@ -759,6 +759,10 @@ if TEXTUAL_AVAILABLE:
                     placeholder="Naming (original/content/sequential)",
                     id="naming-input",
                 ),
+                Input(
+                    placeholder="Padding for extract (default: 20)",
+                    id="padding-input",
+                ),
                 Button("Run", id="btn-run", variant="success"),
                 Button("Back", id="btn-back"),
                 id="action-container",
@@ -779,9 +783,11 @@ if TEXTUAL_AVAILABLE:
         def run_action(self):
             folder_input = self.query_one("#folder-input", Input)
             naming_input = self.query_one("#naming-input", Input)
+            padding_input = self.query_one("#padding-input", Input)
 
             self.folder_path = folder_input.value or ""
             self.naming = naming_input.value or "original"
+            self.padding = int(padding_input.value) if padding_input.value else 20
 
             if not self.folder_path:
                 self._show_error("Please enter a folder path")
@@ -806,6 +812,7 @@ if TEXTUAL_AVAILABLE:
                 log=False,
                 naming=self.naming,
                 timeout=30,
+                padding=self.padding,
             )
 
             try:
