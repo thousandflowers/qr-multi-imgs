@@ -4,7 +4,7 @@
 # =============================================================================
 """
 QR Multi IMGS - QR Code Scanner for Images
-Version: v0.3.2
+Version: v0.3.3
 Author: QR Multi IMGS Team
 License: MIT
 """
@@ -59,7 +59,7 @@ DEFAULT_TIMEOUT = 30
 DEFAULT_DEEP_TIMEOUT = 60
 CONTRAST_FACTOR = 1.5
 SHARPNESS_FACTOR = 1.5
-VERSION = "v0.3.2"
+VERSION = "v0.3.3"
 
 
 # Backward compatibility alias - placed after class definition

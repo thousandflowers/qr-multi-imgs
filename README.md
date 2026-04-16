@@ -2,7 +2,7 @@
 
 > QR Code Scanner for Images - Scan a folder of images and detect QR codes
 
-![Version](https://img.shields.io/badge/version-v0.3.2-blue)
+![Version](https://img.shields.io/badge/version-v0.3.3-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Python](https://img.shields.io/badge/python-3.12+-blue)
 
