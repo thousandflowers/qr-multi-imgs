@@ -3,8 +3,8 @@ require "language/python"
 class QrMultiImgs < Formula
   desc "QR Code Scanner for Images - Scan folders of images to detect QR codes"
   homepage "https://github.com/thousandflowers/qr-multi-imgs"
-  url "https://github.com/thousandflowers/qr-multi-imgs/archive/refs/tags/v0.3.4.tar.gz"
-  version "0.3.4"
+  url "https://github.com/thousandflowers/qr-multi-imgs/archive/refs/tags/v0.4.0.tar.gz"
+  version "0.4.0"
   license "MIT"
 
   depends_on "zbar"
