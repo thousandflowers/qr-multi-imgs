@@ -27,12 +27,7 @@
 
 ### Recommended: Homebrew
 
-#### Option 1: From official tap (once published)
-```bash
-brew install thousandflowers/qr-multi-imgs/qr-multi-imgs
-```
-
-#### Option 2: From local tap (for development/testing)
+#### Install from local formula
 ```bash
 cd /path/to/qr-multi-imgs
 brew install ./Formula/qr-multi-imgs.rb
@@ -280,16 +275,18 @@ qr-multi-imgs --path /images --action export --export-format json --progress
 qr-multi-imgs --path /photos --action recreate --qr-format png --naming sequential
 ```
 
-## Homebrew Tap Installation
+## Homebrew Installation
 
 ### Install
 ```bash
-brew install thousandflowers/qr-multi-imgs/qr-multi-imgs
+cd /path/to/qr-multi-imgs
+brew install ./Formula/qr-multi-imgs.rb
 ```
 
 ### Update
 ```bash
-brew upgrade qr-multi-imgs
+cd /path/to/qr-multi-imgs
+brew reinstall ./Formula/qr-multi-imgs.rb
 ```
 
 ### Uninstall
@@ -297,7 +294,7 @@ brew upgrade qr-multi-imgs
 brew uninstall qr-multi-imgs
 ```
 
-### Tap Details
+### Formula Location
 - Repository: https://github.com/thousandflowers/qr-multi-imgs
 - Formula: `Formula/qr-multi-imgs.rb`
 
