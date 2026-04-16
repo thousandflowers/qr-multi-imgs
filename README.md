@@ -331,6 +331,10 @@ For very large images, a timeout of 30 seconds per image is applied. Use `--prog
 
 ## Version History
 
+- **v0.3.2** - Homebrew formula fix
+  - Fixed Ruby syntax error in chmod statement (chmod +x -> chmod "+x")
+  - Updated Homebrew formula for proper installation
+
 - **v0.3.0** - New features and performance improvements
   - Added 4 new actions: decode, filter, batch-rename, verify
   - Added test coverage for new actions
