@@ -111,6 +111,11 @@ class QRMultiIMG:
     Scans a folder of images and detects QR codes using pyzbar.
     Supports multiple detection methods for difficult images.
 
+    NOTE: This class violates Single Responsibility Principle (SRP) by handling
+    multiple concerns: QR detection, 10 action operations, and export logic.
+    This is a known design debt (DES-001) but refactoring would risk breaking
+    the stable API. Consider extracting action handlers in a future version.
+
     Attributes:
         folder_path: Path to folder to scan
         recursive: Whether to scan subfolders
