@@ -2,16 +2,17 @@
 
 > QR Code Scanner for Images - Scan a folder of images and detect QR codes
 
-![Version](https://img.shields.io/badge/version-v0.5.0-blue)
+![Version](https://img.shields.io/badge/version-v0.6.0--Enhanced-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Python](https://img.shields.io/badge/python-3.12+-blue)
 
-**QR Multi IMGSS** is a powerful tool that scans folders of images, detects QR codes, extracts their content, and offers multiple actions like listing, exporting, organizing, recreating, and extracting QR code regions from original images.
+**QR Multi IMGS** is a powerful tool that scans folders of images, detects QR codes, extracts their content, and offers multiple actions like listing, exporting, organizing, recreating, and extracting QR code regions from original images.
 
 ## Features
 
 - **10 Actions**: list, export, delete, organize, recreate, extract, decode, filter, batch-rename, verify
-- **Deep Scan**: Advanced QR detection for difficult/blurry images with `--deep-scan` flag
+- **Enhanced Detection**: 8 methods for difficult/blurry/miscut QR codes
+- **Auto-Escalation**: Automatic retry with stronger methods for failed images
 - **Extract QR Regions**: Crop actual QR code regions from images with padding
 - **Interactive TUI**: Menu-based interface (default)
 - **CLI Mode**: Use `--nomenu` for command-line only
@@ -22,6 +23,8 @@
 - **Custom Formats**: Support for txt, json, csv export
 - **Case-Insensitive**: Works with .JPG, .jpg, .Png, etc.
 - **Path Validation**: Security against path traversal attacks
+- **Thread-Safe**: Parallel processing with proper synchronization
+- **Memory Safe**: Proper image resource management
 
 ## Installation
 
@@ -143,6 +146,44 @@ python3 qr_multi_imgs.py --nomenu --path /path/to/images --action recreate --qr-
 | `--filter-exclude` | | Exclude matching for filter | `false` |
 | `--rename-prefix` | | Prefix for batch-rename | - |
 | `--rename-suffix` | | Suffix for batch-rename | - |
+| `--deep-scan` | | Enable enhanced QR detection | `true` (default) |
+| `--deep-timeout` | | Timeout per image in deep scan (seconds) | `120` |
+| `--verbose` | `-v` | Show detailed progress and errors | `false` |
+| `--force-deep` | | Use maximum detection methods (slower) | `false` |
+| `--timeout` | `-t` | Timeout per image (seconds) | `60` |
+
+## Enhanced Detection
+
+The enhanced version includes 8 detection methods:
+
+| Method | Purpose | Best For |
+|--------|---------|---------|
+| Method 1-3 | Standard + preprocessing | Normal QR codes |
+| Method 4 (Sharpening) | OpenCV sharpening kernels | Blurry QR codes |
+| Method 5 (Deblur) | Wiener + bilateral filter | Very blurry QR |
+| Method 6 (Rotation) | 90°, 180°, 270° + flips | Mis-rotated QR |
+| Method 7 (Multi-scale) | 0.5x to 3x resize | Different sizes |
+| Method 8 (QReader) | ML-based detection | Hard-to-read QR |
+
+### Detection Flow
+
+1. **Phase 1** (always): Standard methods (1-3)
+2. **Phase 2** (if deep_scan): Sharpening + Deblur
+3. **Phase 3** (if force_deep): Rotation + Multi-scale
+4. **Full** (fallback): All methods combined
+
+### Examples
+
+```bash
+# Standard scan with verbose output
+python3 qr_multi_imgs.py -p /path/to/images --action list --verbose
+
+# Maximum detection (try everything)
+python3 qr_multi_imgs.py -p /path/to/images --action list --force-deep
+
+# Maximum + verbose
+python3 qr_multi_imgs.py -p /path/to/images --action list --progress --verbose --force-deep
+```
 
 ## Actions
 
@@ -337,6 +378,16 @@ qr-multi-imgs --path /images --action list --parallel --progress
 For very large images, a timeout of 30 seconds per image is applied. Use `--progress` to see progress.
 
 ## Version History
+
+- **v0.6.0** - Enhanced Detection
+  - Added 8 detection methods (standard → multi-scale)
+  - Sharpening/deblur for blurry QR codes
+  - Rotation detection for mis-rotated QR
+  - Multi-scale analysis (0.5x to 3x)
+  - Auto-retry failed images
+  - Thread-safe parallel processing
+  - Memory leak fixes
+  - Extended CLI options (--verbose, --force-deep)
 
 - **v0.5.0** - Code refactoring
   - Separated TUI screens into separate file `tui_screens.py`
