@@ -31,6 +31,7 @@ import re
 from pathlib import Path
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from threading import Lock
 
 if platform.system() == "Darwin":
     import ctypes.util
@@ -184,6 +185,7 @@ class QRMultiIMGS:
         self._scan_count = 0
         self._total_count = 0
         self._failed_images = []
+        self._results_lock = Lock()
 
         if log_file:
             self._setup_logger()
@@ -732,7 +734,8 @@ class QRMultiIMGS:
                     self._scan_count = completed_count
                     img_path = futures[future]
                     result = future.result()
-                    self.results.append(result)
+                    with self._results_lock:
+                        self.results.append(result)
 
                     if progress:
                         status = "✓" if result.has_qr else "✗"
@@ -741,7 +744,8 @@ class QRMultiIMGS:
                         )
 
                     if not result.has_qr and not result.error:
-                        self._failed_images.append(result)
+                        with self._results_lock:
+                            self._failed_images.append(result)
         else:
             for i, img in enumerate(images):
                 self._scan_count = i + 1
