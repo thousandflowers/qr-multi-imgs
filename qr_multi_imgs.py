@@ -1,12 +1,22 @@
 #!/usr/bin/env python3
 # =============================================================================
 # QR MULTI IMGS - QR Code Scanner for Images
+# IMPROVED VERSION - Enhanced detection for blurry, miscut, difficult QR codes
 # =============================================================================
 """
 QR Multi IMGS - QR Code Scanner for Images
-Version: v0.5.0
+Version: v0.6.0-Enhanced
 Author: QR Multi IMGS Team
 License: MIT
+
+Enhanced Detection:
+- Extended preprocessing (10+ methods)
+- Sharpening for blurry QR codes
+- Deblur for very blurry QR codes
+- Rotation detection for mis-rotated QR codes
+- Multi-scale detection for different sizes
+- Auto-escalation for failed images
+- Verbose error reporting
 """
 
 import os
@@ -55,14 +65,13 @@ import pyzbar.pyzbar as pyzbar
 SUPPORTED_FORMATS = {".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp", ".tiff", ".tif"}
 DEFAULT_QR_FORMAT = "png"
 DEFAULT_PADDING = 20
-DEFAULT_TIMEOUT = 30
-DEFAULT_DEEP_TIMEOUT = 60
+
+DEFAULT_TIMEOUT = 60
+DEFAULT_DEEP_TIMEOUT = 120
+
 CONTRAST_FACTOR = 1.5
 SHARPNESS_FACTOR = 1.5
-VERSION = "v0.5.0"
-
-
-# Backward compatibility alias - placed after class definition
+VERSION = "v0.6.0-Enhanced"
 
 
 class QRCodeResult:
@@ -77,6 +86,9 @@ class QRCodeResult:
         error: Error message if processing failed
         file_size: Size in bytes
         timestamp: ISO format timestamp
+        attempts_made: List of detection methods tried
+        methods_failed: List of methods that failed
+        detection_method: The method that successfully detected the QR
     """
 
     def __init__(
@@ -94,6 +106,9 @@ class QRCodeResult:
         self.error = error
         self.file_size = 0
         self.timestamp = datetime.now().isoformat()
+        self.attempts_made = []
+        self.methods_failed = []
+        self.detection_method = None
 
         if os.path.exists(file_path):
             self.file_size = os.path.getsize(file_path)
@@ -107,20 +122,23 @@ class QRCodeResult:
             "file_size": self.file_size,
             "timestamp": self.timestamp,
             "error": self.error,
+            "attempts_made": self.attempts_made,
+            "detection_method": self.detection_method,
         }
 
 
 class QRMultiIMGS:
     """
-    QR Code Scanner for Images.
+    QR Code Scanner for Images - Enhanced Version.
 
     Scans a folder of images and detects QR codes using pyzbar.
-    Supports multiple detection methods for difficult images.
+    Supports multiple detection methods for difficult/blurry/miscut QR codes.
 
-    NOTE: This class violates Single Responsibility Principle (SRP) by handling
-    multiple concerns: QR detection, 10 action operations, and export logic.
-    This is a known design debt (DES-001) but refactoring would risk breaking
-    the stable API. Consider extracting action handlers in a future version.
+    Enhanced Detection Phases:
+    - Phase 1: Standard methods (1-3)
+    - Phase 2: Sharpening + Deblur (4-5)
+    - Phase 3: Rotation + Multi-scale (6-7)
+    - Phase 4: Full aggressive (all methods combined)
 
     Attributes:
         folder_path: Path to folder to scan
@@ -130,6 +148,9 @@ class QRMultiIMGS:
         log_file: Enable logging to file
         qr_format: Output format for recreated QR codes
         timeout: Seconds per image before timeout (0=disabled)
+        deep_scan: Enable enhanced detection
+        verbose: Show detailed progress and errors
+        force_deep: Use maximum detection methods
         results: List of QRCodeResult objects
     """
 
@@ -142,8 +163,10 @@ class QRMultiIMGS:
         log_file: bool = False,
         qr_format: str = "png",
         timeout: int = DEFAULT_TIMEOUT,
-        deep_scan: bool = False,
+        deep_scan: bool = True,
         deep_timeout: int = DEFAULT_DEEP_TIMEOUT,
+        verbose: bool = False,
+        force_deep: bool = False,
     ):
         self.folder_path = Path(folder_path)
         self.recursive = recursive
@@ -154,10 +177,13 @@ class QRMultiIMGS:
         self.timeout = timeout
         self.deep_scan = deep_scan
         self.deep_timeout = deep_timeout
+        self.verbose = verbose
+        self.force_deep = force_deep
         self.results: list[QRCodeResult] = []
         self.logger = None
         self._scan_count = 0
         self._total_count = 0
+        self._failed_images = []
 
         if log_file:
             self._setup_logger()
@@ -167,20 +193,26 @@ class QRMultiIMGS:
             filename="qr_scanner.log",
             level=logging.INFO,
             format="%(asctime)s - %(levelname)s - %(message)s",
-            filemode="a",  # Append mode
+            filemode="a",
         )
         self.logger = logging.getLogger(__name__)
 
     def _log(self, message: str):
         if self.logger:
             self.logger.info(message)
-        print(message)
+        if self.verbose:
+            print(f"[LOG] {message}")
+        else:
+            print(message)
 
     def _get_with_qr(self) -> list:
         return [r for r in self.results if r.has_qr]
 
     def _get_without_qr(self) -> list:
         return [r for r in self.results if not r.has_qr and not r.error]
+
+    def _get_failed(self) -> list:
+        return [r for r in self.results if r.error is not None]
 
     def _get_total_qr_count(self, with_qr_list: list = None) -> int:
         if with_qr_list is None:
@@ -219,18 +251,25 @@ class QRMultiIMGS:
         ]
         return contents, bboxes
 
+    # =========================================================================
+    # DETECTION METHODS
+    # =========================================================================
+
     def _detect_qr_method1(self, image: Image.Image) -> tuple[list, list]:
+        """Method 1: Standard direct decode."""
         decoded = pyzbar.decode(image)
         return self._extract_qr_data(decoded)
 
     def _detect_qr_method2(self, image: Image.Image) -> tuple[list, list]:
+        """Method 2: Grayscale conversion."""
         gray = image.convert("L")
         decoded = pyzbar.decode(gray)
         return self._extract_qr_data(decoded)
 
-    def _detect_qr_method3(
+    def _detect_qr_method3_extended(
         self, img: Image.Image, attempt: int = 0
     ) -> tuple[list, list, str]:
+        """Method 3: Extended preprocessing - 10+ variations for general difficult QR."""
         methods = []
 
         methods.append(lambda i: i)
@@ -241,6 +280,36 @@ class QRMultiIMGS:
             methods.append(
                 lambda i: i.resize((i.width * 2, i.height * 2), Image.LANCZOS)
             )
+        except Exception:
+            pass
+
+        try:
+            methods.append(
+                lambda i: i.resize((i.width * 2, i.height * 2), Image.BICUBIC)
+            )
+        except Exception:
+            pass
+
+        try:
+            methods.append(
+                lambda i: i.resize((i.width * 3, i.height * 3), Image.BICUBIC)
+            )
+        except Exception:
+            pass
+
+        methods.append(lambda i: i.convert("L"))
+        methods.append(lambda i: self._preprocess_image(i.convert("L")))
+
+        methods.append(
+            lambda i: i.filter(
+                ImageFilter.UnsharpMask(radius=2, percent=150, threshold=3)
+            )
+        )
+        methods.append(lambda i: i.filter(ImageFilter.MedianFilter(size=3)))
+
+        try:
+            methods.append(lambda i: i.filter(ImageFilter.MinFilter(3)))
+            methods.append(lambda i: i.filter(ImageFilter.MaxFilter(3)))
         except Exception:
             pass
 
@@ -255,8 +324,192 @@ class QRMultiIMGS:
         except Exception as e:
             return [], [], str(e)
 
-    def _detect_qr_method4_qreader(self, image: Image.Image) -> tuple[list, list]:
-        """Method 4: Use QReader for difficult QR codes (requires qreader package)."""
+    def _detect_qr_method4_sharpen(self, image: Image.Image) -> tuple[list, list]:
+        """Method 4: Sharpening for blurry QR codes using OpenCV."""
+        try:
+            import cv2
+            import numpy as np
+
+            img_array = np.array(image.convert("RGB"))
+            results = []
+
+            # Sharpening kernels
+            kernels = [
+                np.array([[-1, -1, -1], [-1, 9, -1], [-1, -1, -1]]),
+                np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]]),
+                np.array([[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]]) / -1,
+            ]
+
+            for kernel in kernels:
+                try:
+                    blurred = cv2.filter2D(img_array, -1, kernel)
+                    result_img = Image.fromarray(blurred)
+                    try:
+                        decoded = pyzbar.decode(result_img)
+                        if decoded:
+                            contents, bboxes = self._extract_qr_data(decoded)
+                            if contents:
+                                return contents, bboxes
+                    finally:
+                        result_img.close()
+                except Exception:
+                    continue
+
+            for percent in [200, 250, 300]:
+                try:
+                    blurred = cv2.GaussianBlur(img_array, (0, 0), percent / 100)
+                    sharpened = cv2.addWeighted(img_array, 1.5, blurred, -0.5, 0)
+                    result_img = Image.fromarray(sharpened)
+                    try:
+                        decoded = pyzbar.decode(result_img)
+                        if decoded:
+                            contents, bboxes = self._extract_qr_data(decoded)
+                            if contents:
+                                return contents, bboxes
+                    finally:
+                        result_img.close()
+                except Exception:
+                    continue
+
+            return [], []
+        except ImportError:
+            return [], []
+        except Exception:
+            return [], []
+        return [], []
+
+    def _detect_qr_method5_deblur(self, image: Image.Image) -> tuple[list, list]:
+        """Method 5: Deblur for very blurry QR codes using OpenCV."""
+        try:
+            import cv2
+            import numpy as np
+
+            img_array = np.array(image.convert("RGB"))
+            gray = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
+
+            for kernel_size in [3, 5, 7]:
+                for sigma in [1, 2, 3]:
+                    try:
+                        blurred = cv2.GaussianBlur(
+                            gray, (kernel_size, kernel_size), sigma
+                        )
+                        sharpened = cv2.addWeighted(gray, 1.5, blurred, -0.5, 0)
+                        result_img = Image.fromarray(sharpened)
+                        try:
+                            decoded = pyzbar.decode(result_img)
+                            if decoded:
+                                contents, bboxes = self._extract_qr_data(decoded)
+                                if contents:
+                                    return contents, bboxes
+                        finally:
+                            result_img.close()
+                    except Exception:
+                        continue
+
+            try:
+                deblurred = cv2.equalizeHist(gray)
+                result_img = Image.fromarray(deblurred)
+                try:
+                    decoded = pyzbar.decode(result_img)
+                    if decoded:
+                        contents, bboxes = self._extract_qr_data(decoded)
+                        if contents:
+                            return contents, bboxes
+                finally:
+                    result_img.close()
+            except Exception:
+                pass
+
+            try:
+                bilateral = cv2.bilateralFilter(gray, 9, 75, 75)
+                result_img = Image.fromarray(bilateral)
+                enhancer = ImageEnhance.Sharpness(result_img)
+                try:
+                    enhanced = enhancer.enhance(2.0)
+                    decoded = pyzbar.decode(enhanced)
+                    if decoded:
+                        contents, bboxes = self._extract_qr_data(decoded)
+                        if contents:
+                            return contents, bboxes
+                finally:
+                    result_img.close()
+                    enhanced.close()
+            except Exception:
+                pass
+
+            return [], []
+        except ImportError:
+            return [], []
+        except Exception:
+            return [], []
+
+    def _detect_qr_method6_rotation(self, image: Image.Image) -> tuple[list, list]:
+        """Method 6: Rotation attempts for mis-rotated QR codes."""
+        methods = []
+
+        for angle in [90, 180, 270]:
+            try:
+                methods.append(lambda i, a=angle: i.rotate(a, expand=True))
+            except Exception:
+                pass
+
+        methods.append(lambda i: i.transpose(Image.FLIP_LEFT_RIGHT))
+        methods.append(lambda i: i.transpose(Image.FLIP_TOP_BOTTOM))
+
+        try:
+            methods.append(lambda i: i.transpose(Image.TRANSPOSE))
+            methods.append(lambda i: i.transpose(Image.TRANSVERSE))
+        except Exception:
+            pass
+
+        for processed in methods:
+            try:
+                img = processed(image)
+                try:
+                    decoded = pyzbar.decode(img)
+                    if decoded:
+                        contents, bboxes = self._extract_qr_data(decoded)
+                        if contents:
+                            return contents, bboxes
+                finally:
+                    img.close()
+            except Exception:
+                continue
+
+        return [], []
+
+    def _detect_qr_method7_multiscale(self, image: Image.Image) -> tuple[list, list]:
+        """Method 7: Multi-scale detection for different sizes."""
+        scales = [0.5, 0.75, 1.5, 2.0, 2.5, 3.0]
+
+        for scale in scales:
+            try:
+                new_width = int(image.width * scale)
+                new_height = int(image.height * scale)
+                scaled = image.resize((new_width, new_height), Image.LANCZOS)
+                try:
+                    decoded = pyzbar.decode(scaled)
+                    if decoded:
+                        contents, bboxes = self._extract_qr_data(decoded)
+                        if contents:
+                            return [c for c in contents], [
+                                (
+                                    b[0] // scale,
+                                    b[1] // scale,
+                                    b[2] // scale,
+                                    b[3] // scale,
+                                )
+                                for b in bboxes
+                            ]
+                finally:
+                    scaled.close()
+            except Exception:
+                continue
+
+        return [], []
+
+    def _detect_qr_method8_qreader(self, image: Image.Image) -> tuple[list, list]:
+        """Method 8: Use QReader for difficult QR codes (requires qreader package)."""
         try:
             import numpy as np
             import cv2
@@ -278,50 +531,89 @@ class QRMultiIMGS:
         except Exception:
             return [], []
 
-    def _detect_qr_method5_advanced(self, image: Image.Image) -> tuple[list, list]:
-        """Method 5: Advanced preprocessing for difficult QR codes."""
-        methods = []
+    # =========================================================================
+    # MAIN DETECTION WITH AUTO-ESCALATION
+    # =========================================================================
 
-        methods.append(
-            lambda i: i.filter(
-                ImageFilter.UnsharpMask(radius=2, percent=150, threshold=3)
-            )
-        )
-        methods.append(lambda i: i.filter(ImageFilter.MedianFilter(size=3)))
+    def _detect_phase1(self, img: Image.Image) -> tuple[list, list, str]:
+        """Phase 1: Standard detection methods (1-3)."""
+        contents, bboxes = self._detect_qr_method1(img)
+        if contents:
+            return contents, bboxes, "method1"
 
-        try:
-            methods.append(
-                lambda i: i.resize((i.width * 3, i.height * 3), Image.BICUBIC)
-            )
-        except Exception:
-            pass
+        contents, bboxes = self._detect_qr_method2(img)
+        if contents:
+            return contents, bboxes, "method2"
 
-        try:
-            methods.append(lambda i: i.filter(ImageFilter.MinFilter(3)))
-            methods.append(lambda i: i.filter(ImageFilter.MaxFilter(3)))
-        except Exception:
-            pass
+        for attempt in range(10):
+            contents, bboxes, error = self._detect_qr_method3_extended(img, attempt)
+            if contents:
+                return contents, bboxes, f"method3_attempt{attempt}"
+            if error == "all_methods_exhausted":
+                break
 
-        methods.append(lambda i: self._preprocess_image(i))
+        return [], [], "phase1_exhausted"
 
-        for processed_img in methods:
+    def _detect_phase2(self, img: Image.Image) -> tuple[list, list, str]:
+        """Phase 2: Sharpening and deblur (methods 4-5)."""
+        contents, bboxes = self._detect_qr_method4_sharpen(img)
+        if contents:
+            return contents, bboxes, "method4_sharpen"
+
+        contents, bboxes = self._detect_qr_method5_deblur(img)
+        if contents:
+            return contents, bboxes, "method5_deblur"
+
+        return [], [], "phase2_exhausted"
+
+    def _detect_phase3(self, img: Image.Image) -> tuple[list, list, str]:
+        """Phase 3: Rotation and multi-scale (methods 6-7)."""
+        contents, bboxes = self._detect_qr_method6_rotation(img)
+        if contents:
+            return contents, bboxes, "method6_rotation"
+
+        contents, bboxes = self._detect_qr_method7_multiscale(img)
+        if contents:
+            return contents, bboxes, "method7_multiscale"
+
+        return [], [], "phase3_exhausted"
+
+    def _detect_full(self, img: Image.Image) -> tuple[list, list, str]:
+        """Phase 4: Full aggressive detection (all methods)."""
+        contents, bboxes = self._detect_qr_method8_qreader(img)
+        if contents:
+            return contents, bboxes, "method8_qreader"
+
+        combined_methods = [
+            lambda i: self._preprocess_image(i).filter(
+                ImageFilter.UnsharpMask(radius=2, percent=200, threshold=3)
+            ),
+            lambda i: self._preprocess_image(i.convert("L")),
+            lambda i: i.filter(ImageFilter.MedianFilter(size=5)),
+        ]
+
+        for processed in combined_methods:
             try:
-                img = processed_img(image)
-                decoded = pyzbar.decode(img)
+                img_processed = processed(img)
+                decoded = pyzbar.decode(img_processed)
                 if decoded:
                     contents, bboxes = self._extract_qr_data(decoded)
                     if contents:
-                        return contents, bboxes
+                        return contents, bboxes, "method9_combined"
             except Exception:
                 continue
 
-        return [], []
+        return [], [], "all_methods_exhausted"
 
     def detect_qr(self, image_path: Path) -> QRCodeResult:
+        """Main detection with automatic escalation for failed images."""
         contents = []
         bboxes = []
+        detection_method = None
 
-        effective_timeout = self.deep_timeout if self.deep_scan else self.timeout
+        effective_timeout = (
+            self.deep_timeout if (self.deep_scan or self.force_deep) else self.timeout
+        )
         use_signal = effective_timeout > 0 and platform.system() != "Windows"
 
         def timeout_handler(signum, frame):
@@ -333,36 +625,56 @@ class QRMultiIMGS:
                 signal.alarm(effective_timeout)
 
             img = Image.open(image_path)
-            contents, bboxes = self._detect_qr_method1(img)
+
+            if self.verbose:
+                print(f"    Processing: {image_path.name}")
+
+            contents, bboxes, method = self._detect_phase1(img)
+            if contents:
+                detection_method = method
+                if self.verbose:
+                    print(f"    ✓ Detected in Phase 1: {method}")
+
+            if not contents and (self.deep_scan or self.force_deep):
+                contents, bboxes, method = self._detect_phase2(img)
+                if contents:
+                    detection_method = method
+                    if self.verbose:
+                        print(f"    ✓ Detected in Phase 2: {method}")
+
+            if not contents and self.force_deep:
+                contents, bboxes, method = self._detect_phase3(img)
+                if contents:
+                    detection_method = method
+                    if self.verbose:
+                        print(f"    ✓ Detected in Phase 3: {method}")
 
             if not contents:
-                contents, bboxes = self._detect_qr_method2(img)
-
-            if not contents:
-                for attempt in range(4):
-                    contents, bboxes, error = self._detect_qr_method3(img, attempt)
-                    if contents:
-                        break
-                    if error == "all_methods_exhausted":
-                        break
-
-            if not contents and self.deep_scan:
-                contents, bboxes = self._detect_qr_method4_qreader(img)
-
-                if not contents:
-                    contents, bboxes = self._detect_qr_method5_advanced(img)
+                contents, bboxes, method = self._detect_full(img)
+                if contents:
+                    detection_method = method
+                    if self.verbose:
+                        print(f"    ✓ Detected in Full Phase: {method}")
 
             if use_signal:
                 signal.alarm(0)
 
             img.close()
 
-            return QRCodeResult(
+            result = QRCodeResult(
                 str(image_path),
                 has_qr=len(contents) > 0,
                 qr_contents=contents,
                 qr_bboxes=bboxes,
             )
+            result.detection_method = detection_method
+            result.attempts_made = (
+                ["phase1", "phase2", "phase3", "full"]
+                if self.force_deep
+                else ["phase1"]
+            )
+
+            return result
 
         except TimeoutError as e:
             if self.log_file:
@@ -374,6 +686,35 @@ class QRMultiIMGS:
             if self.log_file:
                 self._log(f"Error processing {image_path}: {e}")
             return QRCodeResult(str(image_path), has_qr=False, error=str(e))
+
+    def _retry_failed_images(self):
+        """Auto-retry failed images with enhanced detection."""
+        if not self._failed_images:
+            return
+
+        if self.verbose:
+            print(f"\n=== Auto-retrying {len(self._failed_images)} failed images ===")
+
+        original_deep_scan = self.deep_scan
+        original_force_deep = self.force_deep
+
+        self.deep_scan = True
+        self.force_deep = True
+
+        for result in self._failed_images:
+            if self.verbose:
+                print(f"  Retrying: {result.file_path}")
+
+            image_path = Path(result.file_path)
+            if image_path.exists():
+                retry_result = self.detect_qr(image_path)
+                for i, r in enumerate(self.results):
+                    if r.file_path == result.file_path:
+                        self.results[i] = retry_result
+                        break
+
+        self.deep_scan = original_deep_scan
+        self.force_deep = original_force_deep
 
     def scan(self, progress: bool = True) -> list[QRCodeResult]:
         images = self._get_images()
@@ -390,19 +731,38 @@ class QRMultiIMGS:
                     completed_count += 1
                     self._scan_count = completed_count
                     img_path = futures[future]
+                    result = future.result()
+                    self.results.append(result)
+
                     if progress:
+                        status = "✓" if result.has_qr else "✗"
                         print(
-                            f"Scanning {completed_count}/{len(images)}: {img_path.name}"
+                            f"[{completed_count}/{len(images)}] {img_path.name} {status}"
                         )
-                    self.results.append(future.result())
+
+                    if not result.has_qr and not result.error:
+                        self._failed_images.append(result)
         else:
             for i, img in enumerate(images):
                 self._scan_count = i + 1
+                result = self.detect_qr(img)
+                self.results.append(result)
+
                 if progress:
-                    print(f"Scanning {self._scan_count}/{len(images)}: {img.name}")
-                self.results.append(self.detect_qr(img))
+                    status = "✓" if result.has_qr else "✗"
+                    print(f"[{self._scan_count}/{len(images)}] {img.name} {status}")
+
+                if not result.has_qr and not result.error:
+                    self._failed_images.append(result)
+
+        if self.force_deep and self._failed_images:
+            self._retry_failed_images()
 
         return self.results
+
+    # =========================================================================
+    # ACTION METHODS (Preserved from original)
+    # =========================================================================
 
     def export_list(self, format: str = "txt", output_path: str = None) -> str:
         if not output_path:
@@ -423,6 +783,8 @@ class QRMultiIMGS:
                         "with_qr": [r.to_dict() for r in with_qr],
                         "without_qr": [r.to_dict() for r in without_qr],
                         "total": len(self.results),
+                        "detected": len(with_qr),
+                        "failed": len(self._failed_images),
                     },
                     f,
                     indent=2,
@@ -432,7 +794,14 @@ class QRMultiIMGS:
             with open(output_path, "w", newline="") as f:
                 writer = csv.writer(f)
                 writer.writerow(
-                    ["file_path", "has_qr", "qr_contents", "file_size", "timestamp"]
+                    [
+                        "file_path",
+                        "has_qr",
+                        "qr_contents",
+                        "file_size",
+                        "timestamp",
+                        "detection_method",
+                    ]
                 )
                 for r in self.results:
                     writer.writerow(
@@ -442,30 +811,35 @@ class QRMultiIMGS:
                             "|".join(r.qr_contents),
                             r.file_size,
                             r.timestamp,
+                            r.detection_method or "",
                         ]
                     )
 
         else:
             with open(output_path, "w") as f:
-                f.write(f"QR Multi IMGS Scan Results\n")
-                f.write(f"{'=' * 50}\n\n")
+                f.write(f"QR Multi IMGS Enhanced Scan Results\n")
+                f.write(f"{'=' * 60}\n\n")
                 f.write(f"Total images scanned: {len(self.results)}\n")
                 f.write(f"With QR codes: {len(with_qr)}\n")
-                f.write(f"Without QR codes: {len(without_qr)}\n\n")
+                f.write(f"Without QR codes: {len(without_qr)}\n")
+                f.write(
+                    f"Detection rate: {len(with_qr) / len(self.results) * 100:.1f}%\n\n"
+                )
 
                 if with_qr:
-                    f.write(f"{'-' * 50}\n")
+                    f.write(f"{'-' * 60}\n")
                     f.write(f"IMAGES WITH QR CODES:\n")
-                    f.write(f"{'-' * 50}\n")
+                    f.write(f"{'-' * 60}\n")
                     for r in with_qr:
                         f.write(f"\nFile: {r.file_path}\n")
                         f.write(f"Size: {r.file_size} bytes\n")
+                        f.write(f"Method: {r.detection_method}\n")
                         f.write(f"QR Contents: {', '.join(r.qr_contents)}\n")
 
                 if without_qr:
-                    f.write(f"\n{'-' * 50}\n")
+                    f.write(f"\n{'-' * 60}\n")
                     f.write(f"IMAGES WITHOUT QR CODES:\n")
-                    f.write(f"{'-' * 50}\n")
+                    f.write(f"{'-' * 60}\n")
                     for r in without_qr:
                         f.write(f"File: {r.file_path}\n")
 
@@ -695,13 +1069,18 @@ class QRMultiIMGS:
     def action_list(self) -> None:
         with_qr = self._get_with_qr()
         without_qr = self._get_without_qr()
+        failed = self._get_failed()
 
-        print(f"\n{'=' * 50}")
-        print(f"QR Multi IMGS - Scan Results")
-        print(f"{'=' * 50}")
-        print(f"Total images: {len(self.results)}")
-        print(f"With QR: {len(with_qr)}")
-        print(f"Without QR: {len(without_qr)}")
+        detection_rate = (len(with_qr) / len(self.results) * 100) if self.results else 0
+
+        print(f"\n{'=' * 60}")
+        print(f"QR Multi IMGS - Enhanced Scan Results")
+        print(f"{'=' * 60}")
+        print(f"Total images scanned: {len(self.results)}")
+        print(f"With QR codes: {len(with_qr)}")
+        print(f"Without QR codes: {len(without_qr)}")
+        print(f"Failed/Error: {len(failed)}")
+        print(f"Detection rate: {detection_rate:.1f}%")
 
         if with_qr:
             print(f"\n--- Images WITH QR codes ---")
@@ -711,7 +1090,12 @@ class QRMultiIMGS:
                     if len(r.qr_contents[0]) > 50
                     else r.qr_contents[0]
                 )
-                print(f"  {r.file_path}")
+                method_info = (
+                    f" ({r.detection_method})"
+                    if r.detection_method and self.verbose
+                    else ""
+                )
+                print(f"  ✓ {r.file_path}{method_info}")
                 print(f"    QR: {qr_preview}")
                 if len(r.qr_contents) > 1:
                     print(f"    +{len(r.qr_contents) - 1} more QR codes")
@@ -719,18 +1103,14 @@ class QRMultiIMGS:
         if without_qr:
             print(f"\n--- Images WITHOUT QR codes ---")
             for r in without_qr:
-                print(f"  {r.file_path}")
+                print(f"  ✗ {r.file_path}")
+
+        if failed and self.verbose:
+            print(f"\n--- Failed images (errors) ---")
+            for r in failed:
+                print(f"  ! {r.file_path}: {r.error}")
 
     def action_decode(self, output_format: str = "text") -> list:
-        """
-        Decode QR codes and display content without creating files.
-
-        Args:
-            output_format: Output format - 'text' or 'json'
-
-        Returns:
-            List of QRCodeResult with QR codes
-        """
         with_qr = self._get_with_qr()
 
         if not with_qr:
@@ -745,16 +1125,20 @@ class QRMultiIMGS:
                         "file": r.file_path,
                         "qr_codes": r.qr_contents,
                         "count": len(r.qr_contents),
+                        "method": r.detection_method,
                     }
                 )
             print(json.dumps(results, indent=2))
         else:
             for r in with_qr:
                 for i, content in enumerate(r.qr_contents):
+                    method_info = (
+                        f" [{r.detection_method}]" if r.detection_method else ""
+                    )
                     if len(r.qr_contents) > 1:
-                        print(f"{r.file_path} [{i + 1}]: {content}")
+                        print(f"{r.file_path} [{i + 1}]{method_info}: {content}")
                     else:
-                        print(f"{r.file_path}: {content}")
+                        print(f"{r.file_path}{method_info}: {content}")
 
         print(
             f"\nTotal: {len(with_qr)} images with {sum(len(r.qr_contents) for r in with_qr)} QR codes"
@@ -764,17 +1148,6 @@ class QRMultiIMGS:
     def action_filter(
         self, pattern: str, case_sensitive: bool = False, exclude: bool = False
     ) -> list:
-        """
-        Filter images by QR code content pattern.
-
-        Args:
-            pattern: String or regex pattern to match
-            case_sensitive: Whether to match case-sensitive
-            exclude: If True, show images that DON'T match the pattern
-
-        Returns:
-            List of matching QRCodeResult
-        """
         with_qr = self._get_with_qr()
 
         if case_sensitive:
@@ -817,17 +1190,6 @@ class QRMultiIMGS:
     def action_batch_rename(
         self, prefix: str = "", suffix: str = "", dry_run: bool = True
     ) -> dict:
-        """
-        Rename images based on QR code content.
-
-        Args:
-            prefix: Prefix to add to filename
-            suffix: Suffix to add to filename (before extension)
-            dry_run: If True, only show what would be renamed
-
-        Returns:
-            Dict with renamed count and list of changes
-        """
         with_qr = self._get_with_qr()
 
         if not with_qr:
@@ -884,16 +1246,6 @@ class QRMultiIMGS:
     def action_verify(
         self, originals_folder: str = None, recreated_folder: str = None
     ) -> dict:
-        """
-        Verify that recreated QR codes match the original content.
-
-        Args:
-            originals_folder: Folder with original images (default: scanned folder)
-            recreated_folder: Folder with recreated QR codes
-
-        Returns:
-            Dict with verification results
-        """
         if not originals_folder:
             originals_folder = str(self.folder_path)
 
@@ -972,21 +1324,6 @@ class QRMultiIMGS:
 
 
 def _validate_path(path: str, base_dir: str = None) -> tuple[bool, str]:
-    """
-    Validate and sanitize path for security.
-
-    Args:
-        path: Path string to validate
-        base_dir: Optional base directory to restrict access within
-
-    Returns:
-        tuple: (is_valid, error_message)
-            - is_valid: True if path is safe to use
-            - error_message: Empty if valid, error description if invalid
-
-    Note:
-        Resolves symlinks and blocks path traversal attempts (e.g., ../../../etc)
-    """
     try:
         input_path = Path(path)
         resolved = input_path.resolve()
@@ -1020,6 +1357,9 @@ def run_cli(args):
     if args.formats:
         formats = {f".{f.strip('.')}" for f in args.formats.split(",")}
 
+    verbose = getattr(args, "verbose", False)
+    force_deep = getattr(args, "force_deep", False)
+
     scanner = QRMultiIMGS(
         folder_path=args.path,
         recursive=args.recursive,
@@ -1028,38 +1368,39 @@ def run_cli(args):
         log_file=args.log,
         qr_format=args.qr_format or "png",
         timeout=args.timeout or DEFAULT_TIMEOUT,
-        deep_scan=args.deep_scan or False,
+        deep_scan=args.deep_scan or True,
         deep_timeout=args.deep_timeout or DEFAULT_DEEP_TIMEOUT,
+        verbose=verbose,
+        force_deep=force_deep,
     )
 
     print(f"Scanning folder: {args.path}")
+    if verbose:
+        print(
+            f"Detection mode: {'Full (force-deep)' if force_deep else 'Enhanced (deep-scan)'}"
+        )
+    print("-" * 50)
+
     results = scanner.scan(progress=args.progress)
 
     if args.action == "list":
         scanner.action_list()
-
     elif args.action == "export":
         scanner.export_list(format=args.export_format, output_path=args.output)
-
     elif args.action == "delete":
         scanner.action_delete(output_folder=args.output, confirm=args.confirm)
-
     elif args.action == "organize":
         scanner.action_organize(
             output_folder=args.output, move=args.move, confirm=args.confirm
         )
-
     elif args.action == "recreate":
         scanner.action_recreate(output_folder=args.output, naming=args.naming)
-
     elif args.action == "extract":
         scanner.action_extract(
             output_folder=args.output, naming=args.naming, padding=args.padding
         )
-
     elif args.action == "decode":
         scanner.action_decode(output_format=args.export_format)
-
     elif args.action == "filter":
         if not args.filter_pattern:
             print("Error: --filter-pattern is required for filter action")
@@ -1069,7 +1410,6 @@ def run_cli(args):
             case_sensitive=args.filter_case_sensitive,
             exclude=args.filter_exclude,
         )
-
     elif args.action == "batch-rename":
         result = scanner.action_batch_rename(
             prefix=args.rename_prefix or "",
@@ -1078,17 +1418,13 @@ def run_cli(args):
         )
         if not args.confirm:
             print("\nNo files were renamed (dry run). Use --confirm to apply changes.")
-
     elif args.action == "verify":
         scanner.action_verify(originals_folder=args.path, recreated_folder=args.output)
 
 
-# Backward compatibility alias
 QRMultiIMG = QRMultiIMGS
 
 
-# TUI Screens are now in separate file (disabled by default due to terminal compatibility)
-# Import them when needed for future TUI support
 try:
     from tui_screens import (
         FolderScreen,
@@ -1106,13 +1442,11 @@ except ImportError:
 
 
 def _run_interactive_menu(args, parser):
-    """Simple interactive menu fallback when TUI fails."""
     print("\n" + "=" * 50)
-    print("  QR Multi IMGS - Interactive Menu")
+    print("  QR Multi IMGS - Enhanced Interactive Menu")
     print("=" * 50)
     print()
 
-    # Step 1: Ask for folder
     folder = input("Enter folder path to scan: ").strip()
     if not folder:
         print("Error: No folder path provided")
@@ -1122,12 +1456,10 @@ def _run_interactive_menu(args, parser):
         print(f"Error: Folder not found: {folder}")
         return
 
-    # Step 2: Ask for subfolders
     print("\nScan subfolders too? (Y/n): ", end="")
     recursive_input = input().strip().lower()
     recursive = recursive_input in ("", "y", "yes")
 
-    # Step 3: Ask for action
     print("\nSelect action:")
     print("  1. Show   - Display which images have QR codes")
     print("  2. Save   - Export results to a file")
@@ -1157,7 +1489,6 @@ def _run_interactive_menu(args, parser):
     action_input = input().strip()
     action = action_map.get(action_input, "list")
 
-    # Build args
     new_args = argparse.Namespace(
         path=folder,
         action=action,
@@ -1174,8 +1505,10 @@ def _run_interactive_menu(args, parser):
         naming="original",
         timeout=DEFAULT_TIMEOUT,
         padding=DEFAULT_PADDING,
-        deep_scan=False,
+        deep_scan=True,
         deep_timeout=DEFAULT_DEEP_TIMEOUT,
+        verbose=False,
+        force_deep=False,
         filter_pattern=None,
         filter_case_sensitive=False,
         filter_exclude=False,
@@ -1195,7 +1528,7 @@ def _run_interactive_menu(args, parser):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="QR Multi IMGS - QR Code Scanner for Images"
+        description="QR Multi IMGS - Enhanced QR Code Scanner for Images"
     )
     parser.add_argument("--path", "-p", help="Folder path to scan")
     parser.add_argument(
@@ -1230,9 +1563,7 @@ def main():
         "--filter-case-sensitive", action="store_true", help="Case sensitive filter"
     )
     parser.add_argument(
-        "--filter-exclude",
-        action="store_true",
-        help="Exclude matching (show non-matching)",
+        "--filter-exclude", action="store_true", help="Exclude matching"
     )
     parser.add_argument(
         "--export-format",
@@ -1259,86 +1590,39 @@ def main():
         "--progress", action="store_true", help="Show progress during scan"
     )
     parser.add_argument("--log", action="store_true", help="Save log to file")
+    parser.add_argument("--nomenu", action="store_true", help="Skip interactive menu")
     parser.add_argument(
-        "--nomenu", action="store_true", help="Skip interactive menu, use CLI only"
+        "--naming", choices=["original", "content", "sequential"], default="original"
     )
     parser.add_argument(
-        "--naming",
-        choices=["original", "content", "sequential"],
-        default="original",
-        help="File naming for recreate action",
+        "--timeout", "-t", type=int, default=DEFAULT_TIMEOUT, help="Timeout per image"
     )
     parser.add_argument(
-        "--timeout",
-        "-t",
-        type=int,
-        default=DEFAULT_TIMEOUT,
-        help="Timeout per image in seconds",
+        "--padding", type=int, default=20, help="Padding for extract action"
     )
     parser.add_argument(
-        "--padding",
-        type=int,
-        default=20,
-        help="Padding around QR region for extract action",
-    )
-    parser.add_argument(
-        "--deep-scan",
-        action="store_true",
-        help="Enable deep scan with advanced QR detection (QReader + advanced preprocessing)",
+        "--deep-scan", action="store_true", help="Enable enhanced detection"
     )
     parser.add_argument(
         "--deep-timeout",
         type=int,
         default=DEFAULT_DEEP_TIMEOUT,
-        help="Timeout per image when using deep-scan (default: 60s)",
+        help="Deep scan timeout",
+    )
+    parser.add_argument(
+        "--verbose", "-v", action="store_true", help="Show detailed progress and errors"
+    )
+    parser.add_argument(
+        "--force-deep", action="store_true", help="Use maximum detection methods"
     )
 
     args = parser.parse_args()
 
-    # Check if path is provided - if so, run in CLI mode
     if args.path:
         run_cli(args)
         return
 
-    # By default, use simple interactive menu (more reliable across terminals)
-    # TUI is disabled due to terminal compatibility issues
-    # To enable TUI in the future: add --tui flag
-    if hasattr(args, "tui") and args.tui and TEXTUAL_AVAILABLE:
-        # TUI mode (not currently used)
-        class QRMultiIMGSApp(App):
-            BINDINGS = [Binding("q", "quit", "Quit")]
-            CSS_PATH = None
-
-            def __init__(self):
-                super().__init__()
-                self.folder_path = ""
-                self.selected_action = "list"
-                self.recursive = True
-                self.output_folder = None
-                self.naming = "original"
-
-            def compose(self) -> ComposeResult:
-                yield Header()
-                yield FolderScreen(self)
-                yield Footer()
-
-            def on_mount(self) -> None:
-                self.title = "QR Multi IMGS"
-                self.sub_title = VERSION
-
-            def action_quit(self) -> None:
-                self.exit()
-
-        try:
-            app = QRMultiIMGSApp()
-            app.run()
-        except Exception as e:
-            print(f"\nTUI Error: {e}", file=sys.stderr)
-            print("Falling back to simple menu mode...", file=sys.stderr)
-            _run_interactive_menu(args, parser)
-    else:
-        # Use simple text-based interactive menu (works in all terminals)
-        _run_interactive_menu(args, parser)
+    _run_interactive_menu(args, parser)
 
 
 if __name__ == "__main__":
