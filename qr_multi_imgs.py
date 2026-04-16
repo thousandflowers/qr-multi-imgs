@@ -1339,10 +1339,21 @@ def main():
 
     args = parser.parse_args()
 
-    if args.nomenu or not sys.stdin.isatty():
+    if args.nomenu:
         if not args.path:
             parser.print_help()
             sys.exit(1)
+        run_cli(args)
+        return
+
+    if not sys.stdin.isatty():
+        if not args.path:
+            parser.print_help()
+            sys.exit(1)
+        run_cli(args)
+        return
+
+    if args.path:
         run_cli(args)
         return
 
