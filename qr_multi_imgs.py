@@ -1194,6 +1194,10 @@ class QRMultiIMGS:
     def action_batch_rename(
         self, prefix: str = "", suffix: str = "", dry_run: bool = True
     ) -> dict:
+        is_valid, error = _validate_path(str(self.folder_path))
+        if not is_valid:
+            raise ValueError(f"Invalid folder path: {error}")
+
         with_qr = self._get_with_qr()
 
         if not with_qr:
@@ -1255,6 +1259,11 @@ class QRMultiIMGS:
 
         if not recreated_folder:
             print("Error: --output folder is required for verify action")
+            return {"matched": 0, "mismatched": 0, "errors": 0}
+
+        is_valid, error = _validate_path(recreated_folder)
+        if not is_valid:
+            print(f"Error: {error}")
             return {"matched": 0, "mismatched": 0, "errors": 0}
 
         originals_path = Path(originals_folder)
