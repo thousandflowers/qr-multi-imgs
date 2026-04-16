@@ -379,9 +379,6 @@ class QRMultiIMG:
             if self.log_file:
                 self._log(f"Error processing {image_path}: {e}")
             return QRCodeResult(str(image_path), has_qr=False, error=str(e))
-            if self.log_file:
-                self._log(f"Error processing {image_path}: {e}")
-            return QRCodeResult(str(image_path), has_qr=False, error=str(e))
 
     def scan(self, progress: bool = True) -> list[QRCodeResult]:
         images = self._get_images()
