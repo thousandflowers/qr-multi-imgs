@@ -35,6 +35,7 @@ from threading import Lock
 
 if platform.system() == "Darwin":
     import ctypes.util
+    import os
 
     possible_paths = [
         "/opt/homebrew/lib",
@@ -47,6 +48,16 @@ if platform.system() == "Darwin":
                 os.add_dll_directory(lib_path)
             else:
                 os.environ.setdefault("DYLD_LIBRARY_PATH", lib_path)
+
+    # Ensure zbar library path is set
+    zbar_path = "/opt/homebrew/lib"
+    if os.path.exists(zbar_path) and "DYLD_LIBRARY_PATH" in os.environ:
+        if zbar_path not in os.environ["DYLD_LIBRARY_PATH"]:
+            os.environ["DYLD_LIBRARY_PATH"] = (
+                zbar_path + ":" + os.environ.get("DYLD_LIBRARY_PATH", "")
+            )
+    elif os.path.exists(zbar_path):
+        os.environ["DYLD_LIBRARY_PATH"] = zbar_path
 
 try:
     from textual.app import App, ComposeResult
@@ -67,8 +78,8 @@ SUPPORTED_FORMATS = {".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp", ".tiff", 
 DEFAULT_QR_FORMAT = "png"
 DEFAULT_PADDING = 20
 
-DEFAULT_TIMEOUT = 60
-DEFAULT_DEEP_TIMEOUT = 120
+DEFAULT_TIMEOUT = 15
+DEFAULT_DEEP_TIMEOUT = 30
 
 CONTRAST_FACTOR = 1.5
 SHARPNESS_FACTOR = 1.5
@@ -659,45 +670,130 @@ class QRMultiIMGS:
             return []
 
     # =========================================================================
-    # MAIN DETECTION WITH AUTO-ESCALATION
+    # FAST DETECTION - OPTIMIZED FOR SPEED & ACCURACY
     # =========================================================================
 
     def _detect_phase1(self, img: Image.Image) -> tuple[list, list, str]:
-        """Phase 1: Standard detection methods (1-3)."""
+        """Phase 1: Fast detection methods only."""
+
+        # Method 1: Basic direct decode
         contents, bboxes = self._detect_qr_method1(img)
         if contents:
-            return contents, bboxes, "method1"
+            return contents, bboxes, "basic"
 
+        # Method 2: Grayscale
         contents, bboxes = self._detect_qr_method2(img)
         if contents:
-            return contents, bboxes, "method2"
+            return contents, bboxes, "grayscale"
 
-        for attempt in range(10):
-            contents, bboxes, error = self._detect_qr_method3_extended(img, attempt)
-            if contents:
-                return contents, bboxes, f"method3_attempt{attempt}"
-            if error == "all_methods_exhausted":
-                break
+        # Method 3: Contrast + grayscale
+        gray = img.convert("L")
+        enhancer = ImageEnhance.Contrast(gray)
+        enhanced = enhancer.enhance(1.5)
+        contents, bboxes = self._detect_qr_method1(enhanced)
+        if contents:
+            return contents, bboxes, "contrast"
+
+        # Method 4: Unsharp mask
+        sharp = enhanced.filter(
+            ImageFilter.UnsharpMask(radius=2, percent=150, threshold=3)
+        )
+        contents, bboxes = self._detect_qr_method1(sharp)
+        if contents:
+            return contents, bboxes, "unsharp"
+
+        # Method 5: Resize 2x LANCZOS
+        try:
+            scaled = img.resize((img.width * 2, img.height * 2), Image.LANCZOS)
+            try:
+                contents, bboxes = self._detect_qr_method1(scaled)
+                if contents:
+                    return contents, bboxes, "resize_2x_lanczos"
+            finally:
+                scaled.close()
+        except Exception:
+            pass
+
+        # Method 6: Resize 2x BICUBIC
+        try:
+            scaled = img.resize((img.width * 2, img.height * 2), Image.BICUBIC)
+            try:
+                contents, bboxes = self._detect_qr_method1(scaled)
+                if contents:
+                    return contents, bboxes, "resize_2x_bicubic"
+            finally:
+                scaled.close()
+        except Exception:
+            pass
 
         return [], [], "phase1_exhausted"
 
     def _detect_phase2(self, img: Image.Image) -> tuple[list, list, str]:
-        """Phase 2: Sharpening and deblur (methods 4-5)."""
-        contents, bboxes = self._detect_qr_method4_sharpen(img)
-        if contents:
-            return contents, bboxes, "method4_sharpen"
+        """Phase 2: Extra methods for more detection."""
+        if not self.deep_scan:
+            return [], [], "deep_disabled"
 
-        contents, bboxes = self._detect_qr_method5_deblur(img)
-        if contents:
-            return contents, bboxes, "method5_deblur"
+        gray = img.convert("L")
+
+        # Method 7: Resize 3x
+        try:
+            scaled = img.resize((img.width * 3, img.height * 3), Image.BICUBIC)
+            try:
+                contents, bboxes = self._detect_qr_method1(scaled)
+                if contents:
+                    return contents, bboxes, "resize_3x"
+            finally:
+                scaled.close()
+        except Exception:
+            pass
+
+        # Method 8: Gray + resize 3x
+        try:
+            scaled = gray.resize((gray.width * 3, gray.height * 3), Image.LANCZOS)
+            try:
+                contents, bboxes = self._detect_qr_method1(scaled)
+                if contents:
+                    return contents, bboxes, "gray_resize_3x"
+            finally:
+                scaled.close()
+        except Exception:
+            pass
 
         return [], [], "phase2_exhausted"
 
     def _detect_phase3(self, img: Image.Image) -> tuple[list, list, str]:
-        """Phase 3: Rotation and multi-scale (methods 6-7)."""
-        contents, bboxes = self._detect_qr_method6_rotation(img)
+        """Phase 3: Heavy methods - only if force_deep enabled."""
+        if not self.force_deep:
+            return [], [], "force_deep_disabled"
+
+        # Try QReader if available
+        contents, bboxes = self._detect_qr_method8_qreader(img)
         if contents:
-            return contents, bboxes, "method6_rotation"
+            return contents, bboxes, "qreader"
+
+        return [], [], "phase3_exhausted"
+
+    def _detect_full(self, img: Image.Image) -> tuple[list, list, str]:
+        """Fallback: Extra scales."""
+        if not self.force_deep:
+            return [], [], "full_disabled"
+
+        # Try extreme scales
+        for scale in [4, 5]:
+            try:
+                scaled = img.resize(
+                    (img.width * scale, img.height * scale), Image.BICUBIC
+                )
+                try:
+                    contents, bboxes = self._detect_qr_method1(scaled)
+                    if contents:
+                        return contents, bboxes, f"resize_{scale}x"
+                finally:
+                    scaled.close()
+            except Exception:
+                continue
+
+        return [], [], "all_methods_exhausted"
 
         contents, bboxes = self._detect_qr_method7_multiscale(img)
         if contents:
@@ -706,43 +802,8 @@ class QRMultiIMGS:
         return [], [], "phase3_exhausted"
 
     def _detect_full(self, img: Image.Image) -> tuple[list, list, str]:
-        """Phase 4: Full aggressive detection (all methods)."""
-        contents, bboxes = self._detect_qr_method8_qreader(img)
-        if contents:
-            return contents, bboxes, "method8_qreader"
-
-        contents, bboxes = self._detect_qr_method9_adaptive(img)
-        if contents:
-            return contents, bboxes, "method9_adaptive"
-
-        contents, bboxes = self._detect_qr_method10_morphology(img)
-        if contents:
-            return contents, bboxes, "method10_morphology"
-
-        contents, bboxes = self._detect_qr_method11_extreme_scale(img)
-        if contents:
-            return contents, bboxes, "method11_extreme_scale"
-
-        combined_methods = [
-            lambda i: self._preprocess_image(i).filter(
-                ImageFilter.UnsharpMask(radius=2, percent=200, threshold=3)
-            ),
-            lambda i: self._preprocess_image(i.convert("L")),
-            lambda i: i.filter(ImageFilter.MedianFilter(size=5)),
-        ]
-
-        for processed in combined_methods:
-            try:
-                img_processed = processed(img)
-                decoded = pyzbar.decode(img_processed)
-                if decoded:
-                    contents, bboxes = self._extract_qr_data(decoded)
-                    if contents:
-                        return contents, bboxes, "method12_fallback"
-            except Exception:
-                continue
-
-        return [], [], "all_methods_exhausted"
+        """Fallback - disabled in optimized mode."""
+        return [], [], "full_disabled"
 
     def detect_qr(self, image_path: Path) -> QRCodeResult:
         """Main detection with automatic escalation for failed images."""
@@ -750,19 +811,10 @@ class QRMultiIMGS:
         bboxes = []
         detection_method = None
 
-        effective_timeout = (
-            self.deep_timeout if (self.deep_scan or self.force_deep) else self.timeout
-        )
-        use_signal = effective_timeout > 0 and platform.system() != "Windows"
-
-        def timeout_handler(signum, frame):
-            raise TimeoutError(f"Timeout processing {image_path}")
+        # Skip timeout for faster processing (use only in extreme cases)
+        use_signal = False
 
         try:
-            if use_signal:
-                signal.signal(signal.SIGALRM, timeout_handler)
-                signal.alarm(effective_timeout)
-
             img = Image.open(image_path)
 
             if self.verbose:
@@ -794,9 +846,6 @@ class QRMultiIMGS:
                     detection_method = method
                     if self.verbose:
                         print(f"    ✓ Detected in Full Phase: {method}")
-
-            if use_signal:
-                signal.alarm(0)
 
             img.close()
 
