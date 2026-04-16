@@ -4,7 +4,7 @@
 # =============================================================================
 """
 QR Multi IMGS - QR Code Scanner for Images
-Version: v0.4.1
+Version: v0.4.2
 Author: QR Multi IMGS Team
 License: MIT
 """
@@ -59,7 +59,7 @@ DEFAULT_TIMEOUT = 30
 DEFAULT_DEEP_TIMEOUT = 60
 CONTRAST_FACTOR = 1.5
 SHARPNESS_FACTOR = 1.5
-VERSION = "v0.4.1"
+VERSION = "v0.4.2"
 
 
 # Backward compatibility alias - placed after class definition
@@ -1624,9 +1624,11 @@ def main():
         run_cli(args)
         return
 
-    # Try to launch TUI
-    if TEXTUAL_AVAILABLE:
-
+    # By default, use simple interactive menu (more reliable across terminals)
+    # TUI is disabled due to terminal compatibility issues
+    # To enable TUI in the future: add --tui flag
+    if hasattr(args, "tui") and args.tui and TEXTUAL_AVAILABLE:
+        # TUI mode (not currently used)
         class QRMultiIMGSApp(App):
             BINDINGS = [Binding("q", "quit", "Quit")]
             CSS_PATH = None
@@ -1659,6 +1661,7 @@ def main():
             print("Falling back to simple menu mode...", file=sys.stderr)
             _run_interactive_menu(args, parser)
     else:
+        # Use simple text-based interactive menu (works in all terminals)
         _run_interactive_menu(args, parser)
 
 
