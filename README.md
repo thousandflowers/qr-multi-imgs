@@ -82,7 +82,7 @@ When you run the program without any arguments, you'll see the interactive menu:
 
 ```
 ┌─────────────────────────────────────┐
-│         QR Multi IMGS                │
+│         QR Multi IMGS               │
 │    QR Code Scanner for Images       │
 ├─────────────────────────────────────┤
 │                                     │
