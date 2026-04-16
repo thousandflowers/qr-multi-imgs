@@ -4,7 +4,7 @@
 # =============================================================================
 """
 QR Multi IMGS - QR Code Scanner for Images
-Version: v0.4.0
+Version: v0.4.1
 Author: QR Multi IMGS Team
 License: MIT
 """
@@ -59,7 +59,7 @@ DEFAULT_TIMEOUT = 30
 DEFAULT_DEEP_TIMEOUT = 60
 CONTRAST_FACTOR = 1.5
 SHARPNESS_FACTOR = 1.5
-VERSION = "v0.4.0"
+VERSION = "v0.4.1"
 
 
 # Backward compatibility alias - placed after class definition
@@ -1429,6 +1429,94 @@ if TEXTUAL_AVAILABLE:
                 pass
 
 
+def _run_interactive_menu(args, parser):
+    """Simple interactive menu fallback when TUI fails."""
+    print("\n" + "=" * 50)
+    print("  QR Multi IMGS - Interactive Menu")
+    print("=" * 50)
+    print()
+
+    # Step 1: Ask for folder
+    folder = input("Enter folder path to scan: ").strip()
+    if not folder:
+        print("Error: No folder path provided")
+        return
+
+    if not os.path.isdir(folder):
+        print(f"Error: Folder not found: {folder}")
+        return
+
+    # Step 2: Ask for subfolders
+    print("\nScan subfolders too? (Y/n): ", end="")
+    recursive_input = input().strip().lower()
+    recursive = recursive_input in ("", "y", "yes")
+
+    # Step 3: Ask for action
+    print("\nSelect action:")
+    print("  1. Show   - Display which images have QR codes")
+    print("  2. Save   - Export results to a file")
+    print("  3. Delete - Remove images without QR codes")
+    print("  4. Sort   - Organize into folders")
+    print("  5. Create - Generate new QR code images")
+    print("  6. Crop   - Extract QR code regions")
+    print("  7. Read   - Just decode, don't save")
+    print("  8. Filter - Find images by QR content")
+    print("  9. Rename - Batch rename files by QR")
+    print(" 10. Check  - Verify recreated QR codes")
+    print("\nEnter number (1-10): ", end="")
+
+    action_map = {
+        "1": "list",
+        "2": "export",
+        "3": "delete",
+        "4": "organize",
+        "5": "recreate",
+        "6": "extract",
+        "7": "decode",
+        "8": "filter",
+        "9": "batch-rename",
+        "10": "verify",
+    }
+
+    action_input = input().strip()
+    action = action_map.get(action_input, "list")
+
+    # Build args
+    new_args = argparse.Namespace(
+        path=folder,
+        action=action,
+        recursive=recursive,
+        formats=None,
+        output=None,
+        export_format="txt",
+        qr_format="png",
+        move=False,
+        confirm=False,
+        parallel=False,
+        progress=True,
+        log=False,
+        naming="original",
+        timeout=DEFAULT_TIMEOUT,
+        padding=DEFAULT_PADDING,
+        deep_scan=False,
+        deep_timeout=DEFAULT_DEEP_TIMEOUT,
+        filter_pattern=None,
+        filter_case_sensitive=False,
+        filter_exclude=False,
+        rename_prefix=None,
+        rename_suffix=None,
+        nomenu=True,
+    )
+
+    print(f"\nRunning: {action} on {folder} (recursive={recursive})")
+    print("-" * 50)
+
+    try:
+        run_cli(new_args)
+    except Exception as e:
+        print(f"Error: {e}")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="QR Multi IMGS - QR Code Scanner for Images"
@@ -1531,24 +1619,12 @@ def main():
 
     args = parser.parse_args()
 
-    if args.nomenu:
-        if not args.path:
-            parser.print_help()
-            sys.exit(1)
-        run_cli(args)
-        return
-
-    if not sys.stdin.isatty():
-        if not args.path:
-            parser.print_help()
-            sys.exit(1)
-        run_cli(args)
-        return
-
+    # Check if path is provided - if so, run in CLI mode
     if args.path:
         run_cli(args)
         return
 
+    # Try to launch TUI
     if TEXTUAL_AVAILABLE:
 
         class QRMultiIMGSApp(App):
@@ -1579,17 +1655,11 @@ def main():
             app = QRMultiIMGSApp()
             app.run()
         except Exception as e:
-            print(f"TUI Error: {e}")
-            print("Falling back to CLI mode...")
-            if not args.path:
-                parser.print_help()
-                sys.exit(1)
-            run_cli(args)
+            print(f"\nTUI Error: {e}", file=sys.stderr)
+            print("Falling back to simple menu mode...", file=sys.stderr)
+            _run_interactive_menu(args, parser)
     else:
-        if not args.path:
-            parser.print_help()
-            sys.exit(1)
-        run_cli(args)
+        _run_interactive_menu(args, parser)
 
 
 if __name__ == "__main__":

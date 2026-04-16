@@ -2,7 +2,7 @@
 
 > QR Code Scanner for Images - Scan a folder of images and detect QR codes
 
-![Version](https://img.shields.io/badge/version-v0.4.0-blue)
+![Version](https://img.shields.io/badge/version-v0.4.1-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Python](https://img.shields.io/badge/python-3.12+-blue)
 
@@ -337,6 +337,11 @@ qr-multi-imgs --path /images --action list --parallel --progress
 For very large images, a timeout of 30 seconds per image is applied. Use `--progress` to see progress.
 
 ## Version History
+
+- **v0.4.1** - TUI fix
+  - Fixed TUI not launching properly from terminal
+  - Removed problematic stdin.isatty() check
+  - Added fallback to simple interactive menu when TUI fails
 
 - **v0.4.0** - New wizard TUI
   - Step 1: Folder selection (with Browse button)
