@@ -16,6 +16,7 @@ import logging
 import argparse
 import signal
 import platform
+import re
 from pathlib import Path
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -782,8 +783,6 @@ class QRMultiIMG:
         Returns:
             List of matching QRCodeResult
         """
-        import re
-
         with_qr = self._get_with_qr()
 
         if case_sensitive:
@@ -837,8 +836,6 @@ class QRMultiIMG:
         Returns:
             Dict with renamed count and list of changes
         """
-        import re
-
         with_qr = self._get_with_qr()
 
         if not with_qr:
