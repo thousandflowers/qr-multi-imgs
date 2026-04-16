@@ -4,7 +4,7 @@
 # =============================================================================
 """
 QR Multi IMGS - QR Code Scanner for Images
-Version: v0.3.3
+Version: v0.3.4
 Author: QR Multi IMGS Team
 License: MIT
 """
@@ -59,7 +59,7 @@ DEFAULT_TIMEOUT = 30
 DEFAULT_DEEP_TIMEOUT = 60
 CONTRAST_FACTOR = 1.5
 SHARPNESS_FACTOR = 1.5
-VERSION = "v0.3.3"
+VERSION = "v0.3.4"
 
 
 # Backward compatibility alias - placed after class definition
@@ -1089,11 +1089,10 @@ QRMultiIMG = QRMultiIMGS
 
 if TEXTUAL_AVAILABLE:
 
-    class MainMenu(Screen):
+    class StartScreen(Screen):
         BINDINGS = [
             Binding("q", "quit", "Quit"),
             Binding("escape", "quit", "Quit"),
-            Binding("r", "refresh", "Refresh"),
         ]
 
         def __init__(self, app_ref):
@@ -1105,29 +1104,54 @@ if TEXTUAL_AVAILABLE:
                 Static("QR Multi IMGS", id="title"),
                 Static("QR Code Scanner for Images", id="subtitle"),
                 Static("", id="spacing"),
-                Button("List all images", id="btn-list", variant="primary"),
-                Button("Export results", id="btn-export"),
-                Button("Delete without QR", id="btn-delete"),
-                Button("Organize into folders", id="btn-organize"),
-                Button("Recreate QR codes", id="btn-recreate"),
-                Button("Extract QR regions", id="btn-extract"),
+                Input(placeholder="Enter folder path to scan...", id="folder-input"),
+                Static("Select action:", id="action-label"),
+                Button("List", id="btn-list", variant="primary"),
+                Button("Export", id="btn-export"),
+                Button("Delete", id="btn-delete"),
+                Button("Organize", id="btn-organize"),
+                Button("Recreate", id="btn-recreate"),
+                Button("Extract", id="btn-extract"),
+                Button("Decode", id="btn-decode"),
+                Button("Filter", id="btn-filter"),
+                Button("Batch Rename", id="btn-batch-rename"),
+                Button("Verify", id="btn-verify"),
                 Static("", id="footer"),
                 Static("Press q or escape to quit", id="footer-text"),
             )
-
-        def get_results(self):
-            return getattr(self.app_ref, "last_results", None)
 
         def on_mount(self) -> None:
             try:
                 self.query_one("#title").styles.text_align = "center"
                 self.query_one("#subtitle").styles.text_align = "center"
+                self.query_one("#folder-input").focus()
             except Exception:
                 pass
 
         def on_button_pressed(self, event: Button.Pressed) -> None:
             action = event.button.id.replace("btn-", "")
+            folder_input = self.query_one("#folder-input", Input)
+            folder_path = folder_input.value or ""
+
+            if not folder_path:
+                self._show_error("Please enter a folder path")
+                return
+
+            if not os.path.isdir(folder_path):
+                self._show_error(f"Folder not found: {folder_path}")
+                return
+
+            self.app_ref.folder_path = folder_path
+            self.app_ref.selected_action = action
             self.app.push_screen(ActionScreen(action, self.app_ref))
+
+        def _show_error(self, message: str):
+            try:
+                error_label = Static(f"[red]{message}[/red]", id="error-msg")
+                container = self.query_one("Container")
+                container.mount(error_label)
+            except Exception:
+                print(f"ERROR: {message}")
 
     class ActionScreen(Screen):
         BINDINGS = [
@@ -1138,103 +1162,59 @@ if TEXTUAL_AVAILABLE:
             super().__init__()
             self.action = action
             self.app_ref = app_ref
-            self.folder_path = ""
-            self.naming = "original"
 
         def compose(self) -> ComposeResult:
             yield Container(
+                Static(f"Scanning: {self.app_ref.folder_path}", id="folder-display"),
                 Static(f"Action: {self.action.upper()}", id="action-title"),
-                Input(placeholder="Enter folder path to scan...", id="folder-input"),
-                Input(
-                    placeholder="Naming (original/content/sequential)",
-                    id="naming-input",
-                ),
-                Input(
-                    placeholder="Padding for extract (default: 20)",
-                    id="padding-input",
-                ),
-                Button("Run", id="btn-run", variant="success"),
-                Button("Back", id="btn-back"),
+                Static("Processing...", id="status"),
                 id="action-container",
             )
 
         def on_mount(self) -> None:
+            import threading
+
+            def run_scan():
+                args = argparse.Namespace(
+                    path=self.app_ref.folder_path,
+                    action=self.app_ref.selected_action,
+                    recursive=False,
+                    formats=None,
+                    output=None,
+                    export_format="txt",
+                    qr_format="png",
+                    move=False,
+                    confirm=False,
+                    parallel=False,
+                    progress=True,
+                    log=False,
+                    naming="original",
+                    timeout=DEFAULT_TIMEOUT,
+                    padding=DEFAULT_PADDING,
+                    deep_scan=False,
+                    deep_timeout=DEFAULT_DEEP_TIMEOUT,
+                    filter_pattern=None,
+                    filter_case_sensitive=False,
+                    filter_exclude=False,
+                    rename_prefix=None,
+                    rename_suffix=None,
+                    nomenu=True,
+                )
+
+                try:
+                    run_cli(args)
+                    self._update_status("[green]Done! Press Escape to go back[/green]")
+                except Exception as e:
+                    self._update_status(f"[red]Error: {str(e)}[/red]")
+
+            threading.Thread(target=run_scan, daemon=True).start()
+
+        def _update_status(self, message: str):
             try:
-                self.query_one("#action-title").styles.text_align = "center"
+                status = self.query_one("#status", Static)
+                status.update(message)
             except Exception:
                 pass
-
-        def on_button_pressed(self, event: Button.Pressed) -> None:
-            if event.button.id == "btn-back":
-                self.app.pop_screen()
-            elif event.button.id == "btn-run":
-                self.run_action()
-
-        def run_action(self):
-            folder_input = self.query_one("#folder-input", Input)
-            naming_input = self.query_one("#naming-input", Input)
-            padding_input = self.query_one("#padding-input", Input)
-
-            self.folder_path = folder_input.value or ""
-            self.naming = naming_input.value or "original"
-            self.padding = (
-                int(padding_input.value) if padding_input.value else DEFAULT_PADDING
-            )
-
-            if not self.folder_path:
-                self._show_error("Please enter a folder path")
-                return
-
-            if not os.path.isdir(self.folder_path):
-                self._show_error(f"Folder not found: {self.folder_path}")
-                return
-
-            args = argparse.Namespace(
-                path=self.folder_path,
-                action=self.action,
-                recursive=False,
-                formats=None,
-                output=None,
-                export_format="txt",
-                qr_format="png",
-                move=False,
-                confirm=False,
-                parallel=False,
-                progress=True,
-                log=False,
-                naming=self.naming,
-                timeout=DEFAULT_TIMEOUT,
-                padding=self.padding,
-                deep_scan=False,
-                deep_timeout=DEFAULT_DEEP_TIMEOUT,
-                filter_pattern=None,
-                filter_case_sensitive=False,
-                filter_exclude=False,
-                rename_prefix=None,
-                rename_suffix=None,
-            )
-
-            try:
-                run_cli(args)
-                self._show_success("Done! Press Back to return to menu.")
-            except Exception as e:
-                self._show_error(f"Error: {str(e)}")
-
-        def _show_error(self, message: str):
-            try:
-                error_label = Static(f"[red]{message}[/red]", id="error-msg")
-                container = self.query_one("#action-container")
-                container.mount(error_label)
-            except Exception:
-                print(f"ERROR: {message}")
-
-        def _show_success(self, message: str):
-            try:
-                success_label = Static(f"[green]{message}[/green]", id="success-msg")
-                container = self.query_one("#action-container")
-                container.mount(success_label)
-            except Exception:
-                print(f"SUCCESS: {message}")
 
 
 def main():
@@ -1363,9 +1343,14 @@ def main():
             BINDINGS = [Binding("q", "quit", "Quit")]
             CSS_PATH = None
 
+            def __init__(self):
+                super().__init__()
+                self.folder_path = ""
+                self.selected_action = "list"
+
             def compose(self) -> ComposeResult:
                 yield Header()
-                yield MainMenu(self)
+                yield StartScreen(self)
                 yield Footer()
 
             def on_mount(self) -> None:
