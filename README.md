@@ -1,4 +1,4 @@
-# QR Multi IMGSs
+# QR Multi IMGs
 
 > QR Code Scanner for Images - Scan a folder of images and detect QR codes
 
