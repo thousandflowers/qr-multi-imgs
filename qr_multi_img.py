@@ -1,4 +1,6 @@
-#!/usr/bin/env python3
+# =============================================================================
+# QR MULTI IMG - QR Code Scanner for Images
+# =============================================================================
 """
 QR Multi IMG - QR Code Scanner for Images
 Version: v0.3.0
@@ -942,6 +944,9 @@ def _validate_path(path: str, base_dir: str = None) -> tuple[bool, str]:
 
 
 def run_cli(args):
+    # ==========================================================================
+    # CLI ENTRY POINT - handles command-line argument parsing and execution
+    # ==========================================================================
     # Validate path first
     is_valid, error = _validate_path(args.path)
     if not is_valid:
