@@ -47,13 +47,14 @@ except ImportError:
     TEXTUAL_AVAILABLE = False
 
 import qrcode
-from PIL import Image, ImageEnhance
+from PIL import Image, ImageEnhance, ImageFilter
 import pyzbar.pyzbar as pyzbar
 
 SUPPORTED_FORMATS = {".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp", ".tiff", ".tif"}
 DEFAULT_QR_FORMAT = "png"
 DEFAULT_PADDING = 20
 DEFAULT_TIMEOUT = 30
+DEFAULT_DEEP_TIMEOUT = 60
 CONTRAST_FACTOR = 1.5
 SHARPNESS_FACTOR = 1.5
 VERSION = "v0.3.0"
@@ -136,6 +137,8 @@ class QRMultiIMG:
         log_file: bool = False,
         qr_format: str = "png",
         timeout: int = DEFAULT_TIMEOUT,
+        deep_scan: bool = False,
+        deep_timeout: int = DEFAULT_DEEP_TIMEOUT,
     ):
         self.folder_path = Path(folder_path)
         self.recursive = recursive
@@ -144,6 +147,8 @@ class QRMultiIMG:
         self.log_file = log_file
         self.qr_format = qr_format.lower()
         self.timeout = timeout
+        self.deep_scan = deep_scan
+        self.deep_timeout = deep_timeout
         self.results: list[QRCodeResult] = []
         self.logger = None
         self._scan_count = 0
@@ -245,12 +250,77 @@ class QRMultiIMG:
         except Exception as e:
             return [], [], str(e)
 
+    def _detect_qr_method4_qreader(self, image: Image.Image) -> tuple[list, list]:
+        """Method 4: Use QReader for difficult QR codes (requires qreader package)."""
+        try:
+            import numpy as np
+            import cv2
+            from qreader import QReader
+
+            qreader = QReader()
+            img_array = np.array(image)
+            if len(img_array.shape) == 2:
+                img_array = cv2.cvtColor(img_array, cv2.COLOR_GRAY2RGB)
+            elif img_array.shape[2] == 4:
+                img_array = cv2.cvtColor(img_array, cv2.COLOR_RGBA2RGB)
+
+            results = qreader.detect_and_decode(image=img_array)
+
+            contents = [r for r in results if r is not None]
+            return contents, []
+        except ImportError:
+            return [], []
+        except Exception:
+            return [], []
+
+    def _detect_qr_method5_advanced(self, image: Image.Image) -> tuple[list, list]:
+        """Method 5: Advanced preprocessing for difficult QR codes."""
+        methods = []
+
+        methods.append(
+            lambda i: i.filter(
+                ImageFilter.UnsharpMask(radius=2, percent=150, threshold=3)
+            )
+        )
+        methods.append(lambda i: i.filter(ImageFilter.MedianFilter(size=3)))
+
+        try:
+            methods.append(
+                lambda i: i.resize((i.width * 3, i.height * 3), Image.BICUBIC)
+            )
+        except Exception:
+            pass
+
+        try:
+            methods.append(lambda i: i.filter(ImageFilter.MinFilter(3)))
+            methods.append(lambda i: i.filter(ImageFilter.MaxFilter(3)))
+        except Exception:
+            pass
+
+        methods.append(lambda i: self._preprocess_image(i))
+
+        for processed_img in methods:
+            try:
+                img = processed_img(image)
+                decoded = pyzbar.decode(img)
+                if decoded:
+                    contents, bboxes = self._extract_qr_data(decoded)
+                    if contents:
+                        return contents, bboxes
+            except Exception:
+                continue
+
+        return [], []
+
     def detect_qr(self, image_path: Path) -> QRCodeResult:
         contents = []
         bboxes = []
 
+        # Determine effective timeout based on deep_scan mode
+        effective_timeout = self.deep_timeout if self.deep_scan else self.timeout
+
         # Check if signal is available (not on Windows)
-        use_signal = self.timeout > 0 and platform.system() != "Windows"
+        use_signal = effective_timeout > 0 and platform.system() != "Windows"
 
         # Setup timeout handler
         def timeout_handler(signum, frame):
@@ -260,7 +330,7 @@ class QRMultiIMG:
             # Set timeout alarm on Unix systems only
             if use_signal:
                 signal.signal(signal.SIGALRM, timeout_handler)
-                signal.alarm(self.timeout)
+                signal.alarm(effective_timeout)
 
             img = Image.open(image_path)
             contents, bboxes = self._detect_qr_method1(img)
@@ -275,6 +345,15 @@ class QRMultiIMG:
                         break
                     if error == "all_methods_exhausted":
                         break
+
+            # Deep Scan: continue with advanced methods if still no results
+            if not contents and self.deep_scan:
+                # Method 4: QReader (YOLOv8 based)
+                contents, bboxes = self._detect_qr_method4_qreader(img)
+
+                # Method 5: Advanced preprocessing
+                if not contents:
+                    contents, bboxes = self._detect_qr_method5_advanced(img)
 
             # Cancel alarm if still pending (Unix only)
             if use_signal:
@@ -292,9 +371,14 @@ class QRMultiIMG:
 
         except TimeoutError as e:
             if self.log_file:
-                self._log(f"Timeout processing {image_path}: {self.timeout}s exceeded")
+                self._log(
+                    f"Timeout processing {image_path}: {effective_timeout}s exceeded"
+                )
             return QRCodeResult(str(image_path), has_qr=False, error="Timeout error")
         except Exception as e:
+            if self.log_file:
+                self._log(f"Error processing {image_path}: {e}")
+            return QRCodeResult(str(image_path), has_qr=False, error=str(e))
             if self.log_file:
                 self._log(f"Error processing {image_path}: {e}")
             return QRCodeResult(str(image_path), has_qr=False, error=str(e))
@@ -970,6 +1054,8 @@ def run_cli(args):
         log_file=args.log,
         qr_format=args.qr_format or "png",
         timeout=args.timeout or DEFAULT_TIMEOUT,
+        deep_scan=args.deep_scan or False,
+        deep_timeout=args.deep_timeout or DEFAULT_DEEP_TIMEOUT,
     )
 
     print(f"Scanning folder: {args.path}")
@@ -1256,6 +1342,17 @@ def main():
         type=int,
         default=20,
         help="Padding around QR region for extract action",
+    )
+    parser.add_argument(
+        "--deep-scan",
+        action="store_true",
+        help="Enable deep scan with advanced QR detection (QReader + advanced preprocessing)",
+    )
+    parser.add_argument(
+        "--deep-timeout",
+        type=int,
+        default=DEFAULT_DEEP_TIMEOUT,
+        help="Timeout per image when using deep-scan (default: 60s)",
     )
 
     args = parser.parse_args()
