@@ -612,3 +612,130 @@ class TestActionVerify:
             )
             # No matches expected
             assert result["matched"] == 0
+
+
+class TestDeepScanFeature:
+    """Test deep_scan feature functionality"""
+
+    def test_deep_scan_parameter_accepted(self):
+        """Should accept deep_scan parameter in QRMultiIMG constructor"""
+        from qr_multi_img import QRMultiIMG, DEFAULT_DEEP_TIMEOUT
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Test with deep_scan=False (default)
+            scanner = QRMultiIMG(folder_path=tmpdir, deep_scan=False)
+            assert scanner.deep_scan == False
+            assert scanner.deep_timeout == DEFAULT_DEEP_TIMEOUT
+
+            # Test with deep_scan=True
+            scanner = QRMultiIMG(folder_path=tmpdir, deep_scan=True, deep_timeout=120)
+            assert scanner.deep_scan == True
+            assert scanner.deep_timeout == 120
+
+    def test_deep_scan_default_timeout(self):
+        """Should have correct default timeout for deep scan"""
+        from qr_multi_img import QRMultiIMG, DEFAULT_DEEP_TIMEOUT, DEFAULT_TIMEOUT
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            scanner = QRMultiIMG(folder_path=tmpdir)
+            # Default should be regular timeout
+            assert scanner.timeout == DEFAULT_TIMEOUT
+            assert scanner.deep_timeout == DEFAULT_DEEP_TIMEOUT
+            assert scanner.deep_timeout > scanner.timeout
+
+
+class TestDecodeJSONFormat:
+    """Test decode action with JSON output format"""
+
+    def test_decode_json_output_format(self):
+        """Should output valid JSON when format is json"""
+        from qr_multi_img import QRMultiIMG, QRCodeResult
+        import tempfile
+        import json
+        import re
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            scanner = QRMultiIMG(folder_path=tmpdir)
+            scanner.results = [
+                QRCodeResult(
+                    "/fake/image1.jpg",
+                    has_qr=True,
+                    qr_contents=["test1", "test2"],
+                ),
+                QRCodeResult(
+                    "/fake/image2.jpg",
+                    has_qr=True,
+                    qr_contents=["test3"],
+                ),
+            ]
+
+            import io
+            import sys
+
+            old_stdout = sys.stdout
+            sys.stdout = io.StringIO()
+
+            result = scanner.action_decode(output_format="json")
+
+            output = sys.stdout.getvalue()
+            sys.stdout = old_stdout
+
+            # Output contains JSON followed by "Total: ..." line - extract JSON part
+            json_match = re.match(r"(\[.*\])", output, re.DOTALL)
+            assert json_match is not None, f"Could not find JSON in output: {output}"
+
+            parsed = json.loads(json_match.group(1))
+            assert len(parsed) == 2
+            assert parsed[0]["file"] == "/fake/image1.jpg"
+            assert parsed[0]["qr_codes"] == ["test1", "test2"]
+            assert parsed[0]["count"] == 2
+            assert parsed[1]["count"] == 1
+
+
+class TestActionVerifyEdgeCases:
+    """Test action_verify edge cases and error handling"""
+
+    def test_verify_mismatched_qr_codes(self):
+        """Should detect mismatched QR codes correctly"""
+        from qr_multi_img import QRMultiIMG
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            originals_folder = Path(tmpdir) / "originals"
+            originals_folder.mkdir()
+            recreated_folder = Path(tmpdir) / "recreated"
+            recreated_folder.mkdir()
+
+            scanner = QRMultiIMG(folder_path=str(originals_folder))
+
+            result = scanner.action_verify(
+                originals_folder=str(originals_folder),
+                recreated_folder=str(recreated_folder),
+            )
+
+            # Should handle gracefully - no matches, no mismatches, no errors
+            assert "matched" in result
+            assert "mismatched" in result
+            assert "errors" in result
+            assert result["matched"] == 0
+
+    def test_verify_with_only_images_with_qr(self):
+        """Should handle folder with only QR-coded images"""
+        from qr_multi_img import QRMultiIMG
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            scanner = QRMultiIMG(folder_path=tmpdir)
+
+            result = scanner.action_verify(
+                originals_folder=tmpdir,
+                recreated_folder="/nonexistent",
+            )
+
+            # Should return error structure even when folder doesn't exist
+            assert "matched" in result
+            assert "mismatched" in result
+            assert "errors" in result
