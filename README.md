@@ -2,7 +2,7 @@
 
 > QR Code Scanner for Images - Scan a folder of images and detect QR codes
 
-![Version](https://img.shields.io/badge/version-v0.3.0-blue)
+![Version](https://img.shields.io/badge/version-v0.3.1-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Python](https://img.shields.io/badge/python-3.12+-blue)
 
@@ -10,7 +10,8 @@
 
 ## Features
 
-- **6 Actions**: list, export, delete, organize, recreate, extract
+- **10 Actions**: list, export, delete, organize, recreate, extract, decode, filter, batch-rename, verify
+- **Deep Scan**: Advanced QR detection for difficult/blurry images with `--deep-scan` flag
 - **Extract QR Regions**: Crop actual QR code regions from images with padding
 - **Interactive TUI**: Menu-based interface (default)
 - **CLI Mode**: Use `--nomenu` for command-line only
