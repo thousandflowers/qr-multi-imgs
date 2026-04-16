@@ -1,10 +1,10 @@
 # =============================================================================
-# QR MULTI IMG - QR Code Scanner for Images
+# QR MULTI IMGS - QR Code Scanner for Images
 # =============================================================================
 """
-QR Multi IMG - QR Code Scanner for Images
+QR Multi IMGS - QR Code Scanner for Images
 Version: v0.3.1
-Author: QR Multi IMG Team
+Author: QR Multi IMGS Team
 License: MIT
 """
 
@@ -61,6 +61,9 @@ SHARPNESS_FACTOR = 1.5
 VERSION = "v0.3.1"
 
 
+# Backward compatibility alias - placed after class definition
+
+
 class QRCodeResult:
     """
     Result of QR code detection on a single image.
@@ -106,7 +109,7 @@ class QRCodeResult:
         }
 
 
-class QRMultiIMG:
+class QRMultiIMGS:
     """
     QR Code Scanner for Images.
 
@@ -317,18 +320,13 @@ class QRMultiIMG:
         contents = []
         bboxes = []
 
-        # Determine effective timeout based on deep_scan mode
         effective_timeout = self.deep_timeout if self.deep_scan else self.timeout
-
-        # Check if signal is available (not on Windows)
         use_signal = effective_timeout > 0 and platform.system() != "Windows"
 
-        # Setup timeout handler
         def timeout_handler(signum, frame):
             raise TimeoutError(f"Timeout processing {image_path}")
 
         try:
-            # Set timeout alarm on Unix systems only
             if use_signal:
                 signal.signal(signal.SIGALRM, timeout_handler)
                 signal.alarm(effective_timeout)
@@ -347,20 +345,15 @@ class QRMultiIMG:
                     if error == "all_methods_exhausted":
                         break
 
-            # Deep Scan: continue with advanced methods if still no results
             if not contents and self.deep_scan:
-                # Method 4: QReader (YOLOv8 based)
                 contents, bboxes = self._detect_qr_method4_qreader(img)
 
-                # Method 5: Advanced preprocessing
                 if not contents:
                     contents, bboxes = self._detect_qr_method5_advanced(img)
 
-            # Cancel alarm if still pending (Unix only)
             if use_signal:
                 signal.alarm(0)
 
-            # Close the image when done to prevent memory leaks
             img.close()
 
             return QRCodeResult(
@@ -389,7 +382,6 @@ class QRMultiIMG:
             return []
 
         if self.parallel:
-            # Use ordered completion tracking instead of index-based
             with ThreadPoolExecutor() as executor:
                 futures = {executor.submit(self.detect_qr, img): img for img in images}
                 completed_count = 0
@@ -398,7 +390,6 @@ class QRMultiIMG:
                     self._scan_count = completed_count
                     img_path = futures[future]
                     if progress:
-                        # Show completed/total instead of index (order is non-deterministic in parallel)
                         print(
                             f"Scanning {completed_count}/{len(images)}: {img_path.name}"
                         )
@@ -455,7 +446,7 @@ class QRMultiIMG:
 
         else:
             with open(output_path, "w") as f:
-                f.write(f"QR Multi IMG Scan Results\n")
+                f.write(f"QR Multi IMGS Scan Results\n")
                 f.write(f"{'=' * 50}\n\n")
                 f.write(f"Total images scanned: {len(self.results)}\n")
                 f.write(f"With QR codes: {len(with_qr)}\n")
@@ -705,7 +696,7 @@ class QRMultiIMG:
         without_qr = self._get_without_qr()
 
         print(f"\n{'=' * 50}")
-        print(f"QR Multi IMG - Scan Results")
+        print(f"QR Multi IMGS - Scan Results")
         print(f"{'=' * 50}")
         print(f"Total images: {len(self.results)}")
         print(f"With QR: {len(with_qr)}")
@@ -863,7 +854,6 @@ class QRMultiIMG:
             new_name = f"{safe_name}{src.suffix}"
             dst = src.parent / new_name
 
-            # Use os.path.exists for faster file existence check
             if os.path.exists(src):
                 if dry_run:
                     print(f"  {src.name} → {new_name}")
@@ -926,7 +916,6 @@ class QRMultiIMG:
         print(f"Recreated: {recreated_folder}")
         print()
 
-        # Pre-scan all original images once (O(n) instead of O(n*m))
         original_qr_contents = {}
         for original_img in originals_path.glob("*"):
             if original_img.suffix.lower() not in SUPPORTED_FORMATS:
@@ -941,7 +930,6 @@ class QRMultiIMG:
 
         print(f"Pre-scanned {len(original_qr_contents)} original images")
 
-        # Now verify each recreated QR against pre-scanned originals (O(m))
         recreated_files = list(recreated_path.glob("*"))
 
         for recreated_file in recreated_files:
@@ -1000,19 +988,14 @@ def _validate_path(path: str, base_dir: str = None) -> tuple[bool, str]:
     """
     try:
         input_path = Path(path)
-
-        # Resolve to absolute path (handles .., symlinks, etc.)
         resolved = input_path.resolve()
 
-        # Check if path exists
         if not resolved.exists():
             return False, f"Path does not exist: {path}"
 
-        # Check if it's a directory
         if not resolved.is_dir():
             return False, f"Path is not a directory: {path}"
 
-        # Optional: check if within allowed base tree (for extra security)
         if base_dir:
             base_resolved = Path(base_dir).resolve()
             try:
@@ -1027,10 +1010,6 @@ def _validate_path(path: str, base_dir: str = None) -> tuple[bool, str]:
 
 
 def run_cli(args):
-    # ==========================================================================
-    # CLI ENTRY POINT - handles command-line argument parsing and execution
-    # ==========================================================================
-    # Validate path first
     is_valid, error = _validate_path(args.path)
     if not is_valid:
         print(f"Error: {error}")
@@ -1040,7 +1019,7 @@ def run_cli(args):
     if args.formats:
         formats = {f".{f.strip('.')}" for f in args.formats.split(",")}
 
-    scanner = QRMultiIMG(
+    scanner = QRMultiIMGS(
         folder_path=args.path,
         recursive=args.recursive,
         formats=formats,
@@ -1103,6 +1082,10 @@ def run_cli(args):
         scanner.action_verify(originals_folder=args.path, recreated_folder=args.output)
 
 
+# Backward compatibility alias
+QRMultiIMG = QRMultiIMGS
+
+
 if TEXTUAL_AVAILABLE:
 
     class MainMenu(Screen):
@@ -1114,11 +1097,11 @@ if TEXTUAL_AVAILABLE:
 
         def __init__(self, app_ref):
             super().__init__()
-            self.app_ref = app_ref  # Reference to main app for communication
+            self.app_ref = app_ref
 
         def compose(self) -> ComposeResult:
             yield Container(
-                Static("QR Multi IMG", id="title"),
+                Static("QR Multi IMGS", id="title"),
                 Static("QR Code Scanner for Images", id="subtitle"),
                 Static("", id="spacing"),
                 Button("List all images", id="btn-list", variant="primary"),
@@ -1132,7 +1115,6 @@ if TEXTUAL_AVAILABLE:
             )
 
         def get_results(self):
-            """Get scan results from parent app"""
             return getattr(self.app_ref, "last_results", None)
 
         def on_mount(self) -> None:
@@ -1222,6 +1204,13 @@ if TEXTUAL_AVAILABLE:
                 naming=self.naming,
                 timeout=DEFAULT_TIMEOUT,
                 padding=self.padding,
+                deep_scan=False,
+                deep_timeout=DEFAULT_DEEP_TIMEOUT,
+                filter_pattern=None,
+                filter_case_sensitive=False,
+                filter_exclude=False,
+                rename_prefix=None,
+                rename_suffix=None,
             )
 
             try:
@@ -1231,7 +1220,6 @@ if TEXTUAL_AVAILABLE:
                 self._show_error(f"Error: {str(e)}")
 
         def _show_error(self, message: str):
-            """Show error message in TUI"""
             try:
                 error_label = Static(f"[red]{message}[/red]", id="error-msg")
                 container = self.query_one("#action-container")
@@ -1240,7 +1228,6 @@ if TEXTUAL_AVAILABLE:
                 print(f"ERROR: {message}")
 
         def _show_success(self, message: str):
-            """Show success message in TUI"""
             try:
                 success_label = Static(f"[green]{message}[/green]", id="success-msg")
                 container = self.query_one("#action-container")
@@ -1251,7 +1238,7 @@ if TEXTUAL_AVAILABLE:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="QR Multi IMG - QR Code Scanner for Images"
+        description="QR Multi IMGS - QR Code Scanner for Images"
     )
     parser.add_argument("--path", "-p", help="Folder path to scan")
     parser.add_argument(
@@ -1360,9 +1347,9 @@ def main():
 
     if TEXTUAL_AVAILABLE:
 
-        class QRMultiIMGApp(App):
+        class QRMultiIMGSApp(App):
             BINDINGS = [Binding("q", "quit", "Quit")]
-            CSS_PATH = None  # Auto-detect theme from system
+            CSS_PATH = None
 
             def compose(self) -> ComposeResult:
                 yield Header()
@@ -1370,16 +1357,14 @@ def main():
                 yield Footer()
 
             def on_mount(self) -> None:
-                self.title = "QR Multi IMG"
+                self.title = "QR Multi IMGS"
                 self.sub_title = VERSION
-                # Auto-detect theme based on system preference
-                # Textual automatically uses system theme
 
             def action_quit(self) -> None:
                 self.exit()
 
         try:
-            app = QRMultiIMGApp()
+            app = QRMultiIMGSApp()
             app.run()
         except Exception as e:
             print(f"TUI Error: {e}")

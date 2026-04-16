@@ -1,10 +1,10 @@
 require "language/python"
 
-class QrMultiImg < Formula
+class QrMultiImgs < Formula
   desc "QR Code Scanner for Images - Scan folders of images to detect QR codes"
-  homepage "https://github.com/thousandflowers/qr-multi-img"
-  url "https://github.com/thousandflowers/qr-multi-img/archive/refs/tags/v0.3.0.tar.gz"
-  version "0.3.0"
+  homepage "https://github.com/thousandflowers/qr-multi-imgs"
+  url "https://github.com/thousandflowers/qr-multi-imgs/archive/refs/tags/v0.3.1.tar.gz"
+  version "0.3.1"
   license "MIT"
 
   depends_on "zbar"
@@ -26,25 +26,25 @@ class QrMultiImg < Formula
     bin.mkpath
 
     # Install the main script
-    bin.install "qr_multi_img.py" => "qr-multi-img"
+    bin.install "qr_multi_imgs.py" => "qr-multi-imgs"
   end
 
   def caveats
     <<~EOS
-      QR Multi IMG has been installed successfully!
+      QR Multi IMGS has been installed successfully!
 
       Usage:
-        qr-multi-img          # Start with interactive menu
-        qr-multi-img --help  # Show CLI options
+        qr-multi-imgs          # Start with interactive menu
+        qr-multi-imgs --help  # Show CLI options
 
       Note: Requires zbar library. If you get errors:
         brew reinstall zbar
 
-      For more info: https://github.com/thousandflowers/qr-multi-img
+      For more info: https://github.com/thousandflowers/qr-multi-imgs
     EOS
   end
 
   test do
-    assert_match "QR Multi IMG", shell_output("#{bin}/qr-multi-img --help 2>&1")
+    assert_match "QR Multi IMGS", shell_output("#{bin}/qr-multi-imgs --help 2>&1")
   end
 end

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test suite for QR Multi IMG
+Test suite for QR Multi IMGS
 Tests for security fixes: path validation
 """
 
@@ -16,7 +16,7 @@ class TestPathValidation:
 
     def test_path_traversal_attempt_blocked(self):
         """Should block path traversal attempts like ../../../etc"""
-        from qr_multi_img import _validate_path
+        from qr_multi_imgs import _validate_path
 
         with tempfile.TemporaryDirectory() as tmpdir:
             malicious_path = os.path.join(tmpdir, "..", "..", "..", "etc", "passwd")
@@ -31,7 +31,7 @@ class TestPathValidation:
 
     def test_absolute_path_outside_allowed_tree(self):
         """Should block absolute paths outside allowed tree"""
-        from qr_multi_img import _validate_path
+        from qr_multi_imgs import _validate_path
 
         # Test con /etc (di solito non accessibile come cartella)
         system_path = "/etc" if os.path.isdir("/etc") else "/usr"
@@ -44,7 +44,7 @@ class TestPathValidation:
 
     def test_valid_directory_accepted(self):
         """Should accept valid directories within allowed tree"""
-        from qr_multi_img import _validate_path
+        from qr_multi_imgs import _validate_path
 
         with tempfile.TemporaryDirectory() as tmpdir:
             is_valid, error = _validate_path(tmpdir)
@@ -59,7 +59,7 @@ class TestQRDetection:
     def test_no_images_returns_empty(self):
         """Should return empty list when no images found"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            from qr_multi_img import QRMultiIMG
+            from qr_multi_imgs import QRMultiIMG
 
             scanner = QRMultiIMG(folder_path=tmpdir)
             results = scanner.scan(progress=False)
@@ -68,7 +68,7 @@ class TestQRDetection:
     def test_scan_counts_images(self):
         """Should count images correctly"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            from qr_multi_img import QRMultiIMG
+            from qr_multi_imgs import QRMultiIMG
 
             # Crea alcuni file temporanei (non immagini reali)
             for i in range(3):
@@ -85,7 +85,7 @@ class TestMemoryLeak:
     def test_image_context_manager(self):
         """Images should be closed after processing"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            from qr_multi_img import QRMultiIMG
+            from qr_multi_imgs import QRMultiIMG
 
             # Crea un file JPEG simulato
             test_img = Path(tmpdir, "test.jpg")
@@ -102,7 +102,7 @@ class TestParallelProgress:
     def test_parallel_progress_ordering(self):
         """Progress should show correct count even in parallel mode"""
         with tempfile.TemporaryDirectory() as tmpdir:
-            from qr_multi_img import QRMultiIMG
+            from qr_multi_imgs import QRMultiIMG
 
             # Crea 5 file
             for i in range(5):
@@ -121,7 +121,7 @@ class TestTUIAction:
     def test_action_invalid_folder(self):
         """Should handle invalid folder gracefully"""
         import argparse
-        from qr_multi_img import run_cli
+        from qr_multi_imgs import run_cli
 
         # Crea args con cartella inesistente
         args = argparse.Namespace(
@@ -157,7 +157,7 @@ class TestQRCodeEdgeCases:
     def test_empty_qr_content_is_valid(self):
         """Empty QR code content should be handled gracefully"""
         # QR code with empty content is valid but should be noted
-        from qr_multi_img import QRCodeResult
+        from qr_multi_imgs import QRCodeResult
 
         result = QRCodeResult("/test/image.jpg", has_qr=True, qr_contents=[""])
 
@@ -167,7 +167,7 @@ class TestQRCodeEdgeCases:
 
     def test_multiple_empty_qr_codes(self):
         """Multiple QR codes with empty content should be handled"""
-        from qr_multi_img import QRCodeResult
+        from qr_multi_imgs import QRCodeResult
 
         result = QRCodeResult(
             "/test/image.jpg", has_qr=True, qr_contents=["", "hello", ""]
@@ -182,7 +182,7 @@ class TestExtractPathValidation:
 
     def test_extract_with_valid_output_folder(self):
         """Should accept valid output folder in extract action"""
-        from qr_multi_img import QRMultiIMG, QRCodeResult
+        from qr_multi_imgs import QRMultiIMG, QRCodeResult
         import tempfile
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -210,7 +210,7 @@ class TestExtractPathValidation:
 
     def test_extract_with_malicious_output_path(self):
         """Should reject malicious output path (path traversal) in extract action"""
-        from qr_multi_img import QRMultiIMG, QRCodeResult
+        from qr_multi_imgs import QRMultiIMG, QRCodeResult
         import tempfile
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -248,7 +248,7 @@ class TestRecreatePathValidation:
 
     def test_recreate_with_valid_output_folder(self):
         """Should accept valid output folder in recreate action"""
-        from qr_multi_img import QRMultiIMG, QRCodeResult
+        from qr_multi_imgs import QRMultiIMG, QRCodeResult
         import tempfile
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -271,7 +271,7 @@ class TestRecreatePathValidation:
 
     def test_recreate_with_malicious_output_path(self):
         """Should reject malicious output path (path traversal) in recreate action"""
-        from qr_multi_img import QRMultiIMG, QRCodeResult
+        from qr_multi_imgs import QRMultiIMG, QRCodeResult
         import tempfile
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -303,7 +303,7 @@ class TestActionRecreate:
 
     def test_recreate_with_no_qr_results(self):
         """Should handle no QR results gracefully"""
-        from qr_multi_img import QRMultiIMG
+        from qr_multi_imgs import QRMultiIMG
         import tempfile
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -319,7 +319,7 @@ class TestActionRecreate:
 
     def test_recreate_naming_sequential(self):
         """Should use sequential naming when specified"""
-        from qr_multi_img import QRMultiIMG, QRCodeResult
+        from qr_multi_imgs import QRMultiIMG, QRCodeResult
         import tempfile
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -347,7 +347,7 @@ class TestActionExtract:
 
     def test_extract_with_no_qr_results(self):
         """Should handle no QR results gracefully"""
-        from qr_multi_img import QRMultiIMG
+        from qr_multi_imgs import QRMultiIMG
         import tempfile
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -363,7 +363,7 @@ class TestActionExtract:
 
     def test_extract_padding_boundary(self):
         """Should handle padding that exceeds image boundaries"""
-        from qr_multi_img import QRMultiIMG, QRCodeResult
+        from qr_multi_imgs import QRMultiIMG, QRCodeResult
         import tempfile
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -391,15 +391,15 @@ class TestVersionConsistency:
 
     def test_version_docstring_matches_constant(self):
         """Docstring version should match VERSION constant"""
-        import qr_multi_img
+        import qr_multi_imgs
 
-        with open(qr_multi_img.__file__, "r") as f:
+        with open(qr_multi_imgs.__file__, "r") as f:
             content = f.read()
 
         import re
 
         docstring_version = re.search(r"Version:\s*(v[\d.]+)", content)
-        constant_version = qr_multi_img.VERSION
+        constant_version = qr_multi_imgs.VERSION
 
         assert docstring_version is not None, "Version not found in docstring"
         assert docstring_version.group(1) == constant_version, (
@@ -413,7 +413,7 @@ class TestActionDecode:
 
     def test_decode_with_no_qr_results(self):
         """Should handle no QR results gracefully"""
-        from qr_multi_img import QRMultiIMG
+        from qr_multi_imgs import QRMultiIMG
         import tempfile
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -425,7 +425,7 @@ class TestActionDecode:
 
     def test_decode_returns_list_with_qr(self):
         """Should return list of results when QR codes found"""
-        from qr_multi_img import QRMultiIMG, QRCodeResult
+        from qr_multi_imgs import QRMultiIMG, QRCodeResult
         import tempfile
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -454,7 +454,7 @@ class TestActionFilter:
 
     def test_filter_no_qr_results(self):
         """Should handle no QR results gracefully"""
-        from qr_multi_img import QRMultiIMG
+        from qr_multi_imgs import QRMultiIMG
         import tempfile
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -466,7 +466,7 @@ class TestActionFilter:
 
     def test_filter_matching_pattern(self):
         """Should return images matching pattern"""
-        from qr_multi_img import QRMultiIMG, QRCodeResult
+        from qr_multi_imgs import QRMultiIMG, QRCodeResult
         import tempfile
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -490,7 +490,7 @@ class TestActionFilter:
 
     def test_filter_exclude_mode(self):
         """Should return non-matching images when exclude is True"""
-        from qr_multi_img import QRMultiIMG, QRCodeResult
+        from qr_multi_imgs import QRMultiIMG, QRCodeResult
         import tempfile
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -518,7 +518,7 @@ class TestActionBatchRename:
 
     def test_batch_rename_no_qr_results(self):
         """Should handle no QR results gracefully"""
-        from qr_multi_img import QRMultiIMG
+        from qr_multi_imgs import QRMultiIMG
         import tempfile
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -530,7 +530,7 @@ class TestActionBatchRename:
 
     def test_batch_rename_dry_run(self):
         """Should show dry run without actually renaming"""
-        from qr_multi_img import QRMultiIMG, QRCodeResult
+        from qr_multi_imgs import QRMultiIMG, QRCodeResult
         import tempfile
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -554,7 +554,7 @@ class TestActionBatchRename:
 
     def test_batch_rename_returns_changes(self):
         """Should return list of changes"""
-        from qr_multi_img import QRMultiIMG, QRCodeResult
+        from qr_multi_imgs import QRMultiIMG, QRCodeResult
         import tempfile
         from pathlib import Path
 
@@ -584,7 +584,7 @@ class TestActionVerify:
 
     def test_verify_invalid_folder(self):
         """Should handle invalid recreated folder"""
-        from qr_multi_img import QRMultiIMG
+        from qr_multi_imgs import QRMultiIMG
         import tempfile
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -598,7 +598,7 @@ class TestActionVerify:
 
     def test_verify_empty_folder(self):
         """Should handle empty recreated folder"""
-        from qr_multi_img import QRMultiIMG
+        from qr_multi_imgs import QRMultiIMG
         import tempfile
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -619,7 +619,7 @@ class TestDeepScanFeature:
 
     def test_deep_scan_parameter_accepted(self):
         """Should accept deep_scan parameter in QRMultiIMG constructor"""
-        from qr_multi_img import QRMultiIMG, DEFAULT_DEEP_TIMEOUT
+        from qr_multi_imgs import QRMultiIMG, DEFAULT_DEEP_TIMEOUT
         import tempfile
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -635,7 +635,7 @@ class TestDeepScanFeature:
 
     def test_deep_scan_default_timeout(self):
         """Should have correct default timeout for deep scan"""
-        from qr_multi_img import QRMultiIMG, DEFAULT_DEEP_TIMEOUT, DEFAULT_TIMEOUT
+        from qr_multi_imgs import QRMultiIMG, DEFAULT_DEEP_TIMEOUT, DEFAULT_TIMEOUT
         import tempfile
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -651,7 +651,7 @@ class TestDecodeJSONFormat:
 
     def test_decode_json_output_format(self):
         """Should output valid JSON when format is json"""
-        from qr_multi_img import QRMultiIMG, QRCodeResult
+        from qr_multi_imgs import QRMultiIMG, QRCodeResult
         import tempfile
         import json
         import re
@@ -699,7 +699,7 @@ class TestActionVerifyEdgeCases:
 
     def test_verify_mismatched_qr_codes(self):
         """Should detect mismatched QR codes correctly"""
-        from qr_multi_img import QRMultiIMG
+        from qr_multi_imgs import QRMultiIMG
         import tempfile
         from pathlib import Path
 
@@ -724,7 +724,7 @@ class TestActionVerifyEdgeCases:
 
     def test_verify_with_only_images_with_qr(self):
         """Should handle folder with only QR-coded images"""
-        from qr_multi_img import QRMultiIMG
+        from qr_multi_imgs import QRMultiIMG
         import tempfile
 
         with tempfile.TemporaryDirectory() as tmpdir:

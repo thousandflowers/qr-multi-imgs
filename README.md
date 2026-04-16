@@ -1,4 +1,4 @@
-# QR Multi IMG
+# QR Multi IMGSS
 
 > QR Code Scanner for Images - Scan a folder of images and detect QR codes
 
@@ -6,7 +6,7 @@
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Python](https://img.shields.io/badge/python-3.12+-blue)
 
-**QR Multi IMG** is a powerful tool that scans folders of images, detects QR codes, extracts their content, and offers multiple actions like listing, exporting, organizing, recreating, and extracting QR code regions from original images.
+**QR Multi IMGSS** is a powerful tool that scans folders of images, detects QR codes, extracts their content, and offers multiple actions like listing, exporting, organizing, recreating, and extracting QR code regions from original images.
 
 ## Features
 
@@ -29,32 +29,32 @@
 
 #### Option 1: From official tap (once published)
 ```bash
-brew install thousandflowers/qr-multi-img/qr-multi-img
+brew install thousandflowers/qr-multi-imgs/qr-multi-imgs
 ```
 
 #### Option 2: From local tap (for development/testing)
 ```bash
-cd /path/to/qr-multi-img
-brew install ./Formula/qr-multi-img.rb
+cd /path/to/qr-multi-imgs
+brew install ./Formula/qr-multi-imgs.rb
 ```
 
 Then run with:
 ```bash
-qr-multi-img
+qr-multi-imgs
 ```
 
 ### Alternative: Clone + pip
 
 ```bash
 # Clone the repository
-git clone https://github.com/thousandflowers/qr-multi-img.git
-cd qr-multi-img
+git clone https://github.com/thousandflowers/qr-multi-imgs.git
+cd qr-multi-imgs
 
 # Install dependencies
 pip install -r requirements.txt
 
 # Run the program
-python3 qr_multi_img.py
+python3 qr_multi_imgs.py
 ```
 
 ### Manual Installation
@@ -71,7 +71,7 @@ brew install zbar
 pip install textual pyzbar Pillow qrcode
 
 # Run
-python3 qr_multi_img.py
+python3 qr_multi_imgs.py
 ```
 
 ## Usage
@@ -82,7 +82,7 @@ When you run the program without any arguments, you'll see the interactive menu:
 
 ```
 ┌─────────────────────────────────────┐
-│         QR Multi IMG                │
+│         QR Multi IMGS                │
 │    QR Code Scanner for Images       │
 ├─────────────────────────────────────┤
 │                                     │
@@ -104,19 +104,19 @@ Use `--nomenu` to skip the interactive menu and use command-line arguments:
 
 ```bash
 # List all images with QR codes
-python3 qr_multi_img.py --nomenu --path /path/to/images --action list
+python3 qr_multi_imgs.py --nomenu --path /path/to/images --action list
 
 # Export results to JSON
-python3 qr_multi_img.py --nomenu --path /path/to/images --action export --export-format json
+python3 qr_multi_imgs.py --nomenu --path /path/to/images --action export --export-format json
 
 # Delete images without QR codes
-python3 qr_multi_img.py --nomenu --path /path/to/images --action delete --confirm
+python3 qr_multi_imgs.py --nomenu --path /path/to/images --action delete --confirm
 
 # Organize images into folders
-python3 qr_multi_img.py --nomenu --path /path/to/images --action organize --move
+python3 qr_multi_imgs.py --nomenu --path /path/to/images --action organize --move
 
 # Generate new QR code images
-python3 qr_multi_img.py --nomenu --path /path/to/images --action recreate --qr-format png
+python3 qr_multi_imgs.py --nomenu --path /path/to/images --action recreate --qr-format png
 ```
 
 ## CLI Options
@@ -149,47 +149,47 @@ python3 qr_multi_img.py --nomenu --path /path/to/images --action recreate --qr-f
 Prints results to console showing which images have QR codes and their content.
 
 ```bash
-qr-multi-img --path /images --action list
+qr-multi-imgs --path /images --action list
 ```
 
 ### 2. export
 Saves scan results to a file (txt, json, or csv).
 
 ```bash
-qr-multi-img --path /images --action export --export-format json
-qr-multi-img --path /images --action export --export-format csv --output results.csv
+qr-multi-imgs --path /images --action export --export-format json
+qr-multi-imgs --path /images --action export --export-format csv --output results.csv
 ```
 
 ### 3. delete
 Deletes images WITHOUT QR codes.
 
 ```bash
-qr-multi-img --path /images --action delete --confirm
+qr-multi-imgs --path /images --action delete --confirm
 ```
 
 ### 4. organize
 Copies or moves images to `with_qr/` and `without_qr/` folders.
 
 ```bash
-qr-multi-img --path /images --action organize
-qr-multi-img --path /images --action organize --move --confirm
+qr-multi-imgs --path /images --action organize
+qr-multi-imgs --path /images --action organize --move --confirm
 ```
 
 ### 5. recreate
 Generates new QR code images from extracted content.
 
 ```bash
-qr-multi-img --path /images --action recreate --qr-format png
-qr-multi-img --path /images --action recreate --qr-format svg --naming content
+qr-multi-imgs --path /images --action recreate --qr-format png
+qr-multi-imgs --path /images --action recreate --qr-format svg --naming content
 ```
 
 ### 6. extract
 Extracts QR code regions from original images with padding.
 
 ```bash
-qr-multi-img --path /images --action extract
-qr-multi-img --path /images --action extract --padding 30 --output ./extracted
-qr-multi-img --path /images --action extract --naming sequential
+qr-multi-imgs --path /images --action extract
+qr-multi-imgs --path /images --action extract --padding 30 --output ./extracted
+qr-multi-imgs --path /images --action extract --naming sequential
 ```
 
 Options:
@@ -201,8 +201,8 @@ Options:
 Decodes QR codes and displays content without creating any files.
 
 ```bash
-qr-multi-img --path /images --action decode
-qr-multi-img --path /images --action decode --export-format json
+qr-multi-imgs --path /images --action decode
+qr-multi-imgs --path /images --action decode --export-format json
 ```
 
 Options:
@@ -212,9 +212,9 @@ Options:
 Filters images by QR code content pattern (supports regex).
 
 ```bash
-qr-multi-img --path /images --action filter --filter-pattern "mcdonalds"
-qr-multi-img --path /images --action filter --filter-pattern "https?://.*\.it" --filter-case-sensitive
-qr-multi-img --path /images --action filter --filter-pattern "http" --filter-exclude
+qr-multi-imgs --path /images --action filter --filter-pattern "mcdonalds"
+qr-multi-imgs --path /images --action filter --filter-pattern "https?://.*\.it" --filter-case-sensitive
+qr-multi-imgs --path /images --action filter --filter-pattern "http" --filter-exclude
 ```
 
 Options:
@@ -226,10 +226,10 @@ Options:
 Renames images based on their QR code content.
 
 ```bash
-qr-multi-img --path /images --action batch-rename
-qr-multi-img --path /images --action batch-rename --rename-prefix "qr_"
-qr-multi-img --path /images --action batch-rename --rename-suffix "_code"
-qr-multi-img --path /images --action batch-rename --confirm
+qr-multi-imgs --path /images --action batch-rename
+qr-multi-imgs --path /images --action batch-rename --rename-prefix "qr_"
+qr-multi-imgs --path /images --action batch-rename --rename-suffix "_code"
+qr-multi-imgs --path /images --action batch-rename --confirm
 ```
 
 Options:
@@ -241,7 +241,7 @@ Options:
 Verifies that recreated QR codes match the original content.
 
 ```bash
-qr-multi-img --path /images --action verify --output ./recreated_qr
+qr-multi-imgs --path /images --action verify --output ./recreated_qr
 ```
 
 Options:
@@ -262,44 +262,44 @@ Case-insensitive: `.jpg`, `.JPG`, `.Jpg` all supported.
 
 ### Scan Desktop Images Folder
 ```bash
-qr-multi-img --path ~/Desktop/images --action list
+qr-multi-imgs --path ~/Desktop/images --action list
 ```
 
 ### Scan All Subfolders
 ```bash
-qr-multi-img --path ~/Pictures --action list --recursive
+qr-multi-imgs --path ~/Pictures --action list --recursive
 ```
 
 ### Export to JSON with Progress
 ```bash
-qr-multi-img --path /images --action export --export-format json --progress
+qr-multi-imgs --path /images --action export --export-format json --progress
 ```
 
 ### Generate QR Code Images
 ```bash
-qr-multi-img --path /photos --action recreate --qr-format png --naming sequential
+qr-multi-imgs --path /photos --action recreate --qr-format png --naming sequential
 ```
 
 ## Homebrew Tap Installation
 
 ### Install
 ```bash
-brew install thousandflowers/qr-multi-img/qr-multi-img
+brew install thousandflowers/qr-multi-imgs/qr-multi-imgs
 ```
 
 ### Update
 ```bash
-brew upgrade qr-multi-img
+brew upgrade qr-multi-imgs
 ```
 
 ### Uninstall
 ```bash
-brew uninstall qr-multi-img
+brew uninstall qr-multi-imgs
 ```
 
 ### Tap Details
-- Repository: https://github.com/thousandflowers/qr-multi-img
-- Formula: `Formula/qr-multi-img.rb`
+- Repository: https://github.com/thousandflowers/qr-multi-imgs
+- Formula: `Formula/qr-multi-imgs.rb`
 
 ## Troubleshooting
 
@@ -322,7 +322,7 @@ brew install zbar
 
 Use parallel processing for large folders:
 ```bash
-qr-multi-img --path /images --action list --parallel --progress
+qr-multi-imgs --path /images --action list --parallel --progress
 ```
 
 ### Large Images
@@ -355,8 +355,8 @@ MIT License - See [LICENSE](LICENSE) file.
 
 ## Author
 
-QR Multi IMG Team
-- GitHub: https://github.com/thousandflowers/qr-multi-img
+QR Multi IMGS Team
+- GitHub: https://github.com/thousandflowers/qr-multi-imgs
 
 ## Contributing
 
