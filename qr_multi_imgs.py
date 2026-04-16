@@ -533,6 +533,131 @@ class QRMultiIMGS:
         except Exception:
             return [], []
 
+    def _detect_qr_method9_adaptive(self, image: Image.Image) -> tuple[list, list]:
+        """Method 9: Adaptive thresholding for difficult images."""
+        try:
+            import cv2
+            import numpy as np
+
+            img_array = np.array(image.convert("RGB"))
+            gray = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
+
+            methods = [
+                ("adaptive_mean", cv2.ADAPTIVE_THRESH_MEAN_C, 11, 2),
+                ("adaptive_gaussian", cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 11, 2),
+                ("adaptive_large", cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 21, 5),
+                ("otsu", 0, 0, 0),
+            ]
+
+            for method_name, block_size, c, _ in methods:
+                try:
+                    if method_name == "otsu":
+                        _, binary = cv2.threshold(
+                            gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
+                        )
+                    else:
+                        if block_size % 2 == 0:
+                            block_size += 1
+                        binary = cv2.adaptiveThreshold(
+                            gray, 255, block_size, cv2.THRESH_BINARY, block_size, c
+                        )
+
+                    result_img = Image.fromarray(binary)
+                    try:
+                        decoded = pyzbar.decode(result_img)
+                        if decoded:
+                            contents, bboxes = self._extract_qr_data(decoded)
+                            if contents:
+                                return contents, bboxes
+                    finally:
+                        result_img.close()
+                except Exception:
+                    continue
+
+            return [], []
+        except ImportError:
+            return [], []
+        except Exception:
+            return [], []
+
+    def _detect_qr_method10_morphology(self, image: Image.Image) -> tuple[list, list]:
+        """Method 10: Morphological operations to enhance QR patterns."""
+        try:
+            import cv2
+            import numpy as np
+
+            img_array = np.array(image.convert("RGB"))
+            gray = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
+
+            kernels = [
+                np.ones((3, 3), np.uint8),
+                np.ones((5, 5), np.uint8),
+            ]
+
+            operations = [
+                ("dilate", cv2.MORPH_DILATE),
+                ("erode", cv2.MORPH_ERODE),
+                ("open", cv2.MORPH_OPEN),
+                ("close", cv2.MORPH_CLOSE),
+            ]
+
+            for kernel in kernels:
+                for op_name, op in operations:
+                    try:
+                        result = cv2.morphologyEx(gray, op, kernel)
+                        result_img = Image.fromarray(result)
+                        try:
+                            decoded = pyzbar.decode(result_img)
+                            if decoded:
+                                contents, bboxes = self._extract_qr_data(decoded)
+                                if contents:
+                                    return contents, bboxes
+                        finally:
+                            result_img.close()
+                    except Exception:
+                        continue
+
+            return [], []
+        except ImportError:
+            return [], []
+        except Exception:
+            return [], []
+
+    def _detect_qr_method11_extreme_scale(
+        self, image: Image.Image
+    ) -> tuple[list, list]:
+        """Method 11: Extreme scaling for very small or very large QR."""
+        try:
+            scales = [0.25, 0.35, 0.45, 4.0, 5.0, 6.0, 8.0]
+
+            for scale in scales:
+                try:
+                    new_width = int(image.width * scale)
+                    new_height = int(image.height * scale)
+                    scaled = image.resize((new_width, new_height), Image.LANCZOS)
+                    try:
+                        decoded = pyzbar.decode(scaled)
+                        if decoded:
+                            contents, bboxes = self._extract_qr_data(decoded)
+                            if contents:
+                                return [c for c in contents], [
+                                    (
+                                        b[0] // scale,
+                                        b[1] // scale,
+                                        b[2] // scale,
+                                        b[3] // scale,
+                                    )
+                                    for b in bboxes
+                                ]
+                    finally:
+                        scaled.close()
+                except Exception:
+                    continue
+
+            return [], []
+        except Exception:
+            return []
+
     # =========================================================================
     # MAIN DETECTION WITH AUTO-ESCALATION
     # =========================================================================
@@ -586,6 +711,18 @@ class QRMultiIMGS:
         if contents:
             return contents, bboxes, "method8_qreader"
 
+        contents, bboxes = self._detect_qr_method9_adaptive(img)
+        if contents:
+            return contents, bboxes, "method9_adaptive"
+
+        contents, bboxes = self._detect_qr_method10_morphology(img)
+        if contents:
+            return contents, bboxes, "method10_morphology"
+
+        contents, bboxes = self._detect_qr_method11_extreme_scale(img)
+        if contents:
+            return contents, bboxes, "method11_extreme_scale"
+
         combined_methods = [
             lambda i: self._preprocess_image(i).filter(
                 ImageFilter.UnsharpMask(radius=2, percent=200, threshold=3)
@@ -601,7 +738,7 @@ class QRMultiIMGS:
                 if decoded:
                     contents, bboxes = self._extract_qr_data(decoded)
                     if contents:
-                        return contents, bboxes, "method9_combined"
+                        return contents, bboxes, "method12_fallback"
             except Exception:
                 continue
 
@@ -637,14 +774,14 @@ class QRMultiIMGS:
                 if self.verbose:
                     print(f"    ✓ Detected in Phase 1: {method}")
 
-            if not contents and (self.deep_scan or self.force_deep):
+            if not contents:
                 contents, bboxes, method = self._detect_phase2(img)
                 if contents:
                     detection_method = method
                     if self.verbose:
                         print(f"    ✓ Detected in Phase 2: {method}")
 
-            if not contents and self.force_deep:
+            if not contents:
                 contents, bboxes, method = self._detect_phase3(img)
                 if contents:
                     detection_method = method
@@ -1473,6 +1610,22 @@ def _run_interactive_menu(args, parser):
     recursive_input = input().strip().lower()
     recursive = recursive_input in ("", "y", "yes")
 
+    print("\nEnhanced Detection (recommended for difficult QR codes)? (Y/n): ", end="")
+    deep_scan_input = input().strip().lower()
+    deep_scan = deep_scan_input not in ("n", "no")
+
+    if deep_scan:
+        print("Show detailed progress (method per image)? (Y/n): ", end="")
+        verbose_input = input().strip().lower()
+        verbose = verbose_input in ("y", "yes")
+
+        print("Use MAXIMUM detection (slower but best results)? (Y/n): ", end="")
+        force_deep_input = input().strip().lower()
+        force_deep = force_deep_input in ("y", "yes")
+    else:
+        verbose = False
+        force_deep = False
+
     print("\nSelect action:")
     print("  1. Show   - Display which images have QR codes")
     print("  2. Save   - Export results to a file")
@@ -1518,10 +1671,10 @@ def _run_interactive_menu(args, parser):
         naming="original",
         timeout=DEFAULT_TIMEOUT,
         padding=DEFAULT_PADDING,
-        deep_scan=True,
+        deep_scan=deep_scan,
         deep_timeout=DEFAULT_DEEP_TIMEOUT,
-        verbose=False,
-        force_deep=False,
+        verbose=verbose,
+        force_deep=force_deep,
         filter_pattern=None,
         filter_case_sensitive=False,
         filter_exclude=False,
