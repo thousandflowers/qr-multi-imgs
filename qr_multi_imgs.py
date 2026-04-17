@@ -686,45 +686,73 @@ class QRMultiIMGS:
         if contents:
             return contents, bboxes, "grayscale"
 
-        # Method 3: Contrast + grayscale
-        gray = img.convert("L")
-        enhancer = ImageEnhance.Contrast(gray)
-        enhanced = enhancer.enhance(1.5)
-        contents, bboxes = self._detect_qr_method1(enhanced)
-        if contents:
-            return contents, bboxes, "contrast"
+        # Methods 3-4: Contrast + Unsharp - with proper cleanup
+        gray = None
+        enhanced = None
+        sharp = None
+        try:
+            gray = img.convert("L")
+            enhancer = ImageEnhance.Contrast(gray)
+            enhanced = enhancer.enhance(1.5)
+            contents, bboxes = self._detect_qr_method1(enhanced)
+            if contents:
+                return contents, bboxes, "contrast"
 
-        # Method 4: Unsharp mask
-        sharp = enhanced.filter(
-            ImageFilter.UnsharpMask(radius=2, percent=150, threshold=3)
-        )
-        contents, bboxes = self._detect_qr_method1(sharp)
-        if contents:
-            return contents, bboxes, "unsharp"
+            # Method 4: Unsharp mask
+            sharp = enhanced.filter(
+                ImageFilter.UnsharpMask(radius=2, percent=150, threshold=3)
+            )
+            contents, bboxes = self._detect_qr_method1(sharp)
+            if contents:
+                return contents, bboxes, "unsharp"
+        finally:
+            if sharp is not None:
+                try:
+                    sharp.close()
+                except Exception:
+                    pass
+            if enhanced is not None:
+                try:
+                    enhanced.close()
+                except Exception:
+                    pass
+            if gray is not None:
+                try:
+                    gray.close()
+                except Exception:
+                    pass
 
         # Method 5: Resize 2x LANCZOS
+        scaled = None
         try:
             scaled = img.resize((img.width * 2, img.height * 2), Image.LANCZOS)
-            try:
-                contents, bboxes = self._detect_qr_method1(scaled)
-                if contents:
-                    return contents, bboxes, "resize_2x_lanczos"
-            finally:
-                scaled.close()
+            contents, bboxes = self._detect_qr_method1(scaled)
+            if contents:
+                return contents, bboxes, "resize_2x_lanczos"
         except Exception:
             pass
+        finally:
+            if scaled is not None:
+                try:
+                    scaled.close()
+                except Exception:
+                    pass
 
         # Method 6: Resize 2x BICUBIC
+        scaled = None
         try:
             scaled = img.resize((img.width * 2, img.height * 2), Image.BICUBIC)
-            try:
-                contents, bboxes = self._detect_qr_method1(scaled)
-                if contents:
-                    return contents, bboxes, "resize_2x_bicubic"
-            finally:
-                scaled.close()
+            contents, bboxes = self._detect_qr_method1(scaled)
+            if contents:
+                return contents, bboxes, "resize_2x_bicubic"
         except Exception:
             pass
+        finally:
+            if scaled is not None:
+                try:
+                    scaled.close()
+                except Exception:
+                    pass
 
         return [], [], "phase1_exhausted"
 
@@ -733,31 +761,47 @@ class QRMultiIMGS:
         if not self.deep_scan:
             return [], [], "deep_disabled"
 
-        gray = img.convert("L")
-
-        # Method 7: Resize 3x
+        gray = None
         try:
-            scaled = img.resize((img.width * 3, img.height * 3), Image.BICUBIC)
+            gray = img.convert("L")
+
+            # Method 7: Resize 3x
+            scaled = None
             try:
+                scaled = img.resize((img.width * 3, img.height * 3), Image.BICUBIC)
                 contents, bboxes = self._detect_qr_method1(scaled)
                 if contents:
                     return contents, bboxes, "resize_3x"
+            except Exception:
+                pass
             finally:
-                scaled.close()
-        except Exception:
-            pass
+                if scaled is not None:
+                    try:
+                        scaled.close()
+                    except Exception:
+                        pass
 
-        # Method 8: Gray + resize 3x
-        try:
-            scaled = gray.resize((gray.width * 3, gray.height * 3), Image.LANCZOS)
+            # Method 8: Gray + resize 3x
+            scaled = None
             try:
+                scaled = gray.resize((gray.width * 3, gray.height * 3), Image.LANCZOS)
                 contents, bboxes = self._detect_qr_method1(scaled)
                 if contents:
                     return contents, bboxes, "gray_resize_3x"
+            except Exception:
+                pass
             finally:
-                scaled.close()
-        except Exception:
-            pass
+                if scaled is not None:
+                    try:
+                        scaled.close()
+                    except Exception:
+                        pass
+        finally:
+            if gray is not None:
+                try:
+                    gray.close()
+                except Exception:
+                    pass
 
         return [], [], "phase2_exhausted"
 
