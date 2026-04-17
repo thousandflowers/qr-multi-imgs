@@ -1,31 +1,31 @@
 # QR Multi IMGs
 
-> Rileva QR code da immagini anche difficili - sfocati, piccoli, ruotati, di bassa qualità
+> Detect QR codes from images - even difficult ones: blurry, small, rotated, low quality
 
 ![Version](https://img.shields.io/badge/version-v0.6.0--Enhanced-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Python](https://img.shields.io/badge/python-3.12+-blue)
 
-I QR code nelle foto reali sono spesso sfocati, tagliati male, molto piccoli o ruotati. QR Multi IMGs usa 11 metodi di rilevazione progressivi per trovare QR code che altri scanner perdono.
+QR codes in real photos are often blurry, poorly cut, very small or rotated. QR Multi IMGs uses 11 progressive detection methods to find QR codes that other scanners miss.
 
 ---
 
-## Perché questo tool
+## Why this tool
 
-I QR code nelle foto reali sono spesso:
-- **Sfocati** o fuori fuoco
-- **Tagliati** male
-- **Piccoli** o molto grandi
-- **Ruotati** ad angoli strani
-- Di **bassa qualità**
+QR codes in real photos are often:
+- **Blurry** or out of focus
+- **Poorly cut**
+- **Small** or very large
+- **Rotated** at strange angles
+- Of **low quality**
 
-QR Multi IMGs affronta questi problemi con una pipeline di 11 metodi che si attivano progressivamente.
+QR Multi IMGs addresses these issues with a pipeline of 11 methods that activate progressively.
 
 ---
 
-## Installazione
+## Installation
 
-### Homebrew (macOS consigliato)
+### Homebrew (recommended)
 
 ```bash
 brew tap thousandflowers/qr-multi-imgs
@@ -40,7 +40,7 @@ pip install -r requirements.txt
 python3 qr_multi_imgs.py --path ./images --action list
 ```
 
-### Dipendenze
+### Dependencies
 
 - Python 3.12+
 - zbar (`brew install zbar`)
@@ -49,7 +49,7 @@ python3 qr_multi_imgs.py --path ./images --action list
 
 ## Quick Start
 
-### Interattivo
+### Interactive
 
 ```bash
 python3 qr_multi_imgs.py
@@ -58,16 +58,16 @@ python3 qr_multi_imgs.py
 ### CLI Mode
 
 ```bash
-# Scansione base
+# Basic scan
 python3 qr_multi_imgs.py --path ./images --action list
 
-# Con dettagli
+# With details
 python3 qr_multi_imgs.py --path ./images --verbose
 
-# Massimo rilevazione (prova tutto)
+# Maximum detection (tries everything)
 python3 qr_multi_imgs.py --path ./images --force-deep --verbose
 
-# Esporta risultati
+# Export results
 python3 qr_multi_imgs.py --path ./images --action export --export-format json
 ```
 
@@ -75,48 +75,48 @@ python3 qr_multi_imgs.py --path ./images --action export --export-format json
 
 ## Features
 
-| Feature | Descrizione |
+| Feature | Description |
 |---------|-------------|
-| **11 Detection Methods** | Pipeline progressiva per QR difficili |
-| **10 Azioni** | list, export, delete, organize, recreate, extract, decode, filter, batch-rename, verify |
-| **Memory Safe** | Chiusura corretta di tutte le immagini |
-| **Thread-Safe** | Processing parallelo |
-| **Path Validation** | protezione path traversal |
-| **Deep Scan** | Rilevazione migliorata |
-| **Verbose** | Log dettagliato per debug |
+| **11 Detection Methods** | Progressive pipeline for difficult QR |
+| **10 Actions** | list, export, delete, organize, recreate, extract, decode, filter, batch-rename, verify |
+| **Memory Safe** | Proper image resource cleanup |
+| **Thread-Safe** | Parallel processing |
+| **Path Validation** | Path traversal protection |
+| **Deep Scan** | Enhanced detection |
+| **Verbose** | Detailed logging for debugging |
 
 ---
 
-## Rilevazione QR Code
+## QR Code Detection
 
-### Metodi Disponibili
+### Available Methods
 
-| # | Metodo | Fase | Usi Per |
-|---|--------|------|---------|
-| 1 | Basic decode | 1 | QR normali |
-| 2 | Grayscale | 1 | Basso contrasto |
-| 3 | Contrast+Unsharp | 1 | preprocessing base |
-| 4 | Sharpen | 2 | QR sfocati |
-| 5 | Deblur | 2 | QR molto sfocati |
-| 6 | Rotation | 3 | QR ruotati |
-| 7 | Multi-scale | 3 | QR di dimensioni variabili |
+| # | Method | Phase | Best For |
+|---|--------|-------|----------|
+| 1 | Basic decode | 1 | Normal QR codes |
+| 2 | Grayscale | 1 | Low contrast |
+| 3 | Contrast+Unsharp | 1 | Basic preprocessing |
+| 4 | Sharpen | 2 | Blurry QR codes |
+| 5 | Deblur | 2 | Very blurry QR |
+| 6 | Rotation | 3 | Rotated QR codes |
+| 7 | Multi-scale | 3 | Variable sizes |
 | 8 | QReader | 3 | ML-based detection |
-| 9 | Adaptive | 3 | Bassa qualità |
-| 10 | Morphology | 3 | QR danneggiati |
-| 11 | Extreme Scale | Full | QR molto piccoli/grandi |
+| 9 | Adaptive | 3 | Low quality images |
+| 10 | Morphology | 3 | Damaged QR codes |
+| 11 | Extreme Scale | Full | Very small/large QR |
 
 ### Detection Flow
 
 ```
-Phase 1 (sempre)
+Phase 1 (always)
 ├── Basic decode
 ├── Grayscale
 ├── Contrast + Unsharp
 └── Resize 2x
 
 Phase 2 (deep_scan)
-├── Sharpen ( blur)
-├── Deblur (blur estremo)
+├── Sharpen (blur)
+├── Deblur (extreme blur)
 └── Resize 3x
 
 Phase 3 (force_deep)
@@ -133,47 +133,47 @@ Full (fallback)
 
 ---
 
-## Comandi CLI
+## CLI Commands
 
-### Azioni
+### Actions
 
-| Azione | Descrizione | Esempio |
+| Action | Description | Example |
 |--------|-------------|---------|
-| `list` | Mostra risultati | `--action list` |
-| `export` | Salva su file | `--action export --export-format json` |
-| `delete` | Elimina senza QR | `--action delete --confirm` |
-| `organize` | Sposta in cartelle | `--action organize --move` |
-| `recreate` | Crea nuovi QR | `--action recreate --qr-format png` |
-| `extract` | Estrai regioni QR | `--action extract --padding 20` |
-| `decode` | Solo contenuto | `--action decode` |
-| `filter` | Filtra per pattern | `--action filter --filter-pattern "mcdonalds"` |
-| `batch-rename` | Rinomina batch | `--action batch-rename --confirm` |
-| `verify` | Verifica QR | `--action verify --output ./recreated` |
+| `list` | Show results | `--action list` |
+| `export` | Save to file | `--action export --export-format json` |
+| `delete` | Delete without QR | `--action delete --confirm` |
+| `organize` | Move to folders | `--action organize --move` |
+| `recreate` | Create new QR | `--action recreate --qr-format png` |
+| `extract` | Extract QR regions | `--action extract --padding 20` |
+| `decode` | Content only | `--action decode` |
+| `filter` | Filter by pattern | `--action filter --filter-pattern "mcdonalds"` |
+| `batch-rename` | Batch rename | `--action batch-rename --confirm` |
+| `verify` | Verify QR | `--action verify --output ./recreated` |
 
-### Opzioni
+### Options
 
-| Opzione | Alias | Default | Descrizione |
+| Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
-| `--path` | `-p` | (richiesto) | Cartella immagini |
-| `--action` | `-a` | `list` | Azione |
-| `--recursive` | `-r` | false | Subfolders |
-| `--verbose` | `-v` | false | Dettagliato |
-| `--force-deep` | | false | Massimo rilevazione |
-| `--deep-scan` | | true | Rilevazione avanzata |
-| `--parallel` | | false | Processing parallelo |
-| `--output` | `-o` | auto | Cartella output |
-| `--confirm` | | false | Skip conferma |
-| `--timeout` | `-t` | 15 | Timeout per immagine |
+| `--path` | `-p` | (required) | Image folder |
+| `--action` | `-a` | `list` | Action to perform |
+| `--recursive` | `-r` | false | Scan subfolders |
+| `--verbose` | `-v` | false | Detailed output |
+| `--force-deep` | | false | Maximum detection |
+| `--deep-scan` | | true | Enhanced detection |
+| `--parallel` | | false | Parallel processing |
+| `--output` | `-o` | auto | Output folder |
+| `--confirm` | | false | Skip confirmation |
+| `--timeout` | `-t` | 15 | Timeout per image |
 
 ---
 
-## Configurazione
+## Configuration
 
 ### Timeout
 
-- Default: 15 secondi per immagine
-- Deep: 30 secondi
-- Usa `--timeout 60` per immagini grandi
+- Default: 15 seconds per image
+- Deep: 30 seconds
+- Use `--timeout 60` for large images
 
 ### Image Formats
 
@@ -195,20 +195,20 @@ brew install zbar
 export DYLD_LIBRARY_PATH=/usr/local/lib
 ```
 
-### Scanning lento
+### Slow scanning
 
 ```bash
-# Usa parallel per molte immagini
+# Use parallel for many images
 python3 qr_multi_imgs.py --path ./images --parallel --progress
 
-# Disabilita deep scan per scan base veloce
+# Disable deep scan for fast basic scan
 python3 qr_multi_imgs.py --path ./images --deep-scan=false
 ```
 
-### Tante immagini non rilevate
+### Many images not detected
 
 ```bash
-# Prova maximum detection
+# Try maximum detection
 python3 qr_multi_imgs.py --path ./images --force-deep --verbose
 ```
 
@@ -216,9 +216,9 @@ python3 qr_multi_imgs.py --path ./images --force-deep --verbose
 
 ## License
 
-MIT License - vedi file LICENSE
+MIT License - see LICENSE file
 
-## Crediti
+## Credits
 
 - **Author**: QR Multi IMGS Team
 - **GitHub**: https://github.com/thousandflowers/qr-multi-imgs
