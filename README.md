@@ -1,458 +1,225 @@
 # QR Multi IMGs
 
-> QR Code Scanner for Images - Scan a folder of images and detect QR codes
+> Rileva QR code da immagini anche difficili - sfocati, piccoli, ruotati, di bassa qualità
 
 ![Version](https://img.shields.io/badge/version-v0.6.0--Enhanced-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Python](https://img.shields.io/badge/python-3.12+-blue)
 
-**QR Multi IMGS** is a powerful tool that scans folders of images, detects QR codes, extracts their content, and offers multiple actions like listing, exporting, organizing, recreating, and extracting QR code regions from original images.
+I QR code nelle foto reali sono spesso sfocati, tagliati male, molto piccoli o ruotati. QR Multi IMGs usa 11 metodi di rilevazione progressivi per trovare QR code che altri scanner perdono.
 
-## Features
+---
 
-- **10 Actions**: list, export, delete, organize, recreate, extract, decode, filter, batch-rename, verify
-- **Enhanced Detection**: 8 methods for difficult/blurry/miscut QR codes
-- **Auto-Escalation**: Automatic retry with stronger methods for failed images
-- **Extract QR Regions**: Crop actual QR code regions from images with padding
-- **Interactive TUI**: Menu-based interface (default)
-- **CLI Mode**: Use `--nomenu` for command-line only
-- **Recursive Scanning**: Scan subfolders with `-r` flag
-- **Multiple QR Codes**: Extract all QR codes per image
-- **Multiple Retry Methods**: Handles difficult/damaged QR codes
-- **UTF-8 Encoding**: Supports special characters and emoji
-- **Custom Formats**: Support for txt, json, csv export
-- **Case-Insensitive**: Works with .JPG, .jpg, .Png, etc.
-- **Path Validation**: Security against path traversal attacks
-- **Thread-Safe**: Parallel processing with proper synchronization
-- **Memory Safe**: Proper image resource management
+## Perché questo tool
 
-## Installation
+I QR code nelle foto reali sono spesso:
+- **Sfocati** o fuori fuoco
+- **Tagliati** male
+- **Piccoli** o molto grandi
+- **Ruotati** ad angoli strani
+- Di **bassa qualità**
 
-### Recommended: Homebrew
+QR Multi IMGs affronta questi problemi con una pipeline di 11 metodi che si attivano progressivamente.
 
-#### Option 1: From tap (easiest)
+---
+
+## Installazione
+
+### Homebrew (macOS consigliato)
+
 ```bash
 brew tap thousandflowers/qr-multi-imgs
-brew install thousandflowers/qr-multi-imgs/qr-multi-imgs
+brew install qr-multi-imgs
+qr-multi-imgs --path ./images --action list
 ```
 
-#### Option 2: From local formula
-```bash
-cd /path/to/qr-multi-imgs
-brew install ./Formula/qr-multi-imgs.rb
-```
-
-Then run with:
-```bash
-qr-multi-imgs
-```
-
-### Alternative: Clone + pip
+### pip
 
 ```bash
-# Clone the repository
-git clone https://github.com/thousandflowers/qr-multi-imgs.git
-cd qr-multi-imgs
-
-# Install dependencies
 pip install -r requirements.txt
-
-# Run the program
-python3 qr_multi_imgs.py
+python3 qr_multi_imgs.py --path ./images --action list
 ```
 
-### Manual Installation
+### Dipendenze
 
-Requires:
 - Python 3.12+
-- Homebrew (macOS)
+- zbar (`brew install zbar`)
+
+---
+
+## Quick Start
+
+### Interattivo
 
 ```bash
-# Install system dependencies
-brew install zbar
-
-# Install Python dependencies
-pip install textual pyzbar Pillow qrcode
-
-# Run
 python3 qr_multi_imgs.py
 ```
-
-## Usage
-
-### Interactive TUI Mode (Default)
-
-When you run the program without any arguments, you'll see the interactive menu:
-
-```
-┌─────────────────────────────────────┐
-│         QR Multi IMGS               │
-│    QR Code Scanner for Images       │
-├─────────────────────────────────────┤
-│                                     │
-│   > List all images                 │
-│     Export results                  │
-│     Delete without QR               │
-│     Organize into folders           │
-│     Recreate QR codes               │
-│                                     │
-│   Press q to quit                   │
-└─────────────────────────────────────┘
-```
-
-Use arrow keys to navigate and Enter to select.
 
 ### CLI Mode
 
-Use `--nomenu` to skip the interactive menu and use command-line arguments:
-
 ```bash
-# List all images with QR codes
-python3 qr_multi_imgs.py --nomenu --path /path/to/images --action list
+# Scansione base
+python3 qr_multi_imgs.py --path ./images --action list
 
-# Export results to JSON
-python3 qr_multi_imgs.py --nomenu --path /path/to/images --action export --export-format json
+# Con dettagli
+python3 qr_multi_imgs.py --path ./images --verbose
 
-# Delete images without QR codes
-python3 qr_multi_imgs.py --nomenu --path /path/to/images --action delete --confirm
+# Massimo rilevazione (prova tutto)
+python3 qr_multi_imgs.py --path ./images --force-deep --verbose
 
-# Organize images into folders
-python3 qr_multi_imgs.py --nomenu --path /path/to/images --action organize --move
-
-# Generate new QR code images
-python3 qr_multi_imgs.py --nomenu --path /path/to/images --action recreate --qr-format png
+# Esporta risultati
+python3 qr_multi_imgs.py --path ./images --action export --export-format json
 ```
 
-## CLI Options
+---
 
-| Option | Alias | Description | Default |
-|--------|-------|-------------|---------|
-| `--path` | `-p` | Folder path to scan | Required |
-| `--action` | `-a` | Action to perform | `list` |
-| `--recursive` | `-r` | Scan subfolders recursively | `false` |
-| `--formats` | `-f` | Image formats (comma-separated) | All supported |
-| `--output` | `-o` | Output folder path | Auto |
-| `--export-format` | | Export format (txt/json/csv) | `txt` |
-| `--qr-format` | | QR image format (png/svg/pdf) | `png` |
-| `--move` | | Move files instead of copy | `false` |
-| `--confirm` | | Skip confirmation prompt | `false` |
-| `--parallel` | | Process images in parallel | `false` |
-| `--progress` | | Show progress during scan | `false` |
-| `--log` | | Save log to file | `false` |
-| `--nomenu` | | Skip interactive menu | `false` |
-| `--naming` | | File naming (original/content/sequential) | `original` |
-| `--filter-pattern` | | Pattern for filter action | - |
-| `--filter-case-sensitive` | | Case sensitive filter | `false` |
-| `--filter-exclude` | | Exclude matching for filter | `false` |
-| `--rename-prefix` | | Prefix for batch-rename | - |
-| `--rename-suffix` | | Suffix for batch-rename | - |
-| `--deep-scan` | | Enable enhanced QR detection | `true` (default) |
-| `--deep-timeout` | | Timeout per image in deep scan (seconds) | `120` |
-| `--verbose` | `-v` | Show detailed progress and errors | `false` |
-| `--force-deep` | | Use maximum detection methods (slower) | `false` |
-| `--timeout` | `-t` | Timeout per image (seconds) | `60` |
+## Features
 
-## Enhanced Detection
+| Feature | Descrizione |
+|---------|-------------|
+| **11 Detection Methods** | Pipeline progressiva per QR difficili |
+| **10 Azioni** | list, export, delete, organize, recreate, extract, decode, filter, batch-rename, verify |
+| **Memory Safe** | Chiusura corretta di tutte le immagini |
+| **Thread-Safe** | Processing parallelo |
+| **Path Validation** | protezione path traversal |
+| **Deep Scan** | Rilevazione migliorata |
+| **Verbose** | Log dettagliato per debug |
 
-The enhanced version includes 11 detection methods:
+---
 
-| Method | Purpose | Best For |
-|--------|---------|---------|
-| Method 1 | Standard direct decode | Normal QR codes |
-| Method 2 | Grayscale conversion | Low contrast QR |
-| Method 3 (Extended) | Multiple preprocessing | Difficult QR |
-| Method 4 (Sharpening) | OpenCV sharpening kernels | Blurry QR codes |
-| Method 5 (Deblur) | Wiener + bilateral filter | Very blurry QR |
-| Method 6 (Rotation) | 90°, 180°, 270° + flips | Mis-rotated QR |
-| Method 7 (Multi-scale) | 0.5x to 3x resize | Different sizes |
-| Method 8 (QReader) | ML-based detection | Hard-to-read QR |
-| Method 9 (Adaptive) | Adaptive thresholding | Low quality images |
-| Method 10 (Morphology) | Morphological ops | Damaged QR |
-| Method 11 (Extreme) | 4x-8x scaling | Very small/large QR |
+## Rilevazione QR Code
+
+### Metodi Disponibili
+
+| # | Metodo | Fase | Usi Per |
+|---|--------|------|---------|
+| 1 | Basic decode | 1 | QR normali |
+| 2 | Grayscale | 1 | Basso contrasto |
+| 3 | Contrast+Unsharp | 1 | preprocessing base |
+| 4 | Sharpen | 2 | QR sfocati |
+| 5 | Deblur | 2 | QR molto sfocati |
+| 6 | Rotation | 3 | QR ruotati |
+| 7 | Multi-scale | 3 | QR di dimensioni variabili |
+| 8 | QReader | 3 | ML-based detection |
+| 9 | Adaptive | 3 | Bassa qualità |
+| 10 | Morphology | 3 | QR danneggiati |
+| 11 | Extreme Scale | Full | QR molto piccoli/grandi |
 
 ### Detection Flow
 
-1. **Phase 1** (always): Basic methods (1-2), contrast, unsharp, resize 2x
-2. **Phase 2** (deep_scan): resize 3x, gray+resize
-3. **Phase 3** (force_deep): Multi-scale, QReader, Adaptive, Morphology
-4. **Full** (fallback): Extreme scaling 4x-5x, method11
+```
+Phase 1 (sempre)
+├── Basic decode
+├── Grayscale
+├── Contrast + Unsharp
+└── Resize 2x
 
-### Examples
+Phase 2 (deep_scan)
+├── Sharpen ( blur)
+├── Deblur (blur estremo)
+└── Resize 3x
 
-```bash
-# Standard scan with verbose output
-python3 qr_multi_imgs.py -p /path/to/images --action list --verbose
+Phase 3 (force_deep)
+├── Rotation (90°/180°/270°)
+├── Multi-scale (0.5x-3x)
+├── QReader (ML)
+├── Adaptive threshold
+└── Morphology
 
-# Maximum detection (try everything)
-python3 qr_multi_imgs.py -p /path/to/images --action list --force-deep
-
-# Maximum + verbose
-python3 qr_multi_imgs.py -p /path/to/images --action list --progress --verbose --force-deep
+Full (fallback)
+├── Extreme scale (4x-8x)
+└── Method 11
 ```
 
-## Actions
+---
 
-### 1. list
-Prints results to console showing which images have QR codes and their content.
+## Comandi CLI
 
-```bash
-qr-multi-imgs --path /images --action list
-```
+### Azioni
 
-### 2. export
-Saves scan results to a file (txt, json, or csv).
+| Azione | Descrizione | Esempio |
+|--------|-------------|---------|
+| `list` | Mostra risultati | `--action list` |
+| `export` | Salva su file | `--action export --export-format json` |
+| `delete` | Elimina senza QR | `--action delete --confirm` |
+| `organize` | Sposta in cartelle | `--action organize --move` |
+| `recreate` | Crea nuovi QR | `--action recreate --qr-format png` |
+| `extract` | Estrai regioni QR | `--action extract --padding 20` |
+| `decode` | Solo contenuto | `--action decode` |
+| `filter` | Filtra per pattern | `--action filter --filter-pattern "mcdonalds"` |
+| `batch-rename` | Rinomina batch | `--action batch-rename --confirm` |
+| `verify` | Verifica QR | `--action verify --output ./recreated` |
 
-```bash
-qr-multi-imgs --path /images --action export --export-format json
-qr-multi-imgs --path /images --action export --export-format csv --output results.csv
-```
+### Opzioni
 
-### 3. delete
-Deletes images WITHOUT QR codes.
+| Opzione | Alias | Default | Descrizione |
+|--------|-------|---------|-------------|
+| `--path` | `-p` | (richiesto) | Cartella immagini |
+| `--action` | `-a` | `list` | Azione |
+| `--recursive` | `-r` | false | Subfolders |
+| `--verbose` | `-v` | false | Dettagliato |
+| `--force-deep` | | false | Massimo rilevazione |
+| `--deep-scan` | | true | Rilevazione avanzata |
+| `--parallel` | | false | Processing parallelo |
+| `--output` | `-o` | auto | Cartella output |
+| `--confirm` | | false | Skip conferma |
+| `--timeout` | `-t` | 15 | Timeout per immagine |
 
-```bash
-qr-multi-imgs --path /images --action delete --confirm
-```
+---
 
-### 4. organize
-Copies or moves images to `with_qr/` and `without_qr/` folders.
+## Configurazione
 
-```bash
-qr-multi-imgs --path /images --action organize
-qr-multi-imgs --path /images --action organize --move --confirm
-```
+### Timeout
 
-### 5. recreate
-Generates new QR code images from extracted content.
+- Default: 15 secondi per immagine
+- Deep: 30 secondi
+- Usa `--timeout 60` per immagini grandi
 
-```bash
-qr-multi-imgs --path /images --action recreate --qr-format png
-qr-multi-imgs --path /images --action recreate --qr-format svg --naming content
-```
+### Image Formats
 
-### 6. extract
-Extracts QR code regions from original images with padding.
+jpg, jpeg, png, bmp, gif, webp, tiff, tif (case-insensitive)
 
-```bash
-qr-multi-imgs --path /images --action extract
-qr-multi-imgs --path /images --action extract --padding 30 --output ./extracted
-qr-multi-imgs --path /images --action extract --naming sequential
-```
-
-Options:
-- `--padding` - Safe area around QR code (default: 20px)
-- `--naming` - File naming: original/content/sequential
-- `--output` - Output folder path
-
-### 7. decode
-Decodes QR codes and displays content without creating any files.
-
-```bash
-qr-multi-imgs --path /images --action decode
-qr-multi-imgs --path /images --action decode --export-format json
-```
-
-Options:
-- `--export-format` - Output format: txt (default) or json
-
-### 8. filter
-Filters images by QR code content pattern (supports regex).
-
-```bash
-qr-multi-imgs --path /images --action filter --filter-pattern "mcdonalds"
-qr-multi-imgs --path /images --action filter --filter-pattern "https?://.*\.it" --filter-case-sensitive
-qr-multi-imgs --path /images --action filter --filter-pattern "http" --filter-exclude
-```
-
-Options:
-- `--filter-pattern` - Pattern to match (required)
-- `--filter-case-sensitive` - Enable case-sensitive matching
-- `--filter-exclude` - Show images that DON'T match the pattern
-
-### 9. batch-rename
-Renames images based on their QR code content.
-
-```bash
-qr-multi-imgs --path /images --action batch-rename
-qr-multi-imgs --path /images --action batch-rename --rename-prefix "qr_"
-qr-multi-imgs --path /images --action batch-rename --rename-suffix "_code"
-qr-multi-imgs --path /images --action batch-rename --confirm
-```
-
-Options:
-- `--rename-prefix` - Prefix to add to filename
-- `--rename-suffix` - Suffix to add to filename
-- `--confirm` - Actually apply rename (default is dry-run)
-
-### 10. verify
-Verifies that recreated QR codes match the original content.
-
-```bash
-qr-multi-imgs --path /images --action verify --output ./recreated_qr
-```
-
-Options:
-- `--output` - Folder containing recreated QR codes (required)
-
-## Supported Image Formats
-
-- JPG / JPEG
-- PNG
-- BMP
-- GIF
-- WebP
-- TIFF
-
-Case-insensitive: `.jpg`, `.JPG`, `.Jpg` all supported.
-
-## Examples
-
-### Scan Desktop Images Folder
-```bash
-qr-multi-imgs --path ~/Desktop/images --action list
-```
-
-### Scan All Subfolders
-```bash
-qr-multi-imgs --path ~/Pictures --action list --recursive
-```
-
-### Export to JSON with Progress
-```bash
-qr-multi-imgs --path /images --action export --export-format json --progress
-```
-
-### Generate QR Code Images
-```bash
-qr-multi-imgs --path /photos --action recreate --qr-format png --naming sequential
-```
-
-## Homebrew Installation
-
-### Install from tap (recommended)
-```bash
-brew tap thousandflowers/qr-multi-imgs
-brew install thousandflowers/qr-multi-imgs/qr-multi-imgs
-```
-
-### Install from local formula
-```bash
-cd /path/to/qr-multi-imgs
-brew install ./Formula/qr-multi-imgs.rb
-```
-
-### Update
-```bash
-brew upgrade qr-multi-imgs
-```
-
-### Uninstall
-```bash
-brew uninstall qr-multi-imgs
-```
-
-### Tap Repository
-- GitHub: https://github.com/thousandflowers/homebrew-qr-multi-imgs
+---
 
 ## Troubleshooting
 
-### "Cannot read image" Error
-
-The program uses multiple retry methods to handle difficult images:
-1. Standard decoding
-2. Grayscale conversion
-3. Image preprocessing (contrast/sharpness enhancement)
-4. Resolution scaling
-
 ### "zbar library not found"
 
-If you get this error, install zbar:
 ```bash
+# macOS Apple Silicon
 brew install zbar
+export DYLD_LIBRARY_PATH=/opt/homebrew/lib
+
+# macOS Intel
+brew install zbar
+export DYLD_LIBRARY_PATH=/usr/local/lib
 ```
 
-### Slow Scanning
+### Scanning lento
 
-Use parallel processing for large folders:
 ```bash
-qr-multi-imgs --path /images --action list --parallel --progress
+# Usa parallel per molte immagini
+python3 qr_multi_imgs.py --path ./images --parallel --progress
+
+# Disabilita deep scan per scan base veloce
+python3 qr_multi_imgs.py --path ./images --deep-scan=false
 ```
 
-### Large Images
+### Tante immagini non rilevate
 
-For very large images, a timeout of 30 seconds per image is applied. Use `--progress` to see progress.
+```bash
+# Prova maximum detection
+python3 qr_multi_imgs.py --path ./images --force-deep --verbose
+```
 
-## Version History
-
-- **v0.6.0** - Enhanced Detection
-  - Added 8 detection methods (standard → multi-scale)
-  - Sharpening/deblur for blurry QR codes
-  - Rotation detection for mis-rotated QR
-  - Multi-scale analysis (0.5x to 3x)
-  - Auto-retry failed images
-  - Thread-safe parallel processing
-  - Memory leak fixes
-  - Extended CLI options (--verbose, --force-deep)
-
-- **v0.5.0** - Code refactoring
-  - Separated TUI screens into separate file `tui_screens.py`
-  - Main file now cleaner (~900 lines vs ~1669 lines)
-  - TUI still available for future use
-
-- **v0.4.2** - Use interactive menu instead of TUI
-  - TUI has compatibility issues with many terminals
-  - Using simple text-based interactive menu instead
-  - Same step-by-step flow: folder → subfolders → action
-
-- **v0.4.1** - TUI fix
-  - Fixed TUI not launching properly from terminal
-  - Removed problematic stdin.isatty() check
-  - Added fallback to simple interactive menu when TUI fails
-
-- **v0.4.0** - New wizard TUI
-  - Step 1: Folder selection (with Browse button)
-  - Step 2: Scan subfolders question (Y/n)
-  - Step 3: Action selection with clear descriptions
-  - Step 4: Output settings (for Recreate/Extract only)
-  - Progress bar always visible
-
-- **v0.3.4** - Simplified TUI
-  - Launch TUI immediately without pressing Enter
-  - Simplified flow: Enter folder path first, then select action
-
-- **v0.3.3** - Launch TUI immediately without Enter key
-
-- **v0.3.2** - Homebrew formula fix
-  - Fixed Ruby syntax error in chmod statement (chmod +x -> chmod "+x")
-  - Updated Homebrew formula for proper installation
-
-- **v0.3.0** - New features and performance improvements
-  - Added 4 new actions: decode, filter, batch-rename, verify
-  - Added test coverage for new actions
-  - Optimized verify action with pre-scanning
-  - Updated documentation with new features
-
-- **v0.2.0** - Bug fixes and improvements
-  - Fixed version docstring consistency
-  - Added helper methods for code reuse
-  - Added path validation for delete/organize actions
-  - Fixed zbar library path resolution on macOS
-
-- **v0.1.0** (beta) - Initial release
-  - 6 actions (list, export, delete, organize, recreate, extract)
-  - Interactive TUI menu
-  - Multiple retry methods for difficult QR codes
-  - Homebrew tap support
+---
 
 ## License
 
-MIT License - See [LICENSE](LICENSE) file.
+MIT License - vedi file LICENSE
 
-## Author
+## Crediti
 
-QR Multi IMGS Team
-- GitHub: https://github.com/thousandflowers/qr-multi-imgs
-
-## Contributing
-
-Contributions are welcome! Please open an issue or submit a PR.
+- **Author**: QR Multi IMGS Team
+- **GitHub**: https://github.com/thousandflowers/qr-multi-imgs
+- **Issues**: https://github.com/thousandflowers/qr-multi-imgs/issues
