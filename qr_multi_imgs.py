@@ -763,6 +763,14 @@ class QRMultiIMGS:
         if not self.deep_scan:
             return [], [], "deep_disabled"
 
+        contents, bboxes = self._detect_qr_method4_sharpen(img)
+        if contents:
+            return contents, bboxes, "method4_sharpen"
+
+        contents, bboxes = self._detect_qr_method5_deblur(img)
+        if contents:
+            return contents, bboxes, "method5_deblur"
+
         gray = None
         try:
             gray = img.convert("L")
@@ -811,6 +819,10 @@ class QRMultiIMGS:
         """Phase 3: Heavy methods - only if force_deep enabled."""
         if not self.force_deep:
             return [], [], "force_deep_disabled"
+
+        contents, bboxes = self._detect_qr_method6_rotation(img)
+        if contents:
+            return contents, bboxes, "method6_rotation"
 
         contents, bboxes = self._detect_qr_method7_multiscale(img)
         if contents:
