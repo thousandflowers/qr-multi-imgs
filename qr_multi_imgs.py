@@ -10,11 +10,13 @@ Author: QR Multi IMGS Team
 License: MIT
 
 Enhanced Detection:
-- Extended preprocessing (10+ methods)
+- 11 detection methods (standard → extreme scale)
 - Sharpening for blurry QR codes
 - Deblur for very blurry QR codes
-- Rotation detection for mis-rotated QR codes
-- Multi-scale detection for different sizes
+- Multi-scale detection (0.5x to 8x)
+- Adaptive thresholding
+- Morphological operations
+- Memory leak fixes (proper image cleanup)
 - Auto-escalation for failed images
 - Verbose error reporting
 """

@@ -154,23 +154,28 @@ python3 qr_multi_imgs.py --nomenu --path /path/to/images --action recreate --qr-
 
 ## Enhanced Detection
 
-The enhanced version includes 8 detection methods:
+The enhanced version includes 11 detection methods:
 
 | Method | Purpose | Best For |
 |--------|---------|---------|
-| Method 1-3 | Standard + preprocessing | Normal QR codes |
+| Method 1 | Standard direct decode | Normal QR codes |
+| Method 2 | Grayscale conversion | Low contrast QR |
+| Method 3 (Extended) | Multiple preprocessing | Difficult QR |
 | Method 4 (Sharpening) | OpenCV sharpening kernels | Blurry QR codes |
 | Method 5 (Deblur) | Wiener + bilateral filter | Very blurry QR |
 | Method 6 (Rotation) | 90°, 180°, 270° + flips | Mis-rotated QR |
 | Method 7 (Multi-scale) | 0.5x to 3x resize | Different sizes |
 | Method 8 (QReader) | ML-based detection | Hard-to-read QR |
+| Method 9 (Adaptive) | Adaptive thresholding | Low quality images |
+| Method 10 (Morphology) | Morphological ops | Damaged QR |
+| Method 11 (Extreme) | 4x-8x scaling | Very small/large QR |
 
 ### Detection Flow
 
-1. **Phase 1** (always): Standard methods (1-3)
-2. **Phase 2** (if deep_scan): Sharpening + Deblur
-3. **Phase 3** (if force_deep): Rotation + Multi-scale
-4. **Full** (fallback): All methods combined
+1. **Phase 1** (always): Basic methods (1-2), contrast, unsharp, resize 2x
+2. **Phase 2** (deep_scan): resize 3x, gray+resize
+3. **Phase 3** (force_deep): Multi-scale, QReader, Adaptive, Morphology
+4. **Full** (fallback): Extreme scaling 4x-5x, method11
 
 ### Examples
 
