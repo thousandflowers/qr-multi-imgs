@@ -766,19 +766,29 @@ class QRMultiIMGS:
         if not self.force_deep:
             return [], [], "force_deep_disabled"
 
-        # Try QReader if available
+        contents, bboxes = self._detect_qr_method7_multiscale(img)
+        if contents:
+            return contents, bboxes, "method7_multiscale"
+
         contents, bboxes = self._detect_qr_method8_qreader(img)
         if contents:
             return contents, bboxes, "qreader"
 
+        contents, bboxes = self._detect_qr_method9_adaptive(img)
+        if contents:
+            return contents, bboxes, "method9_adaptive"
+
+        contents, bboxes = self._detect_qr_method10_morphology(img)
+        if contents:
+            return contents, bboxes, "method10_morphology"
+
         return [], [], "phase3_exhausted"
 
     def _detect_full(self, img: Image.Image) -> tuple[list, list, str]:
-        """Fallback: Extra scales."""
+        """Fallback: Extra extreme scales - only if force_deep enabled."""
         if not self.force_deep:
             return [], [], "full_disabled"
 
-        # Try extreme scales
         for scale in [4, 5]:
             try:
                 scaled = img.resize(
@@ -793,17 +803,11 @@ class QRMultiIMGS:
             except Exception:
                 continue
 
-        return [], [], "all_methods_exhausted"
-
-        contents, bboxes = self._detect_qr_method7_multiscale(img)
+        contents, bboxes = self._detect_qr_method11_extreme_scale(img)
         if contents:
-            return contents, bboxes, "method7_multiscale"
+            return contents, bboxes, "method11_extreme_scale"
 
-        return [], [], "phase3_exhausted"
-
-    def _detect_full(self, img: Image.Image) -> tuple[list, list, str]:
-        """Fallback - disabled in optimized mode."""
-        return [], [], "full_disabled"
+        return [], [], "all_methods_exhausted"
 
     def detect_qr(self, image_path: Path) -> QRCodeResult:
         """Main detection with automatic escalation for failed images."""
