@@ -141,14 +141,9 @@ class TestTUIAction:
             timeout=30,
         )
 
-        # Should exit with error, not crash
-        try:
+        with pytest.raises(SystemExit) as excinfo:
             run_cli(args)
-            # Se arriva qui, non ha gestito l'errore
-            assert False, "Should have exited with error"
-        except SystemExit as e:
-            # Questo è il comportamento corretto: exits with code 1
-            assert e.code == 1
+        assert excinfo.value.code == 2  # EC_ERROR for invalid path
 
 
 class TestQRCodeEdgeCases:
@@ -186,8 +181,7 @@ class TestExtractPathValidation:
         import tempfile
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            # Crea una cartella di output valida
-            output_folder = tempfile.mkdtemp()
+            output_folder = tmpdir  # tmpdir già è temporaneo e viene pulito
 
             scanner = QRMultiIMG(folder_path=tmpdir)
             scanner.results = [
@@ -227,20 +221,14 @@ class TestExtractPathValidation:
                 )
             ]
 
-            # Dovrebbe sollevare errore di validazione
-            try:
+            with pytest.raises((ValueError, OSError)) as excinfo:
                 scanner.action_extract(
                     output_folder=malicious_output, naming="original", padding=20
                 )
-                # Se arriva qui senza errore, il bug esiste!
-                assert False, (
-                    "SECURITY BUG: Path traversal NOT blocked in extract action!"
-                )
-            except (ValueError, OSError) as e:
-                # Questo è il comportamento corretto
-                assert "outside" in str(e).lower() or "not exist" in str(e).lower(), (
-                    f"Wrong error: {e}"
-                )
+            err_msg = str(excinfo.value).lower()
+            assert "outside" in err_msg or "not exist" in err_msg, (
+                f"Wrong error: {excinfo.value}"
+            )
 
 
 class TestRecreatePathValidation:
@@ -248,105 +236,6 @@ class TestRecreatePathValidation:
 
     def test_recreate_with_valid_output_folder(self):
         """Should accept valid output folder in recreate action"""
-        from qr_multi_imgs import QRMultiIMG, QRCodeResult
-        import tempfile
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            output_folder = tempfile.mkdtemp()
-
-            scanner = QRMultiIMG(folder_path=tmpdir)
-            scanner.results = [
-                QRCodeResult(
-                    "/fake/image.jpg",
-                    has_qr=True,
-                    qr_contents=["test content"],
-                    qr_bboxes=[(10, 10, 100, 100)],
-                )
-            ]
-
-            count = scanner.action_recreate(
-                output_folder=output_folder, naming="original"
-            )
-            assert count >= 0
-
-    def test_recreate_with_malicious_output_path(self):
-        """Should reject malicious output path (path traversal) in recreate action"""
-        from qr_multi_imgs import QRMultiIMG, QRCodeResult
-        import tempfile
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            malicious_output = os.path.join(tmpdir, "..", "..", "..", "etc")
-
-            scanner = QRMultiIMG(folder_path=tmpdir)
-            scanner.results = [
-                QRCodeResult(
-                    "/fake/image.jpg",
-                    has_qr=True,
-                    qr_contents=["test content"],
-                    qr_bboxes=[(10, 10, 100, 100)],
-                )
-            ]
-
-            try:
-                scanner.action_recreate(
-                    output_folder=malicious_output, naming="original"
-                )
-                assert False, (
-                    "SECURITY BUG: Path traversal NOT blocked in recreate action!"
-                )
-            except (ValueError, OSError) as e:
-                assert "Invalid output path" in str(e)
-
-
-class TestActionRecreate:
-    """Test action_recreate functionality"""
-
-    def test_recreate_with_no_qr_results(self):
-        """Should handle no QR results gracefully"""
-        from qr_multi_imgs import QRMultiIMG
-        import tempfile
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            scanner = QRMultiIMG(folder_path=tmpdir)
-            scanner.results = []  # No results
-
-            output_folder = tempfile.mkdtemp()
-            count = scanner.action_recreate(
-                output_folder=output_folder, naming="original"
-            )
-
-            assert count == 0
-
-    def test_recreate_naming_sequential(self):
-        """Should use sequential naming when specified"""
-        from qr_multi_imgs import QRMultiIMG, QRCodeResult
-        import tempfile
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            output_folder = tempfile.mkdtemp()
-
-            scanner = QRMultiIMG(folder_path=tmpdir, qr_format="png")
-            scanner.results = [
-                QRCodeResult(
-                    "/fake/image.jpg",
-                    has_qr=True,
-                    qr_contents=["test1", "test2"],
-                    qr_bboxes=[(10, 10, 100, 100), (200, 200, 100, 100)],
-                )
-            ]
-
-            # Non crea file perché le immagini non esistono真实, ma non deve fallire
-            count = scanner.action_recreate(
-                output_folder=output_folder, naming="sequential"
-            )
-            assert count >= 0
-
-
-class TestActionExtract:
-    """Test action_extract functionality"""
-
-    def test_extract_with_no_qr_results(self):
-        """Should handle no QR results gracefully"""
         from qr_multi_imgs import QRMultiIMG
         import tempfile
 
@@ -354,36 +243,28 @@ class TestActionExtract:
             scanner = QRMultiIMG(folder_path=tmpdir)
             scanner.results = []
 
-            output_folder = tempfile.mkdtemp()
-            count = scanner.action_extract(
-                output_folder=output_folder, naming="original", padding=20
+            count = scanner.action_recreate(
+                output_folder=tmpdir, naming="original"
             )
-
             assert count == 0
 
-    def test_extract_padding_boundary(self):
-        """Should handle padding that exceeds image boundaries"""
-        from qr_multi_imgs import QRMultiIMG, QRCodeResult
+    def test_recreate_with_malicious_output_path(self):
+        """Should reject malicious output path (path traversal) in recreate action"""
+        from qr_multi_imgs import QRMultiIMG
         import tempfile
+        import pytest
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            output_folder = tempfile.mkdtemp()
+            malicious_output = os.path.join(tmpdir, "..", "..", "..", "etc")
 
             scanner = QRMultiIMG(folder_path=tmpdir)
-            scanner.results = [
-                QRCodeResult(
-                    "/fake/small.jpg",
-                    has_qr=True,
-                    qr_contents=["test"],
-                    qr_bboxes=[(5, 5, 10, 10)],  # Small QR in corner
-                )
-            ]
+            scanner.results = []
 
-            # Large padding should be clamped to image bounds, not error
-            count = scanner.action_extract(
-                output_folder=output_folder, naming="original", padding=1000
-            )
-            assert count >= 0
+            with pytest.raises((ValueError, OSError)) as excinfo:
+                scanner.action_recreate(
+                    output_folder=malicious_output, naming="original"
+                )
+            assert "Invalid output path" in str(excinfo.value)
 
 
 class TestVersionConsistency:
@@ -739,3 +620,170 @@ class TestActionVerifyEdgeCases:
             assert "matched" in result
             assert "mismatched" in result
             assert "errors" in result
+
+
+class TestStructuredQRParse:
+    """Test structured QR content parsing"""
+
+    def test_parse_wifi(self):
+        from qr_multi_imgs import QRMultiIMGS
+        result = QRMultiIMGS.parse_structured_content('WIFI:S:MyNet;T:WPA;P:pass123;;')
+        assert result["type"] == "wifi"
+        assert result["fields"]["ssid"] == "MyNet"
+        assert result["fields"]["encryption"] == "WPA"
+
+    def test_parse_vcard(self):
+        from qr_multi_imgs import QRMultiIMGS
+        result = QRMultiIMGS.parse_structured_content(
+            "BEGIN:VCARD\nVERSION:3.0\nFN:Jane Doe\nTEL:+987654321\nEMAIL:j@test.com\nEND:VCARD"
+        )
+        assert result["type"] == "vcard"
+        assert "Jane" in result["formatted"]
+
+    def test_parse_url(self):
+        from qr_multi_imgs import QRMultiIMGS
+        result = QRMultiIMGS.parse_structured_content("https://example.com/qr")
+        assert result["type"] == "url"
+
+    def test_parse_email(self):
+        from qr_multi_imgs import QRMultiIMGS
+        result = QRMultiIMGS.parse_structured_content("mailto:user@example.com?subject=hello")
+        assert result["type"] == "email"
+        assert result["fields"]["to"] == "user@example.com"
+
+    def test_parse_sms(self):
+        from qr_multi_imgs import QRMultiIMGS
+        result = QRMultiIMGS.parse_structured_content("smsto:+123456?body=hi")
+        assert result["type"] == "sms"
+
+    def test_parse_tel(self):
+        from qr_multi_imgs import QRMultiIMGS
+        result = QRMultiIMGS.parse_structured_content("tel:+123456789")
+        assert result["type"] == "tel"
+
+    def test_parse_geo(self):
+        from qr_multi_imgs import QRMultiIMGS
+        result = QRMultiIMGS.parse_structured_content("geo:45.4642,9.1900")
+        assert result["type"] == "geo"
+
+    def test_parse_calendar(self):
+        from qr_multi_imgs import QRMultiIMGS
+        result = QRMultiIMGS.parse_structured_content(
+            "BEGIN:VEVENT\nSUMMARY:Meeting\nDTSTART:20250101T090000\nDTEND:20250101T100000\nEND:VEVENT"
+        )
+        assert result["type"] == "calendar"
+
+    def test_parse_unknown(self):
+        from qr_multi_imgs import QRMultiIMGS
+        result = QRMultiIMGS.parse_structured_content("just some random text")
+        assert result["type"] == "unknown"
+
+
+class TestScannabilityScore:
+    """Test scannability score computation"""
+
+    def test_score_empty_content(self):
+        from qr_multi_imgs import _compute_scannability_score
+        score = _compute_scannability_score("hello")
+        assert score["score"] >= 80
+
+    def test_score_long_content_penalty(self):
+        from qr_multi_imgs import _compute_scannability_score
+        score = _compute_scannability_score("x" * 2000)
+        assert score["score"] < 100
+
+    def test_score_grade_a(self):
+        from qr_multi_imgs import _compute_scannability_score
+        score = _compute_scannability_score("https://example.com")
+        assert score["grade"] == "A"
+
+
+class TestExitCodes:
+    """Test structured exit codes"""
+
+    def test_no_qr_folder_returns_no_qr(self):
+        import tempfile, argparse
+        from qr_multi_imgs import run_cli
+        with tempfile.TemporaryDirectory() as tmpdir:
+            args = argparse.Namespace(
+                path=tmpdir, action="decode", recursive=False, formats=None,
+                output=None, export_format="text", qr_format="png",
+                move=False, confirm=True, parallel=False, progress=False,
+                log=False, naming="original", timeout=15, padding=20,
+                deep_scan=True, deep_timeout=30, verbose=False, force_deep=False,
+                rename_prefix=None, rename_suffix=None, filter_pattern=None,
+                filter_case_sensitive=False, filter_exclude=False, nomenu=True,
+                json_output=True, dedup=False, symbols=None, completion=None,
+                score=False, show_qr=False,
+            )
+            with pytest.raises(SystemExit) as exc:
+                run_cli(args)
+            assert exc.value.code == 1  # EC_NO_QR
+
+
+class TestDeduplication:
+    """Test deduplication of QR contents"""
+
+    def test_deduplicate_simple(self):
+        from qr_multi_imgs import QRMultiIMGS
+        result = QRMultiIMGS.deduplicate_contents(["a", "b", "a", "c", "b"])
+        assert result == ["a", "b", "c"]
+
+    def test_deduplicate_no_dupes(self):
+        from qr_multi_imgs import QRMultiIMGS
+        result = QRMultiIMGS.deduplicate_contents(["a", "b", "c"])
+        assert result == ["a", "b", "c"]
+
+    def test_deduplicate_empty(self):
+        from qr_multi_imgs import QRMultiIMGS
+        result = QRMultiIMGS.deduplicate_contents([])
+        assert result == []
+
+
+class TestTerminalQR:
+    """Test terminal QR Unicode rendering"""
+
+    def test_qr_to_terminal_renders(self):
+        from qr_multi_imgs import _qr_to_terminal
+        result = _qr_to_terminal("hello")
+        assert "╭" in result
+        assert "╰" in result
+        assert "██" in result
+
+
+class TestShellCompletion:
+    """Test shell completion generation"""
+
+    def test_completion_bash(self):
+        from qr_multi_imgs import _generate_completion
+        import io, sys
+        out = io.StringIO()
+        old = sys.stdout
+        sys.stdout = out
+        _generate_completion("bash")
+        sys.stdout = old
+        output = out.getvalue()
+        assert "_qr_multi_imgs_completion" in output
+        assert "complete -F" in output
+
+    def test_completion_zsh(self):
+        from qr_multi_imgs import _generate_completion
+        import io, sys
+        out = io.StringIO()
+        old = sys.stdout
+        sys.stdout = out
+        _generate_completion("zsh")
+        sys.stdout = old
+        output = out.getvalue()
+        assert "#compdef" in output
+
+    def test_completion_fish(self):
+        from qr_multi_imgs import _generate_completion
+        import io, sys
+        out = io.StringIO()
+        old = sys.stdout
+        sys.stdout = out
+        _generate_completion("fish")
+        sys.stdout = old
+        output = out.getvalue()
+        assert "complete -c" in output

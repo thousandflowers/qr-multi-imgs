@@ -33,10 +33,12 @@ class TestDocumentationAlignment:
         active_in_code = len(method_numbers)
 
         readme_content = Path("README.md").read_text()
-        readme_methods = readme_content.count("Method")
+        # Conta le righe della tabella "Available Methods" che iniziano con |<numero>
+        table_rows = re.findall(r"^\|\s*\d+\s+\|", readme_content, re.MULTILINE)
+        readme_methods = len(table_rows)
 
         assert active_in_code <= readme_methods, (
-            f"Code has {active_in_code} methods but README mentions only {readme_methods}. "
+            f"Code has {active_in_code} methods but README documents only {readme_methods}. "
             f"Documentation is out of sync!"
         )
 

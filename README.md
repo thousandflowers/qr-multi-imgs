@@ -2,7 +2,7 @@
 
 > Detect QR codes from images - even difficult ones: blurry, small, rotated, low quality
 
-![Version](https://img.shields.io/badge/version-v0.6.0--Enhanced-blue)
+![Version](https://img.shields.io/badge/version-v0.6.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Python](https://img.shields.io/badge/python-3.12+-blue)
 
