@@ -718,7 +718,7 @@ class TestExitCodes:
             )
             with pytest.raises(SystemExit) as exc:
                 run_cli(args)
-            assert exc.value.code == 1  # EC_NO_QR
+            assert exc.value.code == 4  # EC_NO_QR
 
 
 class TestDeduplication:

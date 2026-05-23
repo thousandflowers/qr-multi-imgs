@@ -5,7 +5,7 @@
 # =============================================================================
 """
 QR Multi IMGS - QR Code Scanner for Images
-Version: v0.7.0
+Version: v0.9.0
 Author: QR Multi IMGS Team
 License: MIT
 
@@ -169,7 +169,7 @@ import pyzbar.pyzbar as pyzbar
 
 # ── Exit codes ────────────────────────────────────────────────
 EC_OK = 0       # QR/barcode found
-EC_NO_QR = 1    # No QR/barcode detected
+EC_NO_QR = 4    # No QR/barcode detected (distinct from error to allow scripting)
 EC_ERROR = 2    # Processing error
 
 # ── Supported symbologies ─────────────────────────────────────
@@ -189,7 +189,7 @@ SHORT_CIRCUIT_ATTEMPTS = 10  # skip expensive Phase 3/Full after this many faile
 
 CONTRAST_FACTOR = 1.5
 SHARPNESS_FACTOR = 1.5
-VERSION = "v0.8.0"
+VERSION = "v0.9.0"
 
 
 class QRCodeResult:
@@ -347,6 +347,9 @@ class QRMultiIMGS:
         return ext
 
     def _get_images(self) -> list[Path]:
+        # Single file mode
+        if self.folder_path.is_file():
+            return [self.folder_path]
         images = []
         if self.recursive:
             for ext in self.formats:
@@ -1196,7 +1199,7 @@ class QRMultiIMGS:
         self.deep_scan = original_deep_scan
         self.force_deep = original_force_deep
 
-    def scan(self, progress: bool = True) -> list[QRCodeResult]:
+    def scan(self, progress: bool = True, quiet: bool = False) -> list[QRCodeResult]:
         images = self._get_images()
         self._total_count = len(images)
 
@@ -1224,7 +1227,7 @@ class QRMultiIMGS:
                         print(
                             f"[{completed_count}/{len(images)}] {img_path.name} {status}"
                         )
-                    elif sys.stdout.isatty():
+                    elif not quiet and sys.stdout.isatty():
                         print(_spinner_text(completed_count, completed_count, len(images)), end="", flush=True)
 
                     if not result.has_qr and not result.error:
@@ -1242,7 +1245,7 @@ class QRMultiIMGS:
                     else:
                         status = _clr("✗", "red") if result.error else _clr("✗", "yellow")
                     print(f"[{self._scan_count}/{len(images)}] {img.name} {status}")
-                elif sys.stdout.isatty():
+                elif not quiet and sys.stdout.isatty():
                     print(_spinner_text(i + 1, i + 1, len(images)), end="", flush=True)
 
                 if not result.has_qr and not result.error:
@@ -1250,7 +1253,7 @@ class QRMultiIMGS:
                         self._failed_images.append(result)
 
         # Clear spinner line when done (if not showing per-file progress)
-        if not progress and sys.stdout.isatty():
+        if not progress and not quiet and sys.stdout.isatty():
             print("\r" + " " * 50 + "\r", end="", flush=True)
 
         if self.force_deep and self._failed_images:
@@ -1561,7 +1564,7 @@ class QRMultiIMGS:
         print(f"Extracted {qr_count} QR code regions in {output_path}")
         return qr_count
 
-    def action_list(self, json_output: bool = False) -> None:
+    def action_list(self, json_output: bool = False, quiet: bool = False) -> None:
         with_qr = self._get_with_qr()
         without_qr = self._get_without_qr()
         failed = self._get_failed()
@@ -1579,6 +1582,9 @@ class QRMultiIMGS:
                 "results": [r.to_dict(structured=True) for r in self.results],
             }
             print(json.dumps(data, indent=2))
+            return
+
+        if quiet:
             return
 
         print()
@@ -2157,14 +2163,24 @@ end
 
 def _validate_path(path: str, base_dir: str = None) -> tuple[bool, str]:
     try:
+        # Special case: "-" means read from stdin
+        if path == "-":
+            return True, ""
+
         input_path = Path(path)
         resolved = input_path.resolve()
 
         if not resolved.exists():
             return False, f"Path does not exist: {path}"
 
+        # Accept both files and directories
+        if resolved.is_file():
+            if resolved.suffix.lower() not in SUPPORTED_FORMATS:
+                return False, f"Unsupported image format: {path} (supported: {', '.join(sorted(SUPPORTED_FORMATS))})"
+            return True, ""
+
         if not resolved.is_dir():
-            return False, f"Path is not a directory: {path}"
+            return False, f"Path is neither a file nor a directory: {path}"
 
         if base_dir:
             base_resolved = Path(base_dir).resolve()
@@ -2180,20 +2196,36 @@ def _validate_path(path: str, base_dir: str = None) -> tuple[bool, str]:
 
 
 def run_cli(args):
-    is_valid, error = _validate_path(args.path)
-    if not is_valid:
-        print(f"Error: {error}")
-        sys.exit(2)
+    quiet = getattr(args, "quiet", False)
+    verbose = getattr(args, "verbose", False)
+    force_deep = getattr(args, "force_deep", False)
 
-    if getattr(args, "no_color", False):
-        _set_color(False)
+    # Handle stdin path "-"
+    stdin_path = None
+    if args.path == "-":
+        import tempfile
+        data = sys.stdin.buffer.read()
+        if not data:
+            print("Error: no data on stdin", file=sys.stderr)
+            sys.exit(EC_ERROR)
+        tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+        tmp.write(data)
+        tmp.close()
+        stdin_path = tmp.name
+        args.path = stdin_path
 
     formats = None
     if args.formats:
         formats = {f".{f.strip('.')}" for f in args.formats.split(",")}
 
-    verbose = getattr(args, "verbose", False)
-    force_deep = getattr(args, "force_deep", False)
+    if getattr(args, "no_color", False):
+        _set_color(False)
+
+    # Validate path before building scanner
+    is_valid, error = _validate_path(args.path)
+    if not is_valid:
+        print(f"Error: {error}", file=sys.stderr)
+        sys.exit(EC_ERROR)
 
     scanner = QRMultiIMGS(
         folder_path=args.path,
@@ -2221,17 +2253,18 @@ def run_cli(args):
     scanner._compute_score = compute_score
     scanner._show_qr = show_qr
 
-    print(f"{_clr('◇', 'cyan')} Scanning: {_clr(args.path, 'bold')}")
-    if verbose:
-        mode = "Full (force-deep)" if force_deep else "Enhanced (deep-scan)"
-        print(f"  {_clr('mode:', 'dim')} {mode}")
-        if scanner._symbols and scanner._symbols != DEFAULT_SYMBOLS:
-            print(f"  {_clr('symbols:', 'dim')} {', '.join(sorted(scanner._symbols))}")
-        if compute_score:
-            print(f"  {_clr('score:', 'dim')} scannability scoring enabled")
-    print(_clr("─" * 50, "dim"))
+    if not quiet:
+        print(f"{_clr('◇', 'cyan')} Scanning: {_clr(args.path, 'bold')}")
+        if verbose:
+            mode = "Full (force-deep)" if force_deep else "Enhanced (deep-scan)"
+            print(f"  {_clr('mode:', 'dim')} {mode}")
+            if scanner._symbols and scanner._symbols != DEFAULT_SYMBOLS:
+                print(f"  {_clr('symbols:', 'dim')} {', '.join(sorted(scanner._symbols))}")
+            if compute_score:
+                print(f"  {_clr('score:', 'dim')} scannability scoring enabled")
+        print(_clr("─" * 50, "dim"))
 
-    results = scanner.scan(progress=args.progress)
+    results = scanner.scan(progress=args.progress, quiet=quiet)
 
     # Deduplicate if requested
     if dedup:
@@ -2253,7 +2286,7 @@ def run_cli(args):
         _exit_code = EC_OK if any(r.has_qr for r in results) else EC_NO_QR if not failed else EC_ERROR
         sys.exit(_exit_code)
     elif args.action == "list":
-        scanner.action_list(json_output=args.json_output)
+        scanner.action_list(json_output=args.json_output, quiet=quiet)
         _exit_code = EC_OK if with_qr else EC_NO_QR if not failed else EC_ERROR
         sys.exit(_exit_code)
     elif args.action == "export":
@@ -2314,6 +2347,13 @@ def run_cli(args):
             json_output=args.json_output,
             verbose=verbose,
         )
+
+    # Clean up stdin temp file
+    if stdin_path:
+        try:
+            os.unlink(stdin_path)
+        except Exception:
+            pass
 
 
 QRMultiIMG = QRMultiIMGS
@@ -2434,7 +2474,31 @@ def _run_interactive_menu(args, parser):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="QR Multi IMGS - Enhanced QR Code Scanner for Images"
+        description="QR Multi IMGS - Enhanced QR Code Scanner for Images",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "EXAMPLES:\n"
+            "  # Scan a folder of images\n"
+            "  qr-multi-imgs --path ./images\n\n"
+            "  # Scan a single image\n"
+            "  qr-multi-imgs --path image.png\n\n"
+            "  # Pipe an image from another command\n"
+            "  cat image.png | qr-multi-imgs --path -\n\n"
+            "  # Quiet mode for scripting (JSON output only)\n"
+            "  qr-multi-imgs --path ./images --json --quiet\n\n"
+            "  # Maximum detection for difficult QR codes\n"
+            "  qr-multi-imgs --path ./images --force-deep --verbose\n\n"
+            "  # Delete images without QR codes\n"
+            "  qr-multi-imgs --path ./images --action delete --confirm\n\n"
+            "  # Filter by content and export\n"
+            "  qr-multi-imgs --path ./images --action filter --filter-pattern mcdonalds --export-format json\n\n"
+            "  # Watch folder for new images (continuous)\n"
+            "  qr-multi-imgs --path ./images --action watch\n\n"
+            "Exit codes:\n"
+            "  0  QR/barcode detected\n"
+            "  2  Processing error\n"
+            "  4  No QR/barcode detected (no errors)\n"
+        ),
     )
     parser.add_argument("--path", "-p", help="Folder path to scan")
     parser.add_argument(
@@ -2524,6 +2588,12 @@ def main():
         "--no-color", action="store_true", help="Disable colored output (overrides NO_COLOR)"
     )
     parser.add_argument(
+        "--quiet", "-q", action="store_true", help="Suppress progress output; only show results and errors"
+    )
+    parser.add_argument(
+        "--version", action="store_true", help="Show version and exit"
+    )
+    parser.add_argument(
         "--force-deep", action="store_true", help="Use maximum detection methods"
     )
     parser.add_argument(
@@ -2558,6 +2628,11 @@ def main():
     # Handle --no-color early so all output (--completion, --score banner, etc.) respects it
     if args.no_color:
         _set_color(False)
+
+    # Handle --version
+    if args.version:
+        print(f"qr-multi-imgs {VERSION}")
+        return
 
     # Handle --completion
     if args.completion:
