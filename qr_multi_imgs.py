@@ -25,6 +25,7 @@ import argparse
 import shutil
 import platform
 import re
+import time
 from pathlib import Path
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -39,10 +40,30 @@ _B = "\033[1m"
 _D = "\033[2m"
 _E = "\033[0m"
 
+# Color support: respects NO_COLOR env var (https://no-color.org/) and --no-color flag
+_COLOR_ENABLED = None  # None = uninitialized, set on first call
+
+
+def _color_enabled() -> bool:
+    """Return True if ANSI color output is supported."""
+    global _COLOR_ENABLED
+    if _COLOR_ENABLED is None:
+        _COLOR_ENABLED = (
+            "NO_COLOR" not in os.environ
+            and sys.stdout.isatty()
+        )
+    return _COLOR_ENABLED
+
+
+def _set_color(enabled: bool) -> None:
+    """Override color detection (used by --no-color flag)."""
+    global _COLOR_ENABLED
+    _COLOR_ENABLED = enabled
+
 
 def _clr(text: str, *codes: str) -> str:
-    """Wrap *text* in ANSI SGR *codes*; auto-disables when stdout not a tty."""
-    if not sys.stdout.isatty():
+    """Wrap *text* in ANSI SGR *codes*; respects NO_COLOR / --no-color / piped output."""
+    if not _color_enabled():
         return text
     code_map = {"green": _G, "red": _R, "yellow": _Y, "cyan": _C, "bold": _B, "dim": _D}
     return "".join(code_map[c] for c in codes) + text + _E
@@ -51,8 +72,28 @@ def _clr(text: str, *codes: str) -> str:
 # Braille spinner frames — CLI analogue of a loading animation
 _SPINNER = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 
+
+def _spinner_text(current: int, completed: int, total: int) -> str:
+    """Render a braille spinner + progress counter."""
+    idx = completed % len(_SPINNER)
+    return f"\r  {_SPINNER[idx]} {current}/{total} "
+
+
 # ── Box-drawing helpers for bold CLI output ───────────────────
-_BOX_W = 56
+_MIN_BOX_W = 40
+_MAX_BOX_W = 120
+
+
+def _get_box_width() -> int:
+    """Detect terminal width, clamped to [_MIN_BOX_W, _MAX_BOX_W]."""
+    try:
+        cols = shutil.get_terminal_size().columns
+        return max(_MIN_BOX_W, min(cols - 2, _MAX_BOX_W))
+    except Exception:
+        return _MIN_BOX_W
+
+
+_BOX_W = _get_box_width()
 
 
 def _bar(value: int, max_val: int, width: int = 10) -> str:
@@ -144,10 +185,11 @@ DEFAULT_PADDING = 20
 
 DEFAULT_TIMEOUT = 15
 DEFAULT_DEEP_TIMEOUT = 30
+SHORT_CIRCUIT_ATTEMPTS = 10  # skip expensive Phase 3/Full after this many failed decode attempts
 
 CONTRAST_FACTOR = 1.5
 SHARPNESS_FACTOR = 1.5
-VERSION = "v0.7.0"
+VERSION = "v0.8.0"
 
 
 class QRCodeResult:
@@ -340,6 +382,7 @@ class QRMultiIMGS:
         If *bbox_scale* != 1.0, divides bbox coords by scale (for rescaled images).
         Returns ([], []) on failure.
         """
+        self._decode_attempts = getattr(self, "_decode_attempts", 0) + 1
         try:
             decoded = pyzbar.decode(img)
             if decoded:
@@ -1013,6 +1056,10 @@ class QRMultiIMGS:
     def detect_qr(self, image_path: Path, symbols: set = None, compute_score: bool = False) -> QRCodeResult:
         """Main detection with automatic escalation for failed images.
 
+        Enforces *timeout* per image (0 = disabled).
+        Short-circuits after SHORT_CIRCUIT_ATTEMPTS failed decode attempts
+        to skip expensive Phase 3/Full when image likely has no QR.
+
         If *symbols* includes non-QRCODE types, barcode detection is also attempted.
         """
         contents = []
@@ -1020,6 +1067,18 @@ class QRMultiIMGS:
         symbologies = []
         detection_method = None
         all_symbols = symbols or self._symbols if hasattr(self, "_symbols") and self._symbols else DEFAULT_SYMBOLS
+        self._decode_attempts = 0  # reset per image
+        start_time = time.perf_counter()
+
+        def _timeout_exceeded() -> bool:
+            return self.timeout > 0 and (time.perf_counter() - start_time) > self.timeout
+
+        def _check_timeout():
+            if _timeout_exceeded():
+                raise TimeoutError("Detection timed out")
+
+        def _should_short_circuit() -> bool:
+            return self._decode_attempts >= SHORT_CIRCUIT_ATTEMPTS
 
         try:
             with Image.open(image_path) as img:
@@ -1028,27 +1087,31 @@ class QRMultiIMGS:
 
                 if all_symbols == DEFAULT_SYMBOLS or "QRCODE" in all_symbols:
                     # Normal QR pipeline
+                    _check_timeout()
                     contents, bboxes, method = self._detect_phase1(img)
                     if contents:
                         detection_method = method
                         if self.verbose:
                             print(f"    ✓ Detected in Phase 1: {method}")
 
-                    if not contents:
+                    if not contents and not _should_short_circuit():
+                        _check_timeout()
                         contents, bboxes, method = self._detect_phase2(img)
                         if contents:
                             detection_method = method
                             if self.verbose:
                                 print(f"    ✓ Detected in Phase 2: {method}")
 
-                    if not contents:
+                    if not contents and not _should_short_circuit():
+                        _check_timeout()
                         contents, bboxes, method = self._detect_phase3(img)
                         if contents:
                             detection_method = method
                             if self.verbose:
                                 print(f"    ✓ Detected in Phase 3: {method}")
 
-                    if not contents:
+                    if not contents and not _should_short_circuit():
+                        _check_timeout()
                         contents, bboxes, method = self._detect_full(img)
                         if contents:
                             detection_method = method
@@ -1058,6 +1121,7 @@ class QRMultiIMGS:
                 # Barcode pass (non-QR or combined)
                 barcode_symbols = all_symbols - {"QRCODE"} if "QRCODE" in all_symbols else all_symbols
                 if barcode_symbols and not contents:
+                    _check_timeout()
                     bc_contents, bc_bboxes, bc_syms = self._detect_barcodes(img, symbols=barcode_symbols)
                     if bc_contents:
                         contents = bc_contents
@@ -2121,6 +2185,9 @@ def run_cli(args):
         print(f"Error: {error}")
         sys.exit(2)
 
+    if getattr(args, "no_color", False):
+        _set_color(False)
+
     formats = None
     if args.formats:
         formats = {f".{f.strip('.')}" for f in args.formats.split(",")}
@@ -2268,6 +2335,18 @@ except ImportError:
     RunScreen = None
 
 
+def _make_args(parser, **overrides):
+    """Build argparse Namespace from parser defaults + overrides.
+
+    Gets all argument defaults from *parser*, then applies **overrides.
+    Eliminates the manual Namespace duplication in _run_interactive_menu.
+    """
+    ns = parser.parse_known_args([])[0]
+    for k, v in overrides.items():
+        setattr(ns, k, v)
+    return ns
+
+
 def _run_interactive_menu(args, parser):
     print("\n" + "=" * 50)
     print("  QR Multi IMGS - Enhanced Interactive Menu")
@@ -2332,38 +2411,16 @@ def _run_interactive_menu(args, parser):
     action_input = input().strip()
     action = action_map.get(action_input, "list")
 
-    new_args = argparse.Namespace(
+    new_args = _make_args(
+        parser,
         path=folder,
         action=action,
         recursive=recursive,
-        formats=None,
-        output=None,
-        export_format="txt",
-        qr_format="png",
-        move=False,
-        confirm=False,
-        parallel=False,
         progress=True,
-        log=False,
-        naming="original",
-        timeout=DEFAULT_TIMEOUT,
-        padding=DEFAULT_PADDING,
+        nomenu=True,
         deep_scan=deep_scan,
-        deep_timeout=DEFAULT_DEEP_TIMEOUT,
         verbose=verbose,
         force_deep=force_deep,
-        filter_pattern=None,
-        filter_case_sensitive=False,
-        filter_exclude=False,
-        rename_prefix=None,
-        rename_suffix=None,
-        nomenu=True,
-        json_output=False,
-        dedup=False,
-        symbols=None,
-        completion=None,
-        score=False,
-        show_qr=False,
     )
 
     print(f"\nRunning: {action} on {folder} (recursive={recursive})")
@@ -2464,6 +2521,9 @@ def main():
         "--verbose", "-v", action="store_true", help="Show detailed progress and errors"
     )
     parser.add_argument(
+        "--no-color", action="store_true", help="Disable colored output (overrides NO_COLOR)"
+    )
+    parser.add_argument(
         "--force-deep", action="store_true", help="Use maximum detection methods"
     )
     parser.add_argument(
@@ -2494,6 +2554,10 @@ def main():
     )
 
     args = parser.parse_args()
+
+    # Handle --no-color early so all output (--completion, --score banner, etc.) respects it
+    if args.no_color:
+        _set_color(False)
 
     # Handle --completion
     if args.completion:
