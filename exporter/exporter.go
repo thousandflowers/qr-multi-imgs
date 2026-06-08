@@ -15,7 +15,7 @@ import (
 	"github.com/makiuchi-d/gozxing"
 	"github.com/makiuchi-d/gozxing/qrcode"
 
-	"qr-multi-imgs/scanner"
+	"github.com/thousandflowers/qr-multi-imgs/scanner"
 )
 
 // ExportFormat represents the output format for export.

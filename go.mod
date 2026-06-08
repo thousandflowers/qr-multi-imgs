@@ -1,4 +1,4 @@
-module qr-multi-imgs
+module github.com/thousandflowers/qr-multi-imgs
 
 go 1.26.4
 

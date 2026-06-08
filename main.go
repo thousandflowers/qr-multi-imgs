@@ -4,11 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime/debug"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -16,8 +14,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"qr-multi-imgs/exporter"
-	"qr-multi-imgs/scanner"
+	"github.com/thousandflowers/qr-multi-imgs/exporter"
+	"github.com/thousandflowers/qr-multi-imgs/scanner"
 )
 
 // ─── TUI state ──────────────────────────────────────────────────────────────
@@ -123,37 +121,6 @@ func isWritablePath(path string) error {
 	f.Close()
 	os.Remove(testFile)
 	return nil
-}
-
-// hasDiskSpace checks that at least `needed` bytes are available on the filesystem.
-func hasDiskSpace(path string, needed int64) error {
-	var stat syscall.Statfs_t
-	if err := syscall.Statfs(path, &stat); err != nil {
-		return nil
-	}
-	available := int64(stat.Bavail) * int64(stat.Bsize)
-	if available < needed {
-		return fmt.Errorf(
-			"insufficient disk space: need ~%s, only %s available",
-			scanner.FormatBytes(needed), scanner.FormatBytes(available),
-		)
-	}
-	return nil
-}
-
-// readClipboard returns a command that reads the macOS pasteboard via pbpaste.
-func readClipboard() tea.Cmd {
-	return func() tea.Msg {
-		out, err := exec.Command("pbpaste").Output()
-		if err != nil {
-			return nil
-		}
-		path := strings.TrimSpace(string(out))
-		if path == "" {
-			return nil
-		}
-		return clipboardMsg{path: path}
-	}
 }
 
 // resolvePath normalizes user input: expands ~, strips quotes, cleans separators.
@@ -810,7 +777,41 @@ func sanitizeFilename(s string, maxLen int) string {
 
 // ─── Main ───────────────────────────────────────────────────────────────────
 
+var version = "0.1.0" // bumped on each release
+
 func main() {
+	for _, a := range os.Args[1:] {
+		if a == "-h" || a == "--help" {
+			fmt.Println(`qr-multi-imgs — scan a folder of images for QR codes
+
+Usage:
+  qr-multi-imgs                   interactive TUI (type or drag folder path)
+  qr-multi-imgs /path/to/images   scan directly, skip folder prompt
+  qr-multi-imgs --help            this help text
+  qr-multi-imgs --version         show version
+
+Actions inside the TUI:
+  l   List all scan results
+  e   Export as JSON / CSV / TXT
+  d   Delete images without QR code
+  o   Organize into with_qr / without_qr folders
+  r   Recreate QR code images from decoded content
+  q   Quit
+
+Input methods:
+  Type a path, drag & drop a folder, or press Ctrl+D to paste clipboard.
+  Press Enter on an empty input to scan the current directory.
+
+Supported formats: PNG, JPG, JPEG, GIF, BMP, WebP
+Project: https://github.com/thousandflowers/qr-multi-imgs`)
+			os.Exit(0)
+		}
+		if a == "--version" || a == "-v" {
+			fmt.Printf("qr-multi-imgs %s\n", version)
+			os.Exit(0)
+		}
+	}
+
 	m := model{
 		page:    pageFolderInput,
 		input:   textinput.New(),
