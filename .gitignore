@@ -1,0 +1,9 @@
+# Built binary
+qr-multi-imgs
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
