@@ -101,27 +101,9 @@ The original Python version worked but required `zbar`, OpenCV, and careful Pyth
 
 ## Demo
 
-```text
-┌─────────────────────────────────────────────┐
-│                                             │
-│   ╔═══ qr-multi-imgs                       ║
-│   ║                                         ║
-│   ║  Folder path: [/path/to/images]         ║
-│   ║  (Ctrl+D to paste clipboard)            ║
-│   ║                                         ║
-│   ╠═══ Results ─────────────────────────── ═╣
-│   ║                                         ║
-│   ║  ✓ github_url.png → https://github...  ║
-│   ║  ✓ wifi_config.png → WIFI:T:WPA...     ║
-│   ║  ✓ vcard_contact.png → BEGIN:VCARD...  ║
-│   ║  ✗ no_qr_here.png → (no QR found)      ║
-│   ║                                         ║
-│   ║  [l] list  [e] export  [d] delete       ║
-│   ║  [o] organize  [r] recreate  [q] quit   ║
-│   ╚═════════════════════════════════════════╝
-│                                             │
-└─────────────────────────────────────────────┘
-```
+![qr-multi-imgs demo](demo.gif)
+
+> GIF generated with [VHS](https://github.com/charmbracelet/vhs) — re-recordable anytime via `vhs _demo.tape`.
 
 ---
 
