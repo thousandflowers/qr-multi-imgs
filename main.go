@@ -777,7 +777,7 @@ func sanitizeFilename(s string, maxLen int) string {
 
 // ─── Main ───────────────────────────────────────────────────────────────────
 
-var version = "0.1.0" // bumped on each release
+var version = "1.0.0" // bumped on each release
 
 func main() {
 	for _, a := range os.Args[1:] {

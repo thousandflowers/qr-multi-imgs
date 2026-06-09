@@ -8,6 +8,7 @@ import (
 	"image/color"
 	"image/png"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -31,7 +32,7 @@ const (
 // Returns the output file path.
 func Export(results []scanner.ScanResult, format ExportFormat, sourceDir string) (string, error) {
 	ts := time.Now().Format("20060102_150405")
-	outPath := fmt.Sprintf("%s/qr_scan_%s.%s", sourceDir, ts, format)
+	outPath := filepath.Join(sourceDir, fmt.Sprintf("qr_scan_%s.%s", ts, format))
 
 	var err error
 	switch format {
@@ -41,6 +42,8 @@ func Export(results []scanner.ScanResult, format ExportFormat, sourceDir string)
 		err = writeCSV(results, outPath)
 	case FormatTXT:
 		err = writeTXT(results, outPath)
+	default:
+		return "", fmt.Errorf("unsupported export format %q", format)
 	}
 	if err != nil {
 		return "", err
@@ -68,7 +71,6 @@ func writeCSV(results []scanner.ScanResult, path string) error {
 	defer f.Close()
 
 	w := csv.NewWriter(f)
-	defer w.Flush()
 
 	w.Write([]string{"file_path", "has_qr", "qr_contents", "error", "file_size"})
 	for _, r := range results {
@@ -80,6 +82,9 @@ func writeCSV(results []scanner.ScanResult, path string) error {
 			strconv.FormatInt(r.FileSize, 10),
 		})
 	}
+	// Flush before reading w.Error(): a deferred Flush would run after the
+	// return value is evaluated, silently dropping buffered-write failures.
+	w.Flush()
 	return w.Error()
 }
 
