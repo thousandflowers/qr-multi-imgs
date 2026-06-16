@@ -1,53 +1,55 @@
 # qr-multi-imgs
 
-**Scan a folder → decode QR → organize, export, recreate.**
+**Scan a folder → decode QR → organize, export, recreate — from a clean TUI.**
+
+![demo](demo.gif)
 
 [![Go](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go)](https://go.dev)
-[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Go Report](https://goreportcard.com/badge/github.com/thousandflowers/qr-multi-imgs)](https://goreportcard.com/report/github.com/thousandflowers/qr-multi-imgs)
 [![CI](https://github.com/thousandflowers/qr-multi-imgs/actions/workflows/ci.yml/badge.svg)](https://github.com/thousandflowers/qr-multi-imgs/actions/workflows/ci.yml)
-[![Zero Deps](https://img.shields.io/badge/deps-0-darkgreen)]()
-[![Speed](https://img.shields.io/badge/scan-1300%20img%2Fs-purple)]()
+![Zero Deps](https://img.shields.io/badge/system%20deps-zero-brightgreen)
+![Speed](https://img.shields.io/badge/~1300%20imgs%2Fsec-M2%20Pro-orange)
 
 ```bash
 bash <(curl -sL https://raw.githubusercontent.com/thousandflowers/qr-multi-imgs/main/install.sh)
 qr-multi-imgs ~/Desktop/qr-test
 ```
 
-**~1300 immagini/secondo** su M2 Pro. Single binary Go. Zero dipendenze di sistema.
+**~1300 images/second** on an M2 Pro. Single Go binary. Zero system dependencies.
 
 ---
 
-## Perché
+## Why
 
-Altri scanner CLI esistono, ma nessuno ha una TUI completa per batch:
+Plenty of CLI QR scanners exist, but none ship a full TUI built for batch work:
 
 | | qr-multi-imgs | qr-scanner-cli | qrtool |
-|---|---|---|---|
-| TUI interattiva | ✅ | ❌ | ❌ |
-| Organizza file (with/without QR) | ✅ | ❌ | ❌ |
-| Elimina senza QR | ✅ | ❌ | ❌ |
-| Ricrea QR da contenuto | ✅ | ❌ | ✅ |
-| Esporta (JSON/CSV/TXT) | ✅ | ❌ | ✅ |
+| --- | --- | --- | --- |
+| Interactive TUI | ✅ | ❌ | ❌ |
+| Organize files (with/without QR) | ✅ | ❌ | ❌ |
+| Delete images without QR | ✅ | ❌ | ❌ |
+| Recreate QR from content | ✅ | ❌ | ✅ |
+| Export (JSON/CSV/TXT) | ✅ | ❌ | ✅ |
 | Drag & drop + clipboard | ✅ | ❌ | ❌ |
 | Pure Go, zero CGo | ✅ | ❌ (npm) | ✅ |
 
 ---
 
-## Azioni TUI
+## TUI actions
 
-| Tasto | Azione |
-|:-----:|--------|
-| `l` | Elenca risultati |
-| `e` | Esporta (JSON/CSV/TXT) |
-| `d` | Elimina immagini senza QR |
-| `o` | Organizza in `with_qr/` e `without_qr/` |
-| `r` | Ricrea QR 512×512 dai contenuti |
-| `q` / `^C` | Esci |
+| Key | Action |
+| --- | --- |
+| `l` | List results |
+| `e` | Export (JSON/CSV/TXT) |
+| `d` | Delete images without a QR code |
+| `o` | Organize into `with_qr/` and `without_qr/` |
+| `r` | Recreate 512×512 QR codes from decoded content |
+| `q` / `^C` | Quit |
 
-### 5 modi di input
+### 5 input methods
 
-Argomento CLI, scrivi path, drag & drop, incolla (`Cmd+V`), clipboard (`Ctrl+D`).
+CLI argument, type a path, drag & drop, paste (`Cmd+V`), clipboard (`Ctrl+D`).
 
 ---
 
@@ -57,15 +59,15 @@ Argomento CLI, scrivi path, drag & drop, incolla (`Cmd+V`), clipboard (`Ctrl+D`)
 # One-liner
 bash <(curl -sL https://raw.githubusercontent.com/thousandflowers/qr-multi-imgs/main/install.sh)
 
-# Da source
+# From source
 git clone https://github.com/thousandflowers/qr-multi-imgs.git
 cd qr-multi-imgs && go build
 ```
 
-**Requisiti:** Go 1.26+, terminale ANSI. Supporta PNG/JPEG/GIF/BMP/WebP.
+**Requirements:** Go 1.26+, an ANSI terminal. Supports PNG / JPEG / GIF / BMP / WebP.
 
 ---
 
 ## License
 
-MIT — [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE).
