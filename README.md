@@ -66,14 +66,6 @@ cd qr-multi-imgs && go build
 
 ---
 
-## Progetti correlati
-
-- [**Raccoon**](https://github.com/thousandflowers/Raccoon) — macOS companion toolkit
-- [**Parrot**](https://github.com/thousandflowers/Parrot) — correzione grammaticale offline macOS
-- [**Stockfish Continue to Play**](https://github.com/thousandflowers/stockfish-continue-to-play) — estensione Chrome scacchi
-
----
-
 ## License
 
 MIT — [LICENSE](LICENSE).
