@@ -1,6 +1,6 @@
 # qr-multi-imgs
 
-**Scan a folder → decode QR → organize, export, recreate — da una TUI pulita.**
+**Scan a folder → decode QR → organize, export, recreate.**
 
 [![Go](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go)](https://go.dev)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
