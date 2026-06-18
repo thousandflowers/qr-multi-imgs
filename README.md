@@ -1,5 +1,4 @@
 # qr-multi-imgs
-
 **Scan a folder → decode QR → organize, export, recreate — from a clean TUI.**
 
 ![demo](demo.gif)
@@ -20,6 +19,14 @@ qr-multi-imgs ~/Desktop/qr-test
 
 ---
 
+## Why I built this
+
+My father needed to catalog hundreds of photos of orders — each one a QR code on a receipt. The existing CLI tools could decode one image at a time, but none of them could handle a folder, organize the results, or do anything useful with the output.
+
+I built a first version to solve that. Then I kept improving it: detection accuracy is up ~200% from the first release, and it now scans ~3000 files in 20 seconds on an M2 Pro. Output formats expanded to include vector (SVG), bitmap, and PDF — so the recreated QR codes are print-ready, not just screen-ready.
+
+---
+
 ## Why
 
 Plenty of CLI QR scanners exist, but none ship a full TUI built for batch work:
@@ -29,7 +36,7 @@ Plenty of CLI QR scanners exist, but none ship a full TUI built for batch work:
 | Interactive TUI | ✅ | ❌ | ❌ |
 | Organize files (with/without QR) | ✅ | ❌ | ❌ |
 | Delete images without QR | ✅ | ❌ | ❌ |
-| Recreate QR from content | ✅ | ❌ | ✅ |
+| Recreate QR (SVG, bitmap, PDF) | ✅ | ❌ | bitmap only |
 | Export (JSON/CSV/TXT) | ✅ | ❌ | ✅ |
 | Drag & drop + clipboard | ✅ | ❌ | ❌ |
 | Pure Go, zero CGo | ✅ | ❌ (npm) | ✅ |
@@ -44,7 +51,7 @@ Plenty of CLI QR scanners exist, but none ship a full TUI built for batch work:
 | `e` | Export (JSON/CSV/TXT) |
 | `d` | Delete images without a QR code |
 | `o` | Organize into `with_qr/` and `without_qr/` |
-| `r` | Recreate 512×512 QR codes from decoded content |
+| `r` | Recreate QR codes from decoded content (SVG, bitmap, PDF) |
 | `q` / `^C` | Quit |
 
 ### 5 input methods
