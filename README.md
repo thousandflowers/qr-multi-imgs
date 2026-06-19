@@ -8,11 +8,14 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Go Report](https://goreportcard.com/badge/github.com/thousandflowers/qr-multi-imgs)](https://goreportcard.com/report/github.com/thousandflowers/qr-multi-imgs)
 [![CI](https://github.com/thousandflowers/qr-multi-imgs/actions/workflows/ci.yml/badge.svg)](https://github.com/thousandflowers/qr-multi-imgs/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/thousandflowers/qr-multi-imgs/graph/badge.svg)](https://codecov.io/gh/thousandflowers/qr-multi-imgs)
 ![Zero Deps](https://img.shields.io/badge/system%20deps-zero-brightgreen)
 ![Speed](https://img.shields.io/badge/3332%20QR%20in%20~23s-M2%20Pro-orange) ![Detection](https://img.shields.io/badge/detection-100%25-brightgreen)
+![Windows](https://img.shields.io/badge/Windows-supported-0078D4?logo=windows)
 
 ```bash
-bash <(curl -sL https://raw.githubusercontent.com/thousandflowers/qr-multi-imgs/main/install.sh)
+# One command — go, or curl, or brew:
+go install github.com/thousandflowers/qr-multi-imgs@latest
 qr-multi-imgs ./folder-of-qr-images
 ```
 
@@ -35,6 +38,10 @@ Plenty of CLI QR scanners exist, but none ship a full TUI built for batch work:
 | Export (JSON/CSV/TXT) | ✅ | ❌ | ✅ |
 | Drag & drop + clipboard | ✅ | ❌ | ❌ |
 | Pure Go, zero CGo | ✅ | ❌ (npm) | ✅ |
+
+### Input — 5 ways
+
+CLI argument · **drag & drop a folder onto the terminal** · type a path · paste (`Cmd+V`) · clipboard (`Ctrl+D`)
 
 ---
 
@@ -71,24 +78,42 @@ Measured on an Apple M2 Pro (10 cores, 16 GB).
 | `r` | Recreate QR codes from decoded content (choose PNG/JPG/SVG) |
 | `q` / `^C` | Quit |
 
-### 5 input methods
-
-CLI argument, type a path, drag & drop, paste (`Cmd+V`), clipboard (`Ctrl+D`).
-
 ---
 
 ## Install
 
-```bash
-# One-liner
-bash <(curl -sL https://raw.githubusercontent.com/thousandflowers/qr-multi-imgs/main/install.sh)
+### macOS — Homebrew
 
-# From source
+```bash
+brew install thousandflowers/tap/qr-multi-imgs
+```
+
+### Any platform — Go install
+
+```bash
+go install github.com/thousandflowers/qr-multi-imgs@latest
+```
+
+### One-liner (curl → bash)
+
+```bash
+bash <(curl -sL https://raw.githubusercontent.com/thousandflowers/qr-multi-imgs/main/install.sh)
+```
+
+### Prebuilt binaries
+
+Download from [GitHub Releases](https://github.com/thousandflowers/qr-multi-imgs/releases) — macOS (Intel + Apple Silicon), Linux (amd64 + arm64), Windows (amd64).
+
+### From source
+
+```bash
 git clone https://github.com/thousandflowers/qr-multi-imgs.git
 cd qr-multi-imgs && go build
 ```
 
-**Requirements:** Go 1.26+, an ANSI terminal. Supports PNG / JPEG / GIF / BMP / WebP.
+**Requirements:** Go 1.26+, an ANSI terminal.  
+**Supported formats:** PNG / JPEG / GIF / BMP / WebP.  
+**Supported platforms:** macOS, Linux, **Windows** (clipboard via external tool).
 
 ---
 

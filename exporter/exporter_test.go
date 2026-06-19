@@ -106,8 +106,30 @@ func TestExport_unknownFormat_returnsError(t *testing.T) {
 }
 
 func TestExport_unwritableDir_returnsError(t *testing.T) {
-	if _, err := Export(sampleResults(), FormatJSON, filepath.Join(t.TempDir(), "missing")); err == nil {
-		t.Fatal("Export into non-existent dir: want error, got nil")
+	dir := filepath.Join(t.TempDir(), "missing")
+	if _, err := Export(sampleResults(), FormatJSON, dir); err == nil {
+		t.Fatal("Export(json) into non-existent dir: want error, got nil")
+	}
+	if _, err := Export(sampleResults(), FormatCSV, dir); err == nil {
+		t.Fatal("Export(csv) into non-existent dir: want error, got nil")
+	}
+	if _, err := Export(sampleResults(), FormatTXT, dir); err == nil {
+		t.Fatal("Export(txt) into non-existent dir: want error, got nil")
+	}
+}
+
+func TestWriteQRCodeFormat_emptyContent(t *testing.T) {
+	dir := t.TempDir()
+	out := filepath.Join(dir, "qr.png")
+	if err := WriteQRCodeFormat("", out, QRFormatPNG); err == nil {
+		t.Fatal("WriteQRCodeFormat with empty content: want error, got nil")
+	}
+}
+
+func TestWriteQRCodeFormat_unwritableDir(t *testing.T) {
+	out := filepath.Join(t.TempDir(), "missing", "qr.png")
+	if err := WriteQRCodeFormat("hello", out, QRFormatPNG); err == nil {
+		t.Fatal("WriteQRCodeFormat into non-existent dir: want error, got nil")
 	}
 }
 
