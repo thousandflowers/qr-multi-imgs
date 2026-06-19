@@ -17,6 +17,13 @@ import (
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
+func skipOnWindows(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows semantics differ from Unix for this test")
+	}
+}
+
 func testModel() model {
 	return model{
 		page:    pageFolderInput,
@@ -64,6 +71,9 @@ func TestResolvePath(t *testing.T) {
 		}
 	})
 	t.Run("trims whitespace", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("Unix absolute path used for test input")
+		}
 		got, err := resolvePath("  /tmp/test  ")
 		if err != nil {
 			t.Fatalf("resolvePath error: %v", err)
@@ -73,6 +83,9 @@ func TestResolvePath(t *testing.T) {
 		}
 	})
 	t.Run("strips quotes", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("Unix absolute path used for test input")
+		}
 		got, err := resolvePath(`"/tmp/test"`)
 		if err != nil {
 			t.Fatalf("resolvePath error: %v", err)
@@ -314,6 +327,7 @@ func TestDeleteWithoutQR_deletesOnlyNoQR(t *testing.T) {
 }
 
 func TestDeleteWithoutQR_removeError(t *testing.T) {
+	skipOnWindows(t)
 	dir := t.TempDir()
 	f := filepath.Join(dir, "target.png")
 	os.WriteFile(f, []byte("x"), 0644)
@@ -392,6 +406,7 @@ func TestOrganizeByQR(t *testing.T) {
 }
 
 func TestOrganizeByQR_renameError(t *testing.T) {
+	skipOnWindows(t)
 	dir := t.TempDir()
 	sub := filepath.Join(dir, "sub")
 	os.MkdirAll(sub, 0755)
@@ -495,6 +510,7 @@ func TestRecreateQRs_noopWhenNoQR(t *testing.T) {
 }
 
 func TestRecreateQRs_writeError(t *testing.T) {
+	skipOnWindows(t)
 	dir := t.TempDir()
 	f := filepath.Join(dir, "test.png")
 	os.WriteFile(f, []byte("x"), 0644)
@@ -972,6 +988,7 @@ func TestUpdateFolderInput_enter_fileNotDir(t *testing.T) {
 }
 
 func TestValidateScanPath_permissionDenied(t *testing.T) {
+	skipOnWindows(t)
 	dir := t.TempDir()
 	sub := filepath.Join(dir, "sub")
 	os.MkdirAll(sub, 0755)
@@ -1328,6 +1345,7 @@ func TestUpdateQRFormat_enterSVG(t *testing.T) {
 }
 
 func TestUpdateQRFormat_enterUnwritableDir(t *testing.T) {
+	skipOnWindows(t)
 	dir := t.TempDir()
 	sub := filepath.Join(dir, "sub")
 	os.MkdirAll(sub, 0755)
@@ -1493,6 +1511,7 @@ func TestUpdateExportFormat_noResults(t *testing.T) {
 }
 
 func TestUpdateExportFormat_enterUnwritableDir(t *testing.T) {
+	skipOnWindows(t)
 	dir := t.TempDir()
 	sub := filepath.Join(dir, "sub")
 	os.MkdirAll(sub, 0755)
@@ -1659,6 +1678,7 @@ func TestExecuteAction_organizeByQR(t *testing.T) {
 }
 
 func TestExecuteAction_deleteWithoutQR_unwritableDir(t *testing.T) {
+	skipOnWindows(t)
 	dir := t.TempDir()
 	sub := filepath.Join(dir, "sub")
 	os.MkdirAll(sub, 0755)
@@ -1687,6 +1707,7 @@ func TestExecuteAction_deleteWithoutQR_unwritableDir(t *testing.T) {
 }
 
 func TestExecuteAction_organizeByQR_unwritableDir(t *testing.T) {
+	skipOnWindows(t)
 	dir := t.TempDir()
 	sub := filepath.Join(dir, "sub")
 	os.MkdirAll(sub, 0755)
