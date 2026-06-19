@@ -8,3 +8,7 @@ qr-scanner
 # IDE
 .idea/
 .vscode/
+
+# Coverage
+coverage.out
+coverage.txt
