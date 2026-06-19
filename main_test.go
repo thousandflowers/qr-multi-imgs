@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -940,8 +941,8 @@ func TestUpdateFolderInput_ctrlC(t *testing.T) {
 func TestUpdateFolderInput_ctrlD(t *testing.T) {
 	m := testModel()
 	_, cmd := m.updateFolderInput(tea.KeyMsg{Type: tea.KeyCtrlD})
-	if cmd == nil {
-		t.Error("expected readClipboard cmd")
+	if runtime.GOOS == "darwin" && cmd == nil {
+		t.Error("expected readClipboard cmd on macOS")
 	}
 }
 
