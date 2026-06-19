@@ -28,11 +28,11 @@ jobs:
         run: go vet ./...
 
       - name: Test
-        run: go test -v -count=1 -coverprofile=coverage.txt . ./exporter ./scanner
+        run: go test -v -count=1 -coverprofile=${{ runner.temp }}/coverage.txt . ./exporter ./scanner
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
-          file: coverage.txt
+          file: ${{ runner.temp }}/coverage.txt
           flags: unittests
           fail_ci_if_error: false
