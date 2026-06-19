@@ -128,3 +128,48 @@ func TestWriteQRCode_roundTripThroughScanner(t *testing.T) {
 		t.Fatalf("round trip = %v, want [%s]", decoded, content)
 	}
 }
+
+func TestWriteQRCodeFormat_jpg(t *testing.T) {
+	dir := t.TempDir()
+	out := filepath.Join(dir, "qr.jpg")
+	const content = "hello-jpg"
+	if err := WriteQRCodeFormat(content, out, QRFormatJPG); err != nil {
+		t.Fatalf("WriteQRCodeFormat(jpg) error: %v", err)
+	}
+	info, err := os.Stat(out)
+	if err != nil {
+		t.Fatalf("output JPG not found: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatal("output JPG is empty")
+	}
+}
+
+func TestWriteQRCodeFormat_svg_syntax(t *testing.T) {
+	dir := t.TempDir()
+	out := filepath.Join(dir, "qr.svg")
+	const content = "hello-svg"
+	if err := WriteQRCodeFormat(content, out, QRFormatSVG); err != nil {
+		t.Fatalf("WriteQRCodeFormat(svg) error: %v", err)
+	}
+	data, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatalf("output SVG not readable: %v", err)
+	}
+	svg := string(data)
+	if !strings.Contains(svg, "<svg ") || !strings.Contains(svg, "</svg>") {
+		t.Fatal("output is not valid SVG")
+	}
+	if !strings.Contains(svg, "<rect") {
+		t.Fatal("SVG has no rect elements (empty QR?)")
+	}
+}
+
+func TestWriteQRCodeFormat_unsupported(t *testing.T) {
+	dir := t.TempDir()
+	out := filepath.Join(dir, "qr.pdf")
+	const content = "hello"
+	if err := WriteQRCodeFormat(content, out, QRCodeFormat("pdf")); err == nil {
+		t.Fatal("WriteQRCodeFormat(pdf) expected error, got nil")
+	}
+}

@@ -1,4 +1,5 @@
 # qr-multi-imgs
+
 **Scan a folder → decode QR → organize, export, recreate — from a clean TUI.**
 
 ![demo](demo.gif)
@@ -8,14 +9,14 @@
 [![Go Report](https://goreportcard.com/badge/github.com/thousandflowers/qr-multi-imgs)](https://goreportcard.com/report/github.com/thousandflowers/qr-multi-imgs)
 [![CI](https://github.com/thousandflowers/qr-multi-imgs/actions/workflows/ci.yml/badge.svg)](https://github.com/thousandflowers/qr-multi-imgs/actions/workflows/ci.yml)
 ![Zero Deps](https://img.shields.io/badge/system%20deps-zero-brightgreen)
-![Speed](https://img.shields.io/badge/~1300%20imgs%2Fsec-M2%20Pro-orange)
+![Speed](https://img.shields.io/badge/~140%20imgs%2Fsec-M2%20Pro-orange)
 
 ```bash
 bash <(curl -sL https://raw.githubusercontent.com/thousandflowers/qr-multi-imgs/main/install.sh)
 qr-multi-imgs ~/Desktop/qr-test
 ```
 
-**~1300 images/second** on an M2 Pro. Single Go binary. Zero system dependencies.
+**~140 images/second** on an M2 Pro (3332 QR, ~23s). Single Go binary. Zero system dependencies.
 
 ---
 
@@ -51,7 +52,7 @@ Plenty of CLI QR scanners exist, but none ship a full TUI built for batch work:
 | `e` | Export (JSON/CSV/TXT) |
 | `d` | Delete images without a QR code |
 | `o` | Organize into `with_qr/` and `without_qr/` |
-| `r` | Recreate QR codes from decoded content (SVG, bitmap, PDF) |
+| `r` | Recreate QR codes from decoded content (choose PNG/JPG/SVG) |
 | `q` / `^C` | Quit |
 
 ### 5 input methods

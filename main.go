@@ -28,6 +28,7 @@ const (
 	pageResults
 	pageList
 	pageExportFormat
+	pageQRFormat
 	pageWorking
 	pageDone
 	pageError
@@ -39,6 +40,7 @@ type model struct {
 	input           textinput.Model
 	spinner         spinner.Model
 	exportFmt       string
+	qrRecreateFmt   string
 	errMsg          string
 	actionMsg       string
 	width           int
@@ -171,6 +173,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateList(msg)
 		case pageExportFormat:
 			return m.updateExportFormat(msg)
+		case pageQRFormat:
+			return m.updateQRFormat(msg)
 		case pageDone, pageError:
 			return m.updateDone(msg)
 		case pageWorking:
@@ -318,14 +322,9 @@ func (m model) executeAction(idx int) (tea.Model, tea.Cmd) {
 			m.actionMsg = "No images with QR code to recreate."
 			return m, nil
 		}
-		base := filepath.Dir(m.summary.Results[0].FilePath)
-		if err := isWritablePath(base); err != nil {
-			m.page = pageError
-			m.errMsg = err.Error()
-			return m, nil
-		}
-		m.page = pageWorking
-		return m, safeCmd(recreateQRs(m.summary))
+		m.page = pageQRFormat
+		m.cursor = 0
+		return m, nil
 
 	case 5:
 		m.page = pageFolderInput
@@ -353,6 +352,40 @@ func (m model) updateList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.cursor++
 		}
 		return m, nil
+	case tea.KeyEscape, tea.KeyBackspace:
+		m.page = pageResults
+		return m, nil
+	case tea.KeyCtrlC:
+		return m, tea.Quit
+	}
+	return m, nil
+}
+
+// ─── page: QR recreate format ──────────────────────────────────────────────
+
+func (m model) updateQRFormat(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.Type {
+	case tea.KeyUp:
+		if m.cursor > 0 {
+			m.cursor--
+		}
+		return m, nil
+	case tea.KeyDown:
+		if m.cursor < 2 {
+			m.cursor++
+		}
+		return m, nil
+	case tea.KeyEnter:
+		formats := []string{"png", "jpg", "svg"}
+		m.qrRecreateFmt = formats[m.cursor]
+		base := filepath.Dir(m.summary.Results[0].FilePath)
+		if err := isWritablePath(base); err != nil {
+			m.page = pageError
+			m.errMsg = err.Error()
+			return m, nil
+		}
+		m.page = pageWorking
+		return m, safeCmd(recreateQRs(m.summary, m.qrRecreateFmt))
 	case tea.KeyEscape, tea.KeyBackspace:
 		m.page = pageResults
 		return m, nil
@@ -428,6 +461,8 @@ func (m model) View() string {
 		return m.viewList()
 	case pageExportFormat:
 		return m.viewExportFormat()
+	case pageQRFormat:
+		return m.viewQRFormat()
 	case pageWorking:
 		return m.viewWorking()
 	case pageDone:
@@ -552,6 +587,27 @@ func (m model) viewList() string {
 	b.WriteString(helpStyle.Render(
 		fmt.Sprintf("↑ ↓ scroll (%d items)  •  Esc back  •  Ctrl+C quit",
 			len(results))))
+	return b.String()
+}
+
+func (m model) viewQRFormat() string {
+	var b strings.Builder
+	b.WriteString(titleStyle.Render("Recreate QR Code Images"))
+	b.WriteString("\n\n")
+	b.WriteString(mutedStyle.Render("Choose output image format:"))
+	b.WriteString("\n\n")
+
+	formats := []string{"PNG (.png)", "JPG (.jpg)", "SVG (.svg)"}
+	for i, f := range formats {
+		prefix := "  "
+		if i == m.cursor {
+			prefix = cursorStyle.Render("▸ ")
+		}
+		b.WriteString(fmt.Sprintf("%s%s\n", prefix, f))
+	}
+
+	b.WriteString("\n")
+	b.WriteString(helpStyle.Render("↑ ↓ navigate  •  Enter select  •  Esc back"))
 	return b.String()
 }
 
@@ -684,7 +740,7 @@ func organizeByQR(s *scanner.Summary) tea.Cmd {
 	}
 }
 
-func recreateQRs(s *scanner.Summary) tea.Cmd {
+func recreateQRs(s *scanner.Summary, format string) tea.Cmd {
 	return func() tea.Msg {
 		base := filepath.Dir(s.Results[0].FilePath)
 		outDir := filepath.Join(base, "recreated_qr")
@@ -706,8 +762,8 @@ func recreateQRs(s *scanner.Summary) tea.Cmd {
 				if i > 0 {
 					safeName = fmt.Sprintf("%s_%d", safeName, i+1)
 				}
-				outPath := filepath.Join(outDir, safeName+".png")
-				if err := exporter.WriteQRCode(content, outPath); err != nil {
+				outPath := filepath.Join(outDir, safeName+"."+format)
+				if err := exporter.WriteQRCodeFormat(content, outPath, exporter.QRCodeFormat(format)); err != nil {
 					errs = append(errs, fmt.Sprintf("%s: %v", safeName, err))
 				} else {
 					created++
@@ -715,7 +771,7 @@ func recreateQRs(s *scanner.Summary) tea.Cmd {
 			}
 		}
 
-		msg := fmt.Sprintf("Created %d QR image(s) in %s/", created, filepath.Base(outDir))
+		msg := fmt.Sprintf("Created %d QR image(s) in %s/ (format: %s)", created, filepath.Base(outDir), format)
 		if len(errs) > 0 {
 			msg += "\n\nErrors:\n" + strings.Join(errs, "\n")
 		}
@@ -777,7 +833,7 @@ func sanitizeFilename(s string, maxLen int) string {
 
 // ─── Main ───────────────────────────────────────────────────────────────────
 
-var version = "1.0.0" // bumped on each release
+var version = "1.1.0"
 
 func main() {
 	for _, a := range os.Args[1:] {

@@ -1,11 +1,13 @@
 package exporter
 
 import (
+	"bytes"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"image"
 	"image/color"
+	"image/jpeg"
 	"image/png"
 	"os"
 	"path/filepath"
@@ -118,8 +120,27 @@ func writeTXT(results []scanner.ScanResult, path string) error {
 	return nil
 }
 
+// QRCodeFormat is the image format for generated QR code images.
+type QRCodeFormat string
+
+const (
+	QRFormatPNG QRCodeFormat = "png"
+	QRFormatJPG QRCodeFormat = "jpg"
+	QRFormatSVG QRCodeFormat = "svg"
+)
+
 // WriteQRCode generates a 512x512 PNG QR code image at outputPath encoding content.
 func WriteQRCode(content, outputPath string) error {
+	return WriteQRCodeFormat(content, outputPath, QRFormatPNG)
+}
+
+func WriteQRCodeFormat(content, outputPath string, format QRCodeFormat) error {
+	switch format {
+	case QRFormatPNG, QRFormatJPG, QRFormatSVG:
+	default:
+		return fmt.Errorf("unsupported QR format %q", format)
+	}
+
 	writer := qrcode.NewQRCodeWriter()
 
 	hints := map[gozxing.EncodeHintType]interface{}{
@@ -131,6 +152,14 @@ func WriteQRCode(content, outputPath string) error {
 		return fmt.Errorf("encode: %w", err)
 	}
 
+	if format == QRFormatSVG {
+		return writeQRCodeSVG(bitMatrix, content, outputPath)
+	}
+
+	return writeQRCodeImage(bitMatrix, outputPath, format)
+}
+
+func writeQRCodeImage(bitMatrix *gozxing.BitMatrix, outputPath string, format QRCodeFormat) error {
 	w := bitMatrix.GetWidth()
 	h := bitMatrix.GetHeight()
 	img := image.NewGray(image.Rect(0, 0, w, h))
@@ -151,5 +180,33 @@ func WriteQRCode(content, outputPath string) error {
 	}
 	defer f.Close()
 
-	return png.Encode(f, img)
+	switch format {
+	case QRFormatJPG:
+		return jpeg.Encode(f, img, &jpeg.Options{Quality: 90})
+	default:
+		return png.Encode(f, img)
+	}
+}
+
+func writeQRCodeSVG(bitMatrix *gozxing.BitMatrix, content, outputPath string) error {
+	w := bitMatrix.GetWidth()
+	h := bitMatrix.GetHeight()
+
+	var buf bytes.Buffer
+	buf.WriteString(fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" viewBox="0 0 %d %d">
+  <rect width="%d" height="%d" fill="#fff"/>
+`, w, h, w, h, w, h))
+
+	moduleSize := 1
+	for y := 0; y < h; y += moduleSize {
+		for x := 0; x < w; x += moduleSize {
+			if bitMatrix.Get(x, y) {
+				buf.WriteString(fmt.Sprintf(`  <rect x="%d" y="%d" width="%d" height="%d" fill="#000"/>
+`, x, y, moduleSize, moduleSize))
+			}
+		}
+	}
+	buf.WriteString(`</svg>`)
+
+	return os.WriteFile(outputPath, buf.Bytes(), 0644)
 }
