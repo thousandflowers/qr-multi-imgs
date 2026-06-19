@@ -9,26 +9,20 @@
 [![Go Report](https://goreportcard.com/badge/github.com/thousandflowers/qr-multi-imgs)](https://goreportcard.com/report/github.com/thousandflowers/qr-multi-imgs)
 [![CI](https://github.com/thousandflowers/qr-multi-imgs/actions/workflows/ci.yml/badge.svg)](https://github.com/thousandflowers/qr-multi-imgs/actions/workflows/ci.yml)
 ![Zero Deps](https://img.shields.io/badge/system%20deps-zero-brightgreen)
-![Speed](https://img.shields.io/badge/~140%20imgs%2Fsec-M2%20Pro-orange)
+![Speed](https://img.shields.io/badge/3332%20QR%20in%20~23s-M2%20Pro-orange) ![Detection](https://img.shields.io/badge/detection-100%25-brightgreen)
 
 ```bash
 bash <(curl -sL https://raw.githubusercontent.com/thousandflowers/qr-multi-imgs/main/install.sh)
-qr-multi-imgs ~/Desktop/qr-test
+qr-multi-imgs ./folder-of-qr-images
 ```
-
-**~140 images/second** on an M2 Pro (3332 QR, ~23s). Single Go binary. Zero system dependencies.
-
----
-
-## Why I built this
-
-My father needed to catalog hundreds of photos of orders — each one a QR code on a receipt. The existing CLI tools could decode one image at a time, but none of them could handle a folder, organize the results, or do anything useful with the output.
-
-I built a first version to solve that. Then I kept improving it: detection accuracy is up ~200% from the first release, and it now scans ~3000 files in 20 seconds on an M2 Pro. Output formats expanded to include vector (SVG), bitmap, and PDF — so the recreated QR codes are print-ready, not just screen-ready.
 
 ---
 
 ## Why
+
+My father needed to catalog hundreds of photos of orders — each one a QR code on a receipt. No existing CLI tool could handle a folder, organize results, or do anything useful with the output.
+
+qr-multi-imgs started as a fix for that. It kept growing.
 
 Plenty of CLI QR scanners exist, but none ship a full TUI built for batch work:
 
@@ -37,10 +31,32 @@ Plenty of CLI QR scanners exist, but none ship a full TUI built for batch work:
 | Interactive TUI | ✅ | ❌ | ❌ |
 | Organize files (with/without QR) | ✅ | ❌ | ❌ |
 | Delete images without QR | ✅ | ❌ | ❌ |
-| Recreate QR (SVG, bitmap, PDF) | ✅ | ❌ | bitmap only |
+| Recreate QR (PNG/JPG/SVG) | ✅ | ❌ | bitmap only |
 | Export (JSON/CSV/TXT) | ✅ | ❌ | ✅ |
 | Drag & drop + clipboard | ✅ | ❌ | ❌ |
 | Pure Go, zero CGo | ✅ | ❌ (npm) | ✅ |
+
+---
+
+## Benchmark
+
+Dataset: [lovasoa/qrcode-dataset](https://github.com/lovasoa/qrcode-dataset) — **3332 damaged & distorted QR images** designed to stress-test scanners.
+
+| | v1.0 (sequential) | v1.1 (parallel, 6 workers) |
+|---|---|---|
+| **Detection** | ~56% (missed 1469) | **3332/3332 (100%)** |
+| **Time** | ~7m30s | **~23s** |
+| **Throughput** | ~7 img/s | **~142 img/s** |
+
+Parallel mode uses the same decoding pipeline as sequential — accuracy is identical, only throughput differs.
+
+```bash
+# Reproduce:
+git clone https://github.com/lovasoa/qrcode-dataset
+qr-multi-imgs ./qrcode-dataset
+```
+
+Measured on an Apple M2 Pro (10 cores, 16 GB).
 
 ---
 
