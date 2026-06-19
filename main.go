@@ -72,10 +72,10 @@ func (m model) Init() tea.Cmd {
 // ─── Messages ───────────────────────────────────────────────────────────────
 
 type scanCompleteMsg struct{ summary *scanner.Summary }
-type actionDoneMsg   struct{ message string }
-type actionErrorMsg  struct{ err error }
-type crashMsg        struct{ recover interface{} }
-type clipboardMsg    struct{ path string }
+type actionDoneMsg struct{ message string }
+type actionErrorMsg struct{ err error }
+type crashMsg struct{ recover interface{} }
+type clipboardMsg struct{ path string }
 
 // safeCmd wraps a command closure with panic recovery.
 func safeCmd(fn func() tea.Msg) tea.Cmd {
@@ -212,12 +212,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if m.page == pageScanning {
-		var cmd tea.Cmd
-		m.spinner, cmd = m.spinner.Update(msg)
-		return m, cmd
+		return m.updateScanning(msg)
 	}
 
 	return m, nil
+}
+
+func (m model) updateScanning(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	m.spinner, cmd = m.spinner.Update(msg)
+	return m, cmd
 }
 
 // ─── page: folder input ─────────────────────────────────────────────────────

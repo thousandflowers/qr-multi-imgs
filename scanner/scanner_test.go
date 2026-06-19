@@ -6,6 +6,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/makiuchi-d/gozxing"
@@ -245,6 +246,9 @@ func TestScanFolder_corruptImage(t *testing.T) {
 }
 
 func TestScanFolder_unreadableDir(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("chmod permissions work differently on Windows")
+	}
 	dir := t.TempDir()
 	if err := os.Chmod(dir, 0000); err != nil {
 		t.Skipf("chmod failed: %v", err)

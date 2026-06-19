@@ -17,7 +17,7 @@ func writeNPY(t *testing.T, path, hdr string, data []byte) {
 	}
 	defer f.Close()
 	f.Write([]byte("\x93NUMPY"))
-	f.Write([]byte{1, 0})             // version 1.0
+	f.Write([]byte{1, 0}) // version 1.0
 	binary.Write(f, binary.LittleEndian, uint16(len(hdr)))
 	f.WriteString(hdr)
 	f.Write(data)
