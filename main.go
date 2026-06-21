@@ -54,7 +54,6 @@ var (
 	okStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("#22C55E"))
 	warnStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#EAB308"))
 	errStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#EF4444"))
-	infoStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#3B82F6"))
 	cursorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#7C3AED"))
 	helpStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#52525B")).MarginTop(1)
 	mutedStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#A1A1AA"))
@@ -164,22 +163,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
-		switch m.page {
-		case pageFolderInput:
-			return m.updateFolderInput(msg)
-		case pageResults:
-			return m.updateResults(msg)
-		case pageList:
-			return m.updateList(msg)
-		case pageExportFormat:
-			return m.updateExportFormat(msg)
-		case pageQRFormat:
-			return m.updateQRFormat(msg)
-		case pageDone, pageError:
-			return m.updateDone(msg)
-		case pageWorking:
-			return m, nil
-		}
+		return m.handleKeyMsg(msg)
 
 	case scanCompleteMsg:
 		m.page = pageResults
@@ -215,6 +199,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateScanning(msg)
 	}
 
+	return m, nil
+}
+
+func (m model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch m.page {
+	case pageFolderInput:
+		return m.updateFolderInput(msg)
+	case pageResults:
+		return m.updateResults(msg)
+	case pageList:
+		return m.updateList(msg)
+	case pageExportFormat:
+		return m.updateExportFormat(msg)
+	case pageQRFormat:
+		return m.updateQRFormat(msg)
+	case pageDone, pageError:
+		return m.updateDone(msg)
+	case pageWorking:
+		return m, nil
+	}
 	return m, nil
 }
 
@@ -839,10 +843,42 @@ func sanitizeFilename(s string, maxLen int) string {
 
 var version = "1.1.0"
 
+// ponytail: overridable in tests; avoids os.Exit killing the test process.
+var osExit = os.Exit
+
 func main() {
-	for _, a := range os.Args[1:] {
-		if a == "-h" || a == "--help" {
-			fmt.Println(`qr-multi-imgs — scan a folder of images for QR codes
+	showHelp, showVersion := parseArgs(os.Args[1:])
+	if showHelp {
+		printHelp()
+		osExit(0)
+	}
+	if showVersion {
+		printVersion()
+		osExit(0)
+	}
+	m := initModel(os.Args)
+	p := tea.NewProgram(m, tea.WithAltScreen())
+	if _, err := p.Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		osExit(1)
+	}
+}
+
+// parseArgs extracts flags from CLI args without side effects.
+func parseArgs(args []string) (showHelp, showVersion bool) {
+	for _, a := range args {
+		switch a {
+		case "-h", "--help":
+			showHelp = true
+		case "-v", "--version":
+			showVersion = true
+		}
+	}
+	return
+}
+
+func printHelp() {
+	fmt.Println(`qr-multi-imgs — scan a folder of images for QR codes
 
 Usage:
   qr-multi-imgs                   interactive TUI (type or drag folder path)
@@ -864,14 +900,14 @@ Input methods:
 
 Supported formats: PNG, JPG, JPEG, GIF, BMP, WebP
 Project: https://github.com/thousandflowers/qr-multi-imgs`)
-			os.Exit(0)
-		}
-		if a == "--version" || a == "-v" {
-			fmt.Printf("qr-multi-imgs %s\n", version)
-			os.Exit(0)
-		}
-	}
+}
 
+func printVersion() {
+	fmt.Printf("qr-multi-imgs %s\n", version)
+}
+
+// initModel creates and configures the initial TUI model from CLI args.
+func initModel(args []string) model {
 	m := model{
 		page:    pageFolderInput,
 		input:   textinput.New(),
@@ -882,8 +918,8 @@ Project: https://github.com/thousandflowers/qr-multi-imgs`)
 	m.input.CharLimit = 512
 	m.input.Width = 80
 
-	if len(os.Args) > 1 && os.Args[1] != "" && os.Args[1][0] != '-' {
-		path, err := resolvePath(os.Args[1])
+	if len(args) > 1 && args[1] != "" && args[1][0] != '-' {
+		path, err := resolvePath(args[1])
 		if err == nil {
 			if err := validateScanPath(path); err == nil {
 				m.page = pageScanning
@@ -898,10 +934,5 @@ Project: https://github.com/thousandflowers/qr-multi-imgs`)
 	if m.page != pageScanning {
 		m.input.Focus()
 	}
-
-	p := tea.NewProgram(m, tea.WithAltScreen())
-	if _, err := p.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
-	}
+	return m
 }

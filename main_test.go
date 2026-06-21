@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -1896,5 +1898,367 @@ func TestView_unknownPage(t *testing.T) {
 	v := m.View()
 	if v != "" {
 		t.Errorf("expected empty string for unknown page, got %q", v)
+	}
+}
+
+// ─── hasDiskSpace ───────────────────────────────────────────────────────────
+
+func TestHasDiskSpace_sufficient(t *testing.T) {
+	if err := hasDiskSpace(t.TempDir(), 10); err != nil {
+		t.Errorf("hasDiskSpace should pass with small need, got %v", err)
+	}
+}
+
+func TestHasDiskSpace_insufficient(t *testing.T) {
+	err := hasDiskSpace("/tmp", 1<<60)
+	if err == nil {
+		t.Log("warning: 1<<60 was somehow available (huge fs)")
+	}
+}
+
+func TestHasDiskSpace_statFailure(t *testing.T) {
+	if err := hasDiskSpace("/nonexistent_path_for_testing", 10); err != nil {
+		t.Errorf("expected nil on stat failure, got %v", err)
+	}
+}
+
+// ─── handleKeyMsg scanning branch ───────────────────────────────────────────
+
+func TestHandleKeyMsg_scanning(t *testing.T) {
+	m := testModel()
+	m.page = pageScanning
+	m2, cmd := m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd != nil {
+		t.Error("expected nil cmd for scanning page")
+	}
+	_ = m2
+}
+
+func TestHandleKeyMsg_unknown(t *testing.T) {
+	m := testModel()
+	m.page = page(999)
+	m2, cmd := m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd != nil {
+		t.Error("expected nil cmd for unknown page")
+	}
+	_ = m2
+}
+
+// ─── executeAction delete dir unwritable ─────────────────────────────────────
+
+func TestExecuteAction_deleteDirUnwritable(t *testing.T) {
+	dir := t.TempDir()
+	sub := filepath.Join(dir, "sub")
+	os.MkdirAll(sub, 0755)
+	f := filepath.Join(sub, "img.png")
+	os.WriteFile(f, []byte("x"), 0644)
+	os.Chmod(sub, 0444)
+	defer os.Chmod(sub, 0755)
+
+	s := &scanner.Summary{
+		Results: []scanner.ScanResult{
+			{FilePath: f, HasQR: false},
+		},
+		WithoutQR: 1,
+	}
+	m := testModel()
+	m.summary = s
+	m.page = pageResults
+	m2, cmd := m.executeAction(2)
+	mm := m2.(model)
+	if mm.page != pageError {
+		t.Errorf("expected pageError for unwritable dir, got %d", mm.page)
+	}
+	if cmd != nil {
+		t.Error("expected nil cmd")
+	}
+}
+
+// ─── handleKeyMsg ─────────────────────────────────────────────────────────────
+
+func TestHandleKeyMsg_working(t *testing.T) {
+	m := testModel()
+	m.page = pageWorking
+	m2, cmd := m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyEnter})
+	if m2.(model).page != pageWorking {
+		t.Error("handleKeyMsg on pageWorking should keep pageWorking")
+	}
+	if cmd != nil {
+		t.Error("expected nil cmd for pageWorking")
+	}
+}
+
+func TestHandleKeyMsg_scanningPage(t *testing.T) {
+	m := testModel()
+	m.page = pageScanning
+	m2, cmd := m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyEnter})
+	if m2.(model).page != pageScanning {
+		t.Error("handleKeyMsg on pageScanning should keep pageScanning")
+	}
+	if cmd != nil {
+		t.Error("expected nil cmd for pageScanning")
+	}
+}
+
+func TestHandleKeyMsg_folderInput(t *testing.T) {
+	m := testModel()
+	m.page = pageFolderInput
+	m2, cmd := m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyEscape})
+	_ = m2
+	if cmd == nil {
+		t.Error("expected tea.Quit cmd from folderInput Escape")
+	}
+}
+
+func TestHandleKeyMsg_results(t *testing.T) {
+	m := testModel()
+	m.page = pageResults
+	m2, cmd := m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyCtrlC})
+	_ = m2
+	if cmd == nil {
+		t.Error("expected tea.Quit cmd from results Ctrl+C")
+	}
+}
+
+func TestHandleKeyMsg_list(t *testing.T) {
+	dir := t.TempDir()
+	m := testModel()
+	m.page = pageList
+	m.summary = testQRSummary(t, dir)
+	m2, cmd := m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyEscape})
+	_ = m2
+	if cmd != nil {
+		t.Error("expected nil cmd from list Escape")
+	}
+}
+
+func TestHandleKeyMsg_exportFormat(t *testing.T) {
+	m := testModel()
+	m.page = pageExportFormat
+	m2, cmd := m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyEscape})
+	_ = m2
+	if cmd != nil {
+		t.Error("expected nil cmd from exportFormat Escape")
+	}
+}
+
+func TestHandleKeyMsg_qrFormat(t *testing.T) {
+	m := testModel()
+	m.page = pageQRFormat
+	m2, cmd := m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyEscape})
+	_ = m2
+	if cmd != nil {
+		t.Error("expected nil cmd from qrFormat Escape")
+	}
+}
+
+func TestHandleKeyMsg_donePage(t *testing.T) {
+	m := testModel()
+	m.page = pageDone
+	m2, cmd := m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyEnter})
+	_ = m2
+	if cmd != nil {
+		t.Error("expected nil cmd from donePage Enter")
+	}
+}
+
+func TestHandleKeyMsg_errorPage(t *testing.T) {
+	m := testModel()
+	m.page = pageError
+	m2, cmd := m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyEnter})
+	_ = m2
+	if cmd != nil {
+		t.Error("expected nil cmd from errorPage Enter")
+	}
+}
+
+// ─── viewList ─────────────────────────────────────────────────────────────────
+
+func TestViewList_scrolled(t *testing.T) {
+	results := make([]scanner.ScanResult, 20)
+	for i := range results {
+		results[i] = scanner.ScanResult{
+			FilePath: fmt.Sprintf("/tmp/img_%02d.png", i),
+			HasQR:    true,
+			Contents: []string{"data"},
+			FileSize: 100,
+		}
+	}
+	m := testModel()
+	m.page = pageList
+	m.summary = &scanner.Summary{Results: results, Total: 20, WithQR: 20}
+	m.cursor = 15 // triggers start = cursor - 12 (line 563)
+
+	out := m.viewList()
+	if !strings.Contains(out, "img_03") {
+		t.Error("scrolled viewList should show img_03 (offset start item)")
+	}
+	if !strings.Contains(out, "img_15") {
+		t.Error("scrolled viewList should show img_15 (cursor item)")
+	}
+}
+
+func TestViewList_withError(t *testing.T) {
+	results := []scanner.ScanResult{
+		{FilePath: "/tmp/img.png", HasQR: false, Error: "something failed", FileSize: 100},
+	}
+	m := testModel()
+	m.page = pageList
+	m.summary = &scanner.Summary{Results: results, Total: 1, Errors: 1}
+
+	out := m.viewList()
+	if !strings.Contains(out, "ERR") {
+		t.Error("viewList should show ERR for result with Error field")
+	}
+	if !strings.Contains(out, "something failed") {
+		t.Error("viewList should show error message text")
+	}
+}
+
+// ─── parseArgs ───────────────────────────────────────────────────────────────
+
+func TestParseArgs(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		wantHelp bool
+		wantVer  bool
+	}{
+		{"no args", nil, false, false},
+		{"empty args", []string{}, false, false},
+		{"--help", []string{"--help"}, true, false},
+		{"-h", []string{"-h"}, true, false},
+		{"--version", []string{"--version"}, false, true},
+		{"-v", []string{"-v"}, false, true},
+		{"both flags", []string{"--help", "-v"}, true, true},
+		{"path arg no flags", []string{"/some/path"}, false, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotHelp, gotVer := parseArgs(tt.args)
+			if gotHelp != tt.wantHelp {
+				t.Errorf("parseArgs() showHelp = %v, want %v", gotHelp, tt.wantHelp)
+			}
+			if gotVer != tt.wantVer {
+				t.Errorf("parseArgs() showVersion = %v, want %v", gotVer, tt.wantVer)
+			}
+		})
+	}
+}
+
+// ─── printHelp / printVersion ────────────────────────────────────────────────
+
+// exitPanic is used by osExit in tests to stop execution without killing the process.
+type exitPanic struct{ code int }
+
+func captureStdout(fn func()) string {
+	r, w, _ := os.Pipe()
+	old := os.Stdout
+	os.Stdout = w
+
+	done := make(chan struct{})
+	go func() {
+		defer func() { recover(); close(done) }()
+		fn()
+	}()
+	<-done
+
+	w.Close()
+	os.Stdout = old
+	out, _ := io.ReadAll(r)
+	r.Close()
+	return string(out)
+}
+
+func TestPrintHelp_output(t *testing.T) {
+	out := captureStdout(printHelp)
+	if !strings.Contains(out, "Usage:") {
+		t.Error("printHelp should contain Usage:")
+	}
+	if !strings.Contains(out, "Supported formats:") {
+		t.Error("printHelp should list supported formats")
+	}
+}
+
+func TestPrintVersion_output(t *testing.T) {
+	out := captureStdout(printVersion)
+	if !strings.Contains(out, version) {
+		t.Errorf("printVersion = %q, should contain %q", out, version)
+	}
+}
+
+// ─── initModel ───────────────────────────────────────────────────────────────
+
+func TestInitModel_default(t *testing.T) {
+	m := initModel([]string{"qr-multi-imgs"})
+	if m.page != pageFolderInput {
+		t.Errorf("expected pageFolderInput, got %d", m.page)
+	}
+	if m.initialScanPath != "" {
+		t.Errorf("expected empty initialScanPath, got %q", m.initialScanPath)
+	}
+}
+
+func TestInitModel_withPath(t *testing.T) {
+	m := initModel([]string{"qr-multi-imgs", t.TempDir()})
+	if m.page != pageScanning {
+		t.Errorf("expected pageScanning for valid dir, got %d", m.page)
+	}
+	if m.initialScanPath == "" {
+		t.Error("expected non-empty initialScanPath")
+	}
+}
+
+func TestInitModel_withInvalidPath(t *testing.T) {
+	m := initModel([]string{"qr-multi-imgs", "/nonexistent_path_xyz"})
+	if m.page != pageFolderInput {
+		t.Errorf("expected pageFolderInput for invalid path, got %d", m.page)
+	}
+}
+
+func TestInitModel_nonDirPath(t *testing.T) {
+	f := filepath.Join(t.TempDir(), "afile.txt")
+	os.WriteFile(f, []byte("x"), 0644)
+	m := initModel([]string{"qr-multi-imgs", f})
+	if m.page != pageFolderInput {
+		t.Errorf("expected pageFolderInput for file path, got %d", m.page)
+	}
+}
+
+// ─── main() with osExit override ─────────────────────────────────────────────
+
+func TestMain_help(t *testing.T) {
+	oldExit := osExit
+	oldArgs := os.Args
+	osExit = func(code int) {
+		if code != 0 {
+			t.Errorf("expected exit code 0, got %d", code)
+		}
+		panic(exitPanic{code: code})
+	}
+	os.Args = []string{"qr-multi-imgs", "--help"}
+	defer func() { osExit = oldExit; os.Args = oldArgs }()
+
+	out := captureStdout(main)
+	if !strings.Contains(out, "Usage:") {
+		t.Error("main() --help should print usage")
+	}
+}
+
+func TestMain_version(t *testing.T) {
+	oldExit := osExit
+	oldArgs := os.Args
+	osExit = func(code int) {
+		if code != 0 {
+			t.Errorf("expected exit code 0, got %d", code)
+		}
+		panic(exitPanic{code: code})
+	}
+	os.Args = []string{"qr-multi-imgs", "--version"}
+	defer func() { osExit = oldExit; os.Args = oldArgs }()
+
+	out := captureStdout(main)
+	if !strings.Contains(out, version) {
+		t.Error("main() --version should print version")
 	}
 }

@@ -143,6 +143,17 @@ func TestReadBoolNPY_headerTruncated(t *testing.T) {
 	}
 }
 
+func TestReadBoolNPY_badJSONHeader(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "badjson.npy")
+	hdr := `{'descr': '|b1', 'fortran_order': False, 'shape': (bad,)}`
+	writeNPY(t, path, hdr, []byte{1, 0, 1})
+	_, err := readBoolNPY(path)
+	if err == nil {
+		t.Fatal("expected error for invalid JSON header")
+	}
+}
+
 func TestReadBoolNPY_1Dshape(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "1d.npy")
@@ -191,8 +202,17 @@ func TestPyDictToJSON_TrueLiteral(t *testing.T) {
 	}
 }
 
+func TestPyDictToJSON_noComma(t *testing.T) {
+	input := `{'descr': '|b1'}`
+	got := pyDictToJSON(input)
+	want := `{"descr": "|b1"}`
+	if got != want {
+		t.Errorf("pyDictToJSON no comma\n  got:  %s\n  want: %s", got, want)
+	}
+}
+
 func TestPyDictToJSON_doubleQuotesInside(t *testing.T) {
-	input := `{'descr': '|b1', 'fortran_order': False, 'shape': (1, 1)}`
+	input := `{'descr': '"|b1"', 'fortran_order': False, 'shape': (1, 1)}`
 	got := pyDictToJSON(input)
 	if !stringsContains(got, `"descr"`) {
 		t.Errorf("expected double-quoted keys, got: %s", got)

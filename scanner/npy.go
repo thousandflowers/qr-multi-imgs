@@ -86,10 +86,16 @@ func pyDictToJSON(s string) string {
 		}
 	}
 	s = b.String()
-	if idx := strings.LastIndex(s, ","); idx >= 0 {
+	for {
+		idx := strings.LastIndex(s, ",")
+		if idx < 0 {
+			break
+		}
 		after := strings.TrimSpace(s[idx+1:])
-		if after == "}" || after == "]" {
+		if len(after) > 0 && (after[0] == '}' || after[0] == ']') {
 			s = s[:idx] + s[idx+1:]
+		} else {
+			break
 		}
 	}
 	return s
