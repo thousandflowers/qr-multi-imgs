@@ -1947,6 +1947,7 @@ func TestHandleKeyMsg_unknown(t *testing.T) {
 // ─── executeAction delete dir unwritable ─────────────────────────────────────
 
 func TestExecuteAction_deleteDirUnwritable(t *testing.T) {
+	skipOnWindows(t)
 	dir := t.TempDir()
 	sub := filepath.Join(dir, "sub")
 	os.MkdirAll(sub, 0755)
