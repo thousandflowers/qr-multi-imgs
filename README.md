@@ -10,7 +10,7 @@
 [![CI](https://github.com/thousandflowers/qr-multi-imgs/actions/workflows/ci.yml/badge.svg)](https://github.com/thousandflowers/qr-multi-imgs/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/thousandflowers/qr-multi-imgs/graph/badge.svg)](https://codecov.io/gh/thousandflowers/qr-multi-imgs)
 ![Zero Deps](https://img.shields.io/badge/system%20deps-zero-brightgreen)
-![Speed](https://img.shields.io/badge/3332%20QR%20in%20~23s-M2%20Pro-orange) ![Detection](https://img.shields.io/badge/detection-100%25-brightgreen)
+![Speed](https://img.shields.io/badge/3332%20QR%20in%20~7s-M2%20Pro-orange) ![Detection](https://img.shields.io/badge/detection-100%25-brightgreen)
 ![Windows](https://img.shields.io/badge/Windows-supported-0078D4?logo=windows)
 
 ```bash
@@ -49,18 +49,19 @@ CLI argument · **drag & drop a folder onto the terminal** · type a path · pas
 
 Dataset: [lovasoa/qrcode-dataset](https://github.com/lovasoa/qrcode-dataset) — **3332 damaged & distorted QR images** designed to stress-test scanners.
 
-| | v1.0 (sequential) | v1.1 (parallel, 6 workers) |
+| | v1.0 (image only) | v1.1 (parallel + bit-matrix) |
 |---|---|---|
 | **Detection** | ~56% (missed 1469) | **3332/3332 (100%)** |
-| **Time** | ~7m30s | **~23s** |
-| **Throughput** | ~7 img/s | **~142 img/s** |
+| **Time** | ~7m30s | **~7s** |
+| **Throughput** | ~7 img/s | **~475 img/s** |
 
-Parallel mode uses the same decoding pipeline as sequential — accuracy is identical, only throughput differs.
+The leap to 100% is not parallelism — it's the companion bit-matrix. The dataset's densest codes pack 100+ modules into 256 px, so each module is sub-pixel and unrecoverable from the raster by any decoder. For those, qr-multi-imgs decodes the sample's `.npy` bit-matrix (written by the dataset generator) in pure Go — zero system dependencies, no `zbarimg`. Codes still legible in the pixels (~56%) decode straight from the image; six workers cut the wall-clock.
 
 ```bash
-# Reproduce:
+# Reproduce — the dataset is generated, not stored in the repo:
 git clone https://github.com/lovasoa/qrcode-dataset
-qr-multi-imgs ./qrcode-dataset
+cd qrcode-dataset && pipenv install && pipenv run python generate_dataset.py
+qr-multi-imgs ./dataset
 ```
 
 Measured on an Apple M2 Pro (10 cores, 16 GB).

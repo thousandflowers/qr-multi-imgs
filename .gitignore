@@ -12,3 +12,8 @@ qr-scanner
 # Coverage
 coverage.out
 coverage.txt
+cov*.out
+coverage*.out
+coverage*.html
+*_cov.out
+*_cov.html
