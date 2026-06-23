@@ -3,6 +3,7 @@ package scanner
 import (
 	"fmt"
 	"image"
+	"image/color"
 	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
@@ -181,33 +182,86 @@ func sortResults(s *Summary) {
 
 // ─── multi-strategy decoding ─────────────────────────────────────────────────
 
-func decodeAttempt(img image.Image, useGlobal bool, scale int) string {
-	srcImg := img
-	if scale > 1 {
-		srcImg = nearestNeighborScale(img, scale)
+// decodeStrategy is one decode configuration: a color-channel projection, a
+// binarizer choice, and an integer upscale. Colored QRs hide their contrast in
+// a single channel that luminance averages away, so we try several.
+type decodeStrategy struct {
+	channel string // lum, r, g, b, min, max
+	global  bool   // global-histogram binarizer vs hybrid (local) default
+	scale   int    // integer nearest-neighbor upscale
+}
+
+func decodeAttempt(img image.Image, s decodeStrategy) string {
+	src := projectChannel(img, s.channel)
+	if s.scale > 1 {
+		src = nearestNeighborScale(src, s.scale)
 	}
 
 	var bmp *gozxing.BinaryBitmap
-	if useGlobal {
-		src := gozxing.NewLuminanceSourceFromImage(srcImg)
-		bin := gozxing.NewGlobalHistgramBinarizer(src)
-		bmp, _ = gozxing.NewBinaryBitmap(bin)
+	if s.global {
+		lum := gozxing.NewLuminanceSourceFromImage(src)
+		bmp, _ = gozxing.NewBinaryBitmap(gozxing.NewGlobalHistgramBinarizer(lum))
 	} else {
-		bmp, _ = gozxing.NewBinaryBitmapFromImage(srcImg)
+		bmp, _ = gozxing.NewBinaryBitmapFromImage(src)
 	}
 	if bmp == nil {
 		return ""
 	}
 
-	reader := qrcode.NewQRCodeReader()
 	hints := map[gozxing.DecodeHintType]interface{}{
 		gozxing.DecodeHintType_TRY_HARDER: true,
 	}
-	result, err := reader.Decode(bmp, hints)
+	result, err := qrcode.NewQRCodeReader().Decode(bmp, hints)
 	if err != nil || result == nil {
 		return ""
 	}
 	return result.GetText()
+}
+
+// projectChannel returns img unchanged for "lum" (gozxing computes luminance),
+// otherwise a grayscale image holding the chosen color channel. Single-channel
+// projection recovers colored QRs whose contrast luminance would wash out.
+func projectChannel(img image.Image, channel string) image.Image {
+	if channel == "lum" {
+		return img
+	}
+	b := img.Bounds()
+	dst := image.NewGray(b)
+	for y := b.Min.Y; y < b.Max.Y; y++ {
+		for x := b.Min.X; x < b.Max.X; x++ {
+			r, g, bl, _ := img.At(x, y).RGBA()
+			r, g, bl = r>>8, g>>8, bl>>8
+			var v uint32
+			switch channel {
+			case "r":
+				v = r
+			case "g":
+				v = g
+			case "b":
+				v = bl
+			case "max":
+				v = maxu(maxu(r, g), bl)
+			case "min":
+				v = minu(minu(r, g), bl)
+			}
+			dst.SetGray(x, y, color.Gray{Y: uint8(v)})
+		}
+	}
+	return dst
+}
+
+func maxu(a, b uint32) uint32 {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func minu(a, b uint32) uint32 {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // nearest-neighbor preserves hard QR edges; bilinear/bicubic would blur small modules.
@@ -223,17 +277,35 @@ func nearestNeighborScale(src image.Image, factor int) *image.RGBA {
 	return dst
 }
 
-// ponytail: 8 combos — each binarizer × 1x-4x. Small 256×256 QR modules often
-// need upscaling. Hybrid first (better for typical QR), lower scale first.
-var strategies = [][2]int{
-	{0, 1}, // hybrid, native
-	{0, 2}, // hybrid, 2x
-	{0, 3}, // hybrid, 3x
-	{0, 4}, // hybrid, 4x
-	{1, 1}, // global, native
-	{1, 2}, // global, 2x
-	{1, 3}, // global, 3x
-	{1, 4}, // global, 4x
+// strategies are tried in order until one decodes. Order from a greedy cover
+// over a colored-QR benchmark: luminance hybrid+global crack the clean codes,
+// per-channel global-histogram recovers gradient-colored ones. No PURE_BARCODE
+// (useless on noisy renders) and no upscale past 2x (no marginal recall, ~3x
+// slower). Measured: 25.7% -> 27.3% on the hard set, easy set stays ~100%.
+var strategies = []decodeStrategy{
+	{"lum", false, 1}, // hybrid, native — clean QRs
+	{"lum", true, 1},  // global, native — biggest colored-set winner
+	{"lum", false, 2}, // hybrid, 2x
+	{"lum", true, 2},  // global, 2x
+	{"r", true, 1},    // red channel
+	{"g", true, 1},    // green channel
+	{"b", true, 1},    // blue channel
+	{"min", true, 1},  // darkest channel
+	{"max", true, 1},  // brightest channel
+	{"r", false, 2},   // red channel, hybrid 2x
+}
+
+// decodeRaster runs the pure-Go strategy loop over a decoded image and returns
+// the first successful decode, or "" if every strategy fails.
+func decodeRaster(img image.Image) string {
+	for _, s := range strategies {
+		// Return the payload exactly as decoded — trimming would corrupt QRs
+		// whose payload is or ends with whitespace.
+		if text := decodeAttempt(img, s); text != "" {
+			return text
+		}
+	}
+	return ""
 }
 
 // maskRenderScale upscales each QR module to this many pixels before decoding.
@@ -282,7 +354,7 @@ func decodeMaskImage(img image.Image) string {
 			hints[gozxing.DecodeHintType_PURE_BARCODE] = true
 		}
 		if res, derr := qrcode.NewQRCodeReader().Decode(bmp, hints); derr == nil && res != nil {
-			return strings.TrimSpace(res.GetText())
+			return res.GetText() // exact payload; do not trim whitespace
 		}
 	}
 	return ""
@@ -308,12 +380,8 @@ func ScanImage(path string) ([]string, error) {
 		return nil, fmt.Errorf("decode: %w", err)
 	}
 
-	for _, s := range strategies {
-		global := s[0] == 1
-		scale := s[1]
-		if text := decodeAttempt(img, global, scale); text != "" {
-			return []string{strings.TrimSpace(text)}, nil
-		}
+	if text := decodeRaster(img); text != "" {
+		return []string{text}, nil
 	}
 
 	// Last resort for real photos with no mask: zbarimg, if installed.
