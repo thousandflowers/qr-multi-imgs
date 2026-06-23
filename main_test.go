@@ -280,25 +280,63 @@ func TestScanFolderCmd_success(t *testing.T) {
 	// Create a dummy image file (not a real image — ScanFolder doesn't validate content at the dir level)
 	os.WriteFile(filepath.Join(dir, "test.png"), []byte("dummy"), 0644)
 
-	cmd := scanFolder(dir)
-	msg := cmd()
-	switch m := msg.(type) {
-	case scanCompleteMsg:
-		if m.summary == nil {
-			t.Fatal("scanCompleteMsg has nil summary")
+	msg := startScan(dir)()
+	started, ok := msg.(scanStartedMsg)
+	if !ok {
+		t.Fatalf("startScan: expected scanStartedMsg, got %T", msg)
+	}
+	for {
+		m := waitForProgress(started.ch)()
+		if m == nil {
+			t.Fatal("stream ended without scanCompleteMsg")
 		}
-	case actionErrorMsg:
-		t.Fatalf("scanFolder: unexpected error: %v", m.err)
-	default:
-		t.Fatalf("scanFolder: expected scanCompleteMsg, got %T", msg)
+		if done, ok := m.(scanCompleteMsg); ok {
+			if done.summary == nil {
+				t.Fatal("scanCompleteMsg has nil summary")
+			}
+			return
+		}
+	}
+}
+
+func TestEmptyFolderGoesToDoneNotPanic(t *testing.T) {
+	dir := t.TempDir() // no images
+	msg := startScan(dir)()
+	started := msg.(scanStartedMsg)
+	var complete scanCompleteMsg
+	for {
+		m := waitForProgress(started.ch)()
+		if c, ok := m.(scanCompleteMsg); ok {
+			complete = c
+			break
+		}
+	}
+	m := initModel(nil)
+	updated, _ := m.Update(complete)
+	got := updated.(model)
+	if got.page != pageDone {
+		t.Fatalf("empty folder: expected pageDone, got %v", got.page)
+	}
+	_ = got.View() // must not panic
+}
+
+func TestViewScanningShowsBarAndFile(t *testing.T) {
+	m := initModel(nil)
+	m.page = pageScanning
+	m.scanDone, m.scanTotal, m.scanFile = 3, 10, "/imgs/photo42.png"
+	out := m.viewScanning()
+	if !strings.Contains(out, "3/10") {
+		t.Errorf("scanning view missing progress count, got:\n%s", out)
+	}
+	if !strings.Contains(out, "photo42.png") {
+		t.Errorf("scanning view missing current file, got:\n%s", out)
 	}
 }
 
 func TestScanFolderCmd_nonexistentDir(t *testing.T) {
-	cmd := scanFolder("/tmp/nonexistent_qr_test_12345")
-	msg := cmd()
+	msg := startScan("/tmp/nonexistent_qr_test_12345")()
 	if _, ok := msg.(actionErrorMsg); !ok {
-		t.Fatalf("scanFolder(nonexistent): expected actionErrorMsg, got %T", msg)
+		t.Fatalf("startScan(nonexistent): expected actionErrorMsg, got %T", msg)
 	}
 }
 

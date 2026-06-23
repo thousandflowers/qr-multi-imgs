@@ -129,6 +129,36 @@ func TestNPYRecall(t *testing.T) {
 	t.Logf("full ScanImage correct %d/%d = %.2f%%", fullOK, total, 100*float64(fullOK)/float64(total))
 }
 
+// TestScanFolderStream checks the streaming scan emits one progress event per
+// file plus a final summary, and that the summary matches the blocking scan.
+func TestScanFolderStream(t *testing.T) {
+	ds, _ := datasetDir(t)
+	ch, err := ScanFolderStream(ds)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var progress, total int
+	var summary *Summary
+	for p := range ch {
+		if p.Summary != nil {
+			summary = p.Summary
+			total = p.Total
+		} else {
+			progress++
+		}
+	}
+	if summary == nil {
+		t.Fatal("no summary emitted")
+	}
+	if progress != total {
+		t.Errorf("progress events %d != total %d", progress, total)
+	}
+	want, _ := ScanFolder(ds)
+	if summary.Total != want.Total {
+		t.Errorf("stream Total %d != ScanFolder Total %d", summary.Total, want.Total)
+	}
+}
+
 // TestCanonicalRecall measures image-only recall on a split dataset, per folder.
 // with_qr are clean renders, without_qr are degraded — the headroom lives there.
 func TestCanonicalRecall(t *testing.T) {

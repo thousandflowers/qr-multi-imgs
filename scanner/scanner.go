@@ -182,6 +182,99 @@ func sortResults(s *Summary) {
 
 // ─── multi-strategy decoding ─────────────────────────────────────────────────
 
+// Progress is one folder-scan progress event. Summary is non-nil only on the
+// final event; before that, File is the path just finished (Done of Total).
+type Progress struct {
+	Done, Total int
+	File        string
+	Summary     *Summary
+}
+
+// ScanFolderStream scans like ScanFolder but emits a Progress per finished file
+// on the returned channel, ending with one event carrying the Summary. Path
+// validation is synchronous so errors surface before scanning starts.
+// ponytail: duplicates ScanFolder's small worker-pool boilerplate to avoid a
+// blind rewrite of the existing function; fold them together if it drifts.
+func ScanFolderStream(dir string) (<-chan Progress, error) {
+	start := time.Now()
+	info, err := os.Stat(dir)
+	if err != nil {
+		return nil, err
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("not a directory: %s", dir)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	type job struct {
+		path string
+		fi   os.FileInfo
+	}
+	var jobList []job
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		if !supportedExtensions[strings.ToLower(filepath.Ext(entry.Name()))] {
+			continue
+		}
+		fi, err := entry.Info()
+		if err != nil {
+			continue
+		}
+		jobList = append(jobList, job{path: filepath.Join(dir, entry.Name()), fi: fi})
+	}
+	total := len(jobList)
+
+	out := make(chan Progress, total+1)
+	go func() {
+		defer close(out)
+		jobs := make(chan job, total)
+		results := make(chan ScanResult, total)
+		var wg sync.WaitGroup
+		for range scanWorkers {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for j := range jobs {
+					r := ScanResult{FilePath: j.path, FileSize: j.fi.Size()}
+					contents, err := ScanImage(j.path)
+					if err != nil {
+						r.Error = err.Error()
+					} else if len(contents) > 0 {
+						r.HasQR = true
+						r.Contents = contents
+					}
+					results <- r
+				}
+			}()
+		}
+		for _, j := range jobList {
+			jobs <- j
+		}
+		close(jobs)
+		go func() {
+			wg.Wait()
+			close(results)
+		}()
+
+		var list []ScanResult
+		done := 0
+		for r := range results {
+			list = append(list, r)
+			done++
+			out <- Progress{Done: done, Total: total, File: r.FilePath}
+		}
+		s := tallySummary(list, start)
+		sortResults(s)
+		out <- Progress{Done: total, Total: total, Summary: s}
+	}()
+	return out, nil
+}
+
 // decodeStrategy is one decode configuration: a color-channel projection, a
 // binarizer choice, and an integer upscale. Colored QRs hide their contrast in
 // a single channel that luminance averages away, so we try several.

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -39,6 +40,11 @@ type model struct {
 	summary         *scanner.Summary
 	input           textinput.Model
 	spinner         spinner.Model
+	progress        progress.Model
+	scanCh          <-chan scanner.Progress
+	scanDone        int
+	scanTotal       int
+	scanFile        string
 	exportFmt       string
 	qrRecreateFmt   string
 	errMsg          string
@@ -63,7 +69,7 @@ var (
 func (m model) Init() tea.Cmd {
 	cmds := []tea.Cmd{textinput.Blink, m.spinner.Tick}
 	if m.initialScanPath != "" {
-		cmds = append(cmds, safeCmd(scanFolder(m.initialScanPath)))
+		cmds = append(cmds, safeCmd(startScan(m.initialScanPath)))
 	}
 	return tea.Batch(cmds...)
 }
@@ -71,6 +77,8 @@ func (m model) Init() tea.Cmd {
 // ─── Messages ───────────────────────────────────────────────────────────────
 
 type scanCompleteMsg struct{ summary *scanner.Summary }
+type scanStartedMsg struct{ ch <-chan scanner.Progress }
+type scanProgressMsg scanner.Progress
 type actionDoneMsg struct{ message string }
 type actionErrorMsg struct{ err error }
 type crashMsg struct{ recover interface{} }
@@ -160,15 +168,34 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		if w := msg.Width - 4; w > 0 {
+			m.progress.Width = w
+		}
 		return m, nil
 
 	case tea.KeyMsg:
 		return m.handleKeyMsg(msg)
 
+	case scanStartedMsg:
+		m.scanCh = msg.ch
+		return m, waitForProgress(m.scanCh)
+
+	case scanProgressMsg:
+		m.scanDone = msg.Done
+		m.scanTotal = msg.Total
+		m.scanFile = msg.File
+		return m, waitForProgress(m.scanCh)
+
 	case scanCompleteMsg:
-		m.page = pageResults
 		m.summary = msg.summary
 		m.cursor = 0
+		// No supported images → skip the results page (which assumes Results[0]).
+		if msg.summary == nil || len(msg.summary.Results) == 0 {
+			m.page = pageDone
+			m.actionMsg = "No supported images found in that folder."
+			return m, nil
+		}
+		m.page = pageResults
 		return m, nil
 
 	case actionDoneMsg:
@@ -247,7 +274,7 @@ func (m model) updateFolderInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.page = pageScanning
-		return m, safeCmd(scanFolder(path))
+		return m, safeCmd(startScan(path))
 
 	case tea.KeyCtrlC, tea.KeyEscape:
 		return m, tea.Quit
@@ -315,6 +342,9 @@ func (m model) executeAction(idx int) (tea.Model, tea.Cmd) {
 		return m, safeCmd(deleteWithoutQR(m.summary))
 
 	case 3:
+		if len(m.summary.Results) == 0 {
+			return m, nil
+		}
 		base := filepath.Dir(m.summary.Results[0].FilePath)
 		if err := isWritablePath(base); err != nil {
 			m.page = pageError
@@ -497,7 +527,20 @@ func (m model) viewScanning() string {
 	var b strings.Builder
 	b.WriteString(titleStyle.Render("QR Multi IMG Scanner"))
 	b.WriteString("\n\n")
-	b.WriteString(fmt.Sprintf("%s Scanning folder for QR codes...\n", m.spinner.View()))
+
+	// Progress bar stays pinned at the top.
+	frac := 0.0
+	if m.scanTotal > 0 {
+		frac = float64(m.scanDone) / float64(m.scanTotal)
+	}
+	b.WriteString(m.progress.ViewAs(frac))
+	b.WriteString(fmt.Sprintf("  %d/%d\n\n", m.scanDone, m.scanTotal))
+
+	if m.scanFile != "" {
+		b.WriteString(fmt.Sprintf("%s Scanning: %s\n", m.spinner.View(), truncate(filepath.Base(m.scanFile), 60)))
+	} else {
+		b.WriteString(fmt.Sprintf("%s Scanning folder for QR codes...\n", m.spinner.View()))
+	}
 	return b.String()
 }
 
@@ -670,13 +713,28 @@ func (m model) viewError() string {
 
 // ─── QR Scanning (TUI bridge) ───────────────────────────────────────────────
 
-func scanFolder(path string) tea.Cmd {
+func startScan(path string) tea.Cmd {
 	return func() tea.Msg {
-		s, err := scanner.ScanFolder(path)
+		ch, err := scanner.ScanFolderStream(path)
 		if err != nil {
 			return actionErrorMsg{err}
 		}
-		return scanCompleteMsg{s}
+		return scanStartedMsg{ch}
+	}
+}
+
+// waitForProgress blocks on the next event from the scan channel and turns it
+// into a message. One event per call; Update re-issues it until the summary.
+func waitForProgress(ch <-chan scanner.Progress) tea.Cmd {
+	return func() tea.Msg {
+		p, ok := <-ch
+		if !ok {
+			return nil
+		}
+		if p.Summary != nil {
+			return scanCompleteMsg{p.Summary}
+		}
+		return scanProgressMsg(p)
 	}
 }
 
@@ -841,7 +899,7 @@ func sanitizeFilename(s string, maxLen int) string {
 
 // ─── Main ───────────────────────────────────────────────────────────────────
 
-var version = "1.1.0"
+var version = "1.3.0"
 
 // ponytail: overridable in tests; avoids os.Exit killing the test process.
 var osExit = os.Exit
@@ -909,9 +967,10 @@ func printVersion() {
 // initModel creates and configures the initial TUI model from CLI args.
 func initModel(args []string) model {
 	m := model{
-		page:    pageFolderInput,
-		input:   textinput.New(),
-		spinner: spinner.New(spinner.WithSpinner(spinner.Dot)),
+		page:     pageFolderInput,
+		input:    textinput.New(),
+		spinner:  spinner.New(spinner.WithSpinner(spinner.Dot)),
+		progress: progress.New(progress.WithDefaultGradient()),
 	}
 
 	m.input.Placeholder = "/path/to/images (Enter for current dir)"

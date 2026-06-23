@@ -7,7 +7,11 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [v1.3.0] — 2026-06-23
+
 ### Added
+- Live progress bar pinned at the top during folder scans, with the file being scanned and a done/total counter
+- Color-channel decode strategies (R/G/B/min/max projections) that recover hard, low-contrast and colored QR codes
 - Homebrew formula (`brew install thousandflowers/tap/qr-multi-imgs`)
 - Prebuilt binaries for macOS, Linux, and Windows via GitHub Releases
 - `codecov.yml` — Codecov coverage tracking
@@ -16,8 +20,13 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 - `CHANGELOG.md` — this file
 
 ### Changed
+- Decoder returns the exact QR payload — no longer trims whitespace (fixes whitespace-only payloads)
+- Faster scanning: dropped the ineffective 3x/4x upscale strategies
 - CI now builds and tests on Windows too
 - README: Codecov badge, `go install` instructions, explicit Windows support
+
+### Fixed
+- Crash (index out of range) when scanning a folder containing no supported images
 
 ## [v1.2.0] — 2026-06-19
 
