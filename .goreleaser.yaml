@@ -9,14 +9,19 @@ before:
     - go mod tidy
 
 builds:
-  - env: [CGO_ENABLED=0]
-    goos:
-      - linux
-      - darwin
-      - windows
-    goarch:
-      - amd64
-      - arm64
+  # macOS: cgo links Apple's Vision framework for real-photo QR decoding.
+  # Must run on a macOS runner (the SDK is unavailable when cross-compiling).
+  - id: darwin
+    env: [CGO_ENABLED=1]
+    goos: [darwin]
+    goarch: [amd64, arm64]
+
+  # Linux/Windows stay pure Go (Vision is stubbed out), so they cross-compile
+  # from the same macOS runner with no C toolchain.
+  - id: cross
+    env: [CGO_ENABLED=0]
+    goos: [linux, windows]
+    goarch: [amd64, arm64]
     ignore:
       - goos: windows
         goarch: arm64

@@ -9,7 +9,10 @@ permissions:
 
 jobs:
   goreleaser:
-    runs-on: ubuntu-latest
+    # macOS runner: darwin builds need cgo + the Vision SDK; linux/windows
+    # cross-compile here too (pure Go). Apple Silicon runner has the universal
+    # SDK, so it can target both darwin/arm64 and darwin/amd64.
+    runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
         with:

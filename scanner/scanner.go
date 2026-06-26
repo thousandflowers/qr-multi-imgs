@@ -477,6 +477,13 @@ func ScanImage(path string) ([]string, error) {
 		return []string{text}, nil
 	}
 
+	// Real photos (warped/low-contrast/small-module QRs) defeat gozxing. On
+	// macOS, Apple Vision recovers many of them and ships with the OS; it's a
+	// no-op elsewhere. Try it before zbarimg, which is weaker and can segfault.
+	if text := decodeWithVision(path); text != "" {
+		return []string{text}, nil
+	}
+
 	// Last resort for real photos with no mask: zbarimg, if installed.
 	if text := decodeWithZbarimg(path); text != "" {
 		return []string{text}, nil
