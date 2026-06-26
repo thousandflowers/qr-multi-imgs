@@ -899,7 +899,7 @@ func sanitizeFilename(s string, maxLen int) string {
 
 // ─── Main ───────────────────────────────────────────────────────────────────
 
-var version = "1.3.0"
+var version = "1.4.1"
 
 // ponytail: overridable in tests; avoids os.Exit killing the test process.
 var osExit = os.Exit
