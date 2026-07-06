@@ -29,3 +29,6 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # PAT with push rights on thousandflowers/homebrew-tap; used by the
+          # brews section of .goreleaser.yaml to publish the formula.
+          TAP_GITHUB_TOKEN: ${{ secrets.GH_PAT }}
