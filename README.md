@@ -126,6 +126,15 @@ perspective-warped QR codes.
 
 ---
 
+## Contributing
+
+PRs welcome. [CONTRIBUTING.md](CONTRIBUTING.md) has the build and test
+loop; [GOOD_FIRST_ISSUES.md](GOOD_FIRST_ISSUES.md) has three tasks sized
+for a first contribution. By taking part you agree to the
+[Code of Conduct](CODE_OF_CONDUCT.md).
+
+---
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
