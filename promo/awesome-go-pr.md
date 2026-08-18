@@ -92,11 +92,26 @@ Linux and Windows.
 
 ---
 
-# Appendix — awesome-tui
+# Where this project already stands with the lists
 
-Kept from the earlier draft. Different list, different rules; check
-`CONTRIBUTING.md` in <https://github.com/rothgar/awesome-tui> for the
-current section names before using this.
+Checked live, so nothing here gets submitted twice.
+
+| List | State | Next move |
+| --- | --- | --- |
+| [awesome-qr-code](https://github.com/make-github-pseudonymous-again/awesome-qr-code/pull/35) | **PR #35 open**, 0 reactions | Merges at **5 👍**. This one is not blocked on anything but votes. |
+| [awesome-tuis](https://github.com/rothgar/awesome-tuis/pull/738) | **PR #738 closed** 2026-07-06 | Maintainer: *"all projects need to be maintained for at least 6 months before included in the list."* Their bot flagged first commit 2026-06-08. Re-open after **2026-12-08**. |
+| awesome-go | not submitted | 5-month rule, eligible ~**2026-11-09** (see above). |
+
+The pattern is the same across all three curated lists: a maturity gate
+measured from the first commit. There is nothing to fix in the repo for
+it — it is a date. Put the two dates in a calendar and stop re-checking.
+
+---
+
+# Appendix — awesome-tuis entry (for the December re-submission)
+
+The draft below is the one PR #738 used. Re-check the section names in
+their `CONTRIBUTING.md` before reopening; the list is reorganized often.
 
 **Entry:**
 
