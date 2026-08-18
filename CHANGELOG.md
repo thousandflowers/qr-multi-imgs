@@ -7,6 +7,19 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Homebrew formula is published to `thousandflowers/homebrew-tap` automatically on every release (goreleaser `brews:`), so `brew` users stop drifting behind
+
+## [v1.4.1] — 2026-06-26
+
+### Fixed
+- Release build: macOS artifacts are built on a macOS runner with `CGO_ENABLED=1` so the Vision backend links; Linux/Windows stay pure Go and cross-compile
+
+## [v1.4.0] — 2026-06-26
+
+### Added
+- macOS Vision QR backend — decodes real-world photos (perspective-warped, low-contrast, small-module receipt QRs) that the pure-Go path misses. Uses the framework shipped with macOS, so it adds no install step
+
 ## [v1.3.0] — 2026-06-23
 
 ### Added
