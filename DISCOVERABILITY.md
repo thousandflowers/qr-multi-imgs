@@ -72,7 +72,8 @@ cost more in bounce than they gain in impressions.
 ## Other UI-only switches
 
 - **Discussions** — enable it. Q&A that is not a bug does not belong in
-  Issues, and Discussions pages are indexed.
+  Issues, and Discussions pages are indexed. `.github/ISSUE_TEMPLATE/config.yml`
+  links to the Discussions tab, so that link 404s until you turn it on.
 - **Social preview image** — Settings → General → Social preview. Without
   one, every link shared on X / LinkedIn / Slack renders as a grey box.
   A single frame of `demo.gif` at 1280×640 is enough.
