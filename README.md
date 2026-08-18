@@ -23,13 +23,21 @@ qr-multi-imgs ./folder-of-qr-images
 
 ## Why
 
-My father needed to catalog hundreds of photos of orders — each one a QR code on a receipt. No existing CLI tool could handle a folder, organize results, or do anything useful with the output.
+My father needed to catalog hundreds of photos of orders — each one a QR code on a receipt. No CLI could take a whole folder, keep the results, and then do something with them.
 
-qr-multi-imgs started as a fix for that. It kept growing.
+qr-multi-imgs is that missing step: point it at a folder, and the decoded codes come out the other side as files you can act on — sorted, exported, or regenerated.
 
-Plenty of CLI QR scanners exist, but none ship a full TUI built for batch work:
+### Input — 5 ways
 
-| | qr-multi-imgs | qr-scanner-cli | qrtool |
+CLI argument · **drag & drop a folder onto the terminal** · type a path · paste (`Cmd+V`) · clipboard (`Ctrl+D`)
+
+---
+
+## Comparison
+
+Plenty of CLI QR scanners exist. None ship a TUI built for batch work.
+
+| | qr-multi-imgs | [qr-scanner-cli](https://github.com/victorperin/qr-scanner-cli) | [qrtool](https://github.com/sorairolake/qrtool) |
 | --- | --- | --- | --- |
 | Interactive TUI | ✅ | ❌ | ❌ |
 | Organize files (with/without QR) | ✅ | ❌ | ❌ |
@@ -37,11 +45,8 @@ Plenty of CLI QR scanners exist, but none ship a full TUI built for batch work:
 | Recreate QR (PNG/JPG/SVG) | ✅ | ❌ | bitmap only |
 | Export (JSON/CSV/TXT) | ✅ | ❌ | ✅ |
 | Drag & drop + clipboard | ✅ | ❌ | ❌ |
+| Photographed QRs (Apple Vision, macOS) | ✅ | ❌ | ❌ |
 | Nothing to install (no runtime deps) | ✅ | ❌ (Node) | ✅ |
-
-### Input — 5 ways
-
-CLI argument · **drag & drop a folder onto the terminal** · type a path · paste (`Cmd+V`) · clipboard (`Ctrl+D`)
 
 ---
 
