@@ -23,13 +23,21 @@ qr-multi-imgs ./folder-of-qr-images
 
 ## Why
 
-My father needed to catalog hundreds of photos of orders — each one a QR code on a receipt. No existing CLI tool could handle a folder, organize results, or do anything useful with the output.
+My father needed to catalog hundreds of photos of orders — each one a QR code on a receipt. No CLI could take a whole folder, keep the results, and then do something with them.
 
-qr-multi-imgs started as a fix for that. It kept growing.
+qr-multi-imgs is that missing step: point it at a folder, and the decoded codes come out the other side as files you can act on — sorted, exported, or regenerated.
 
-Plenty of CLI QR scanners exist, but none ship a full TUI built for batch work:
+### Input — 5 ways
 
-| | qr-multi-imgs | qr-scanner-cli | qrtool |
+CLI argument · **drag & drop a folder onto the terminal** · type a path · paste (`Cmd+V`) · clipboard (`Ctrl+D`)
+
+---
+
+## Comparison
+
+Plenty of CLI QR scanners exist. None ship a TUI built for batch work.
+
+| | qr-multi-imgs | [qr-scanner-cli](https://github.com/victorperin/qr-scanner-cli) | [qrtool](https://github.com/sorairolake/qrtool) |
 | --- | --- | --- | --- |
 | Interactive TUI | ✅ | ❌ | ❌ |
 | Organize files (with/without QR) | ✅ | ❌ | ❌ |
@@ -37,11 +45,8 @@ Plenty of CLI QR scanners exist, but none ship a full TUI built for batch work:
 | Recreate QR (PNG/JPG/SVG) | ✅ | ❌ | bitmap only |
 | Export (JSON/CSV/TXT) | ✅ | ❌ | ✅ |
 | Drag & drop + clipboard | ✅ | ❌ | ❌ |
-| Pure Go, zero CGo | ✅ | ❌ (npm) | ✅ |
-
-### Input — 5 ways
-
-CLI argument · **drag & drop a folder onto the terminal** · type a path · paste (`Cmd+V`) · clipboard (`Ctrl+D`)
+| Photographed QRs (Apple Vision, macOS) | ✅ | ❌ | ❌ |
+| Nothing to install (no runtime deps) | ✅ | ❌ (Node) | ✅ |
 
 ---
 
@@ -55,7 +60,7 @@ Dataset: [lovasoa/qrcode-dataset](https://github.com/lovasoa/qrcode-dataset) —
 | **Time** | ~7m30s | **~7s** |
 | **Throughput** | ~7 img/s | **~475 img/s** |
 
-The leap to 100% is not parallelism — it's the companion bit-matrix. The dataset's densest codes pack 100+ modules into 256 px, so each module is sub-pixel and unrecoverable from the raster by any decoder. For those, qr-multi-imgs decodes the sample's `.npy` bit-matrix (written by the dataset generator) in pure Go — zero system dependencies, no `zbarimg`. Codes still legible in the pixels (~56%) decode straight from the image; six workers cut the wall-clock.
+The leap to 100% is not parallelism — it's the companion bit-matrix. The dataset's densest codes pack 100+ modules into 256 px, so each module is sub-pixel and unrecoverable from the raster by any decoder. For those, qr-multi-imgs decodes the sample's `.npy` bit-matrix (written by the dataset generator) in pure Go — nothing to install, no `zbarimg` required. Codes still legible in the pixels (~56%) decode straight from the image; six workers cut the wall-clock.
 
 ```bash
 # Reproduce — the dataset is generated, not stored in the repo:
@@ -113,8 +118,20 @@ cd qr-multi-imgs && go build
 ```
 
 **Requirements:** Go 1.26+, an ANSI terminal.  
+**Build:** pure Go on Linux/Windows. The macOS build links Apple's Vision
+framework via cgo (ships with the OS — nothing to install) for photographed,
+perspective-warped QR codes.  
 **Supported formats:** PNG / JPEG / GIF / BMP / WebP.  
 **Supported platforms:** macOS, Linux, **Windows** (clipboard via external tool).
+
+---
+
+## Contributing
+
+PRs welcome. [CONTRIBUTING.md](CONTRIBUTING.md) has the build and test
+loop; [GOOD_FIRST_ISSUES.md](GOOD_FIRST_ISSUES.md) has three tasks sized
+for a first contribution. By taking part you agree to the
+[Code of Conduct](CODE_OF_CONDUCT.md).
 
 ---
 

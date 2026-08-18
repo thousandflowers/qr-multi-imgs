@@ -6,6 +6,7 @@ import (
 	"image/color"
 	"image/png"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -308,7 +309,18 @@ func TestDecodeWithZbarimg(t *testing.T) {
 	}
 	content := "ZBARIMG-FALLBACK"
 	path := createTestQR(t, content)
-	if got := decodeWithZbarimg(path); got != content {
+	got := decodeWithZbarimg(path)
+	if got == "" {
+		// A zbar that crashes is the same as a zbar that is not installed:
+		// decodeWithZbarimg swallows the error either way, and the fallback
+		// is optional by design. Some builds (0.23.93 on macOS/arm64) segfault
+		// on a perfectly valid PNG, which is why this path is a fallback and
+		// not the primary decoder.
+		if err := exec.Command(zbarimgPath, "-q", "--raw", path).Run(); err != nil {
+			t.Skipf("zbarimg present but unusable on this host: %v", err)
+		}
+	}
+	if got != content {
 		t.Errorf("decodeWithZbarimg = %q, want %q", got, content)
 	}
 }
