@@ -53,11 +53,12 @@ func defaultJobs() int {
 }
 
 type result struct {
-	rel     string // slash-separated, relative to the corpus root
-	payload string
-	decoded bool
-	err     error
+	rel      string // slash-separated, relative to the corpus root
+	payloads []string
+	err      error
 }
+
+func (r result) decoded() bool { return len(r.payloads) > 0 }
 
 func main() {
 	out := flag.String("o", "", "output manifest path (default <dir>/corpus.csv)")
@@ -121,11 +122,12 @@ func run(root, out string, force bool, jobs int) error {
 	}
 
 	total := len(results)
-	var errored int
+	var errored, codes int
 	for _, r := range results {
 		if r.err != nil {
 			errored++
 		}
+		codes += len(r.payloads)
 	}
 	undecoded := total - decoded
 
@@ -133,6 +135,7 @@ func run(root, out string, force bool, jobs int) error {
 	fmt.Printf("total:      %d\n", total)
 	fmt.Printf("decoded:    %d\n", decoded)
 	fmt.Printf("undecoded:  %d  (commented out, pre-labelled %s)\n", undecoded, expectedFail)
+	fmt.Printf("codes:      %d across %d images (%.2f per decoded image)\n", codes, decoded, perImage(codes, decoded))
 	if errored > 0 {
 		fmt.Printf("read errors: %d  (counted as undecoded)\n", errored)
 	}
@@ -147,6 +150,13 @@ func run(root, out string, force bool, jobs int) error {
 // paths relative to root, in lexical order. Unsupported files are skipped
 // silently. Relative paths are what makes two files with the same base name in
 // different directories distinct rows.
+func perImage(codes, images int) float64 {
+	if images == 0 {
+		return 0
+	}
+	return float64(codes) / float64(images)
+}
+
 func listImages(root string) ([]string, error) {
 	var files []string
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
@@ -205,16 +215,18 @@ func scanAll(root string, files []string, jobs int) []result {
 	return results
 }
 
+// scanOne decodes one image in exhaustive mode: every raster strategy, then
+// Apple Vision and zbarimg, all unconditionally, unioned. That is far slower
+// than the CLI path — Vision alone costs about a second an image — and it is
+// the right trade here. This builds the ground truth everything else is
+// measured against, it runs once, and it can run overnight. Ground truth
+// costing more than the thing it measures is normal.
 func scanOne(root, rel string) result {
-	contents, err := scanner.ScanImage(filepath.Join(root, filepath.FromSlash(rel)))
-	switch {
-	case err != nil:
+	contents, err := scanner.ScanImageMode(filepath.Join(root, filepath.FromSlash(rel)), scanner.ScanExhaustive)
+	if err != nil {
 		return result{rel: rel, err: err}
-	case len(contents) > 0:
-		return result{rel: rel, payload: contents[0], decoded: true}
-	default:
-		return result{rel: rel}
 	}
+	return result{rel: rel, payloads: contents}
 }
 
 const manifestHeader = `# BOOTSTRAP — NOT GROUND TRUTH.
@@ -226,6 +238,10 @@ const manifestHeader = `# BOOTSTRAP — NOT GROUND TRUTH.
 # reproduces itself here as a "correct" expectation. Benchmarking against this
 # manifest unchanged measures self-consistency, not accuracy. Check the
 # payloads by hand before treating any number from it as a success rate.
+#
+# An image holding several codes appears as several rows sharing its path,
+# one row per payload, in reading order. Two rows with the same payload mean
+# two physically distinct codes that happen to carry the same content.
 #
 # Commented rows are images that did not decode, pre-labelled %s.
 # Uncomment and correct each one: %s is right only if the image truly
@@ -244,20 +260,27 @@ func writeManifest(w io.Writer, root string, results []result) (int, error) {
 
 	decoded := 0
 	for _, r := range results {
-		var line string
-		var err error
-		if r.decoded {
-			decoded++
-			line, err = encodeRow(r.rel, r.payload)
+		// An image holding several codes becomes several rows sharing a path,
+		// one per payload, in the reading order the decoder returned them.
+		rows := r.payloads
+		commented := false
+		if !r.decoded() {
+			rows = []string{expectedFail}
+			commented = true
 		} else {
-			line, err = encodeRow(r.rel, expectedFail)
-			line = commentOut(line)
+			decoded++
 		}
-		if err != nil {
-			return decoded, err
-		}
-		if _, err := io.WriteString(w, line); err != nil {
-			return decoded, err
+		for _, payload := range rows {
+			line, err := encodeRow(r.rel, payload)
+			if err != nil {
+				return decoded, err
+			}
+			if commented {
+				line = commentOut(line)
+			}
+			if _, err := io.WriteString(w, line); err != nil {
+				return decoded, err
+			}
 		}
 	}
 	return decoded, nil

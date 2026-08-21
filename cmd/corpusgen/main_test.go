@@ -50,6 +50,34 @@ func writePNG(t *testing.T, path string, img image.Image) {
 	}
 }
 
+// writeMultiQR renders several QRs side by side in one image.
+func writeMultiQR(t *testing.T, path string, contents ...string) {
+	t.Helper()
+	const cell, gap = 300, 150
+	w := len(contents)*cell + (len(contents)+1)*gap
+	dst := image.NewGray(image.Rect(0, 0, w, cell+2*gap))
+	for i := range dst.Pix {
+		dst.Pix[i] = 255
+	}
+	for i, content := range contents {
+		m, err := qrcode.NewQRCodeWriter().Encode(content, gozxing.BarcodeFormat_QR_CODE, cell, cell, nil)
+		if err != nil {
+			t.Fatalf("encode %q: %v", content, err)
+		}
+		ox := gap + i*(cell+gap)
+		for y := range m.GetHeight() {
+			for x := range m.GetWidth() {
+				v := uint8(255)
+				if m.Get(x, y) {
+					v = 0
+				}
+				dst.SetGray(ox+x, gap+y, color.Gray{Y: v})
+			}
+		}
+	}
+	writePNG(t, path, dst)
+}
+
 // writeBlank writes an image with no QR in it.
 func writeBlank(t *testing.T, path string) {
 	t.Helper()
@@ -61,7 +89,7 @@ func writeBlank(t *testing.T, path string) {
 }
 
 // readManifest parses a generated manifest exactly the way TestCorpus does.
-func readManifest(t *testing.T, path string) map[string]string {
+func readManifest(t *testing.T, path string) map[string][]string {
 	t.Helper()
 	f, err := os.Open(path)
 	if err != nil {
@@ -75,15 +103,12 @@ func readManifest(t *testing.T, path string) map[string]string {
 	if err != nil {
 		t.Fatalf("parse manifest: %v", err)
 	}
-	got := make(map[string]string, len(rows))
+	got := make(map[string][]string, len(rows))
 	for _, row := range rows {
 		if row[0] == "path" && row[1] == "expected" {
 			continue
 		}
-		if _, dup := got[row[0]]; dup {
-			t.Errorf("duplicate row for %q", row[0])
-		}
-		got[row[0]] = row[1]
+		got[row[0]] = append(got[row[0]], row[1])
 	}
 	return got
 }
@@ -114,6 +139,11 @@ func TestGenerateManifest(t *testing.T) {
 	// A path beginning with '#', which csv.Reader treats as a comment unless
 	// the writer quotes it.
 	writeQR(t, filepath.Join(root, "#hash.png"), "hash-payload")
+
+	// Several codes in one frame become several rows sharing a path, and two
+	// codes carrying identical payloads must stay two rows.
+	writeMultiQR(t, filepath.Join(root, "two-codes.png"), "CODE-LEFT", "CODE-RIGHT")
+	writeMultiQR(t, filepath.Join(root, "twins.png"), "TWIN", "TWIN")
 
 	// Images with no QR: these must be commented out, not dropped.
 	writeBlank(t, filepath.Join(root, "blank.png"))
@@ -149,23 +179,31 @@ func TestGenerateManifest(t *testing.T) {
 	got := readManifest(t, out)
 
 	// Decoded rows, including every tricky payload, survive the round trip.
-	want := map[string]string{
-		"a/dup.png":              "payload-from-a",
-		"b/dup.png":              "payload-from-b",
-		"deep/deeper/nested.png": "nested-payload",
-		"#hash.png":              "hash-payload",
+	want := map[string][]string{
+		"a/dup.png":              {"payload-from-a"},
+		"b/dup.png":              {"payload-from-b"},
+		"deep/deeper/nested.png": {"nested-payload"},
+		"#hash.png":              {"hash-payload"},
+		"two-codes.png":          {"CODE-LEFT", "CODE-RIGHT"},
+		"twins.png":              {"TWIN", "TWIN"},
 	}
 	for name, payload := range trickyPayloads {
-		want[name] = payload
+		want[name] = []string{payload}
 	}
-	for path, wantPayload := range want {
-		gotPayload, ok := got[path]
+	for path, wantPayloads := range want {
+		gotPayloads, ok := got[path]
 		if !ok {
 			t.Errorf("missing live row for %q", path)
 			continue
 		}
-		if gotPayload != wantPayload {
-			t.Errorf("%s = %q, want %q", path, gotPayload, wantPayload)
+		if len(gotPayloads) != len(wantPayloads) {
+			t.Errorf("%s decoded %d payloads (%q), want %d (%q)", path, len(gotPayloads), gotPayloads, len(wantPayloads), wantPayloads)
+			continue
+		}
+		for i := range wantPayloads {
+			if gotPayloads[i] != wantPayloads[i] {
+				t.Errorf("%s payload %d = %q, want %q", path, i, gotPayloads[i], wantPayloads[i])
+			}
 		}
 	}
 

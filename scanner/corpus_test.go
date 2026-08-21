@@ -34,14 +34,22 @@ const (
 	manifestName     = "corpus.csv"
 )
 
+// corpusEntry is one image and every payload it is expected to yield, in
+// reading order. An empty expected list means the image holds no QR at all.
 type corpusEntry struct {
 	path     string // absolute
 	name     string // as written in the manifest, for reporting
-	expected string
+	expected []string
 }
 
 // readManifest parses dir/corpus.csv into entries. Rows starting with # are
 // comments; an optional "path,expected" header row is skipped.
+//
+// An image with several codes is written as several rows sharing a path, one
+// per payload, in reading order. Keeping two fields per row rather than
+// widening to ragged columns preserves FieldsPerRecord as a typo guard: in a
+// hand-edited manifest an unescaped comma would otherwise turn one payload
+// into two silently.
 func readManifest(dir string) ([]corpusEntry, error) {
 	f, err := os.Open(filepath.Join(dir, manifestName))
 	if err != nil {
@@ -58,30 +66,53 @@ func readManifest(dir string) ([]corpusEntry, error) {
 	}
 
 	var entries []corpusEntry
+	index := make(map[string]int)
 	for _, row := range rows {
-		if row[0] == "path" && row[1] == "expected" {
+		name, expected := row[0], row[1]
+		if name == "path" && expected == "expected" {
 			continue
 		}
-		entries = append(entries, corpusEntry{
-			path:     filepath.Join(dir, filepath.FromSlash(row[0])),
-			name:     row[0],
-			expected: row[1],
-		})
+		i, seen := index[name]
+		if !seen {
+			index[name] = len(entries)
+			entries = append(entries, corpusEntry{
+				path: filepath.Join(dir, filepath.FromSlash(name)),
+				name: name,
+			})
+			i = len(entries) - 1
+		}
+		if expected == expectedFail {
+			if len(entries[i].expected) > 0 {
+				return nil, fmt.Errorf("%s: %s mixed with real payloads", name, expectedFail)
+			}
+			continue
+		}
+		if seen && len(entries[i].expected) == 0 {
+			return nil, fmt.Errorf("%s: real payload mixed with %s", name, expectedFail)
+		}
+		entries[i].expected = append(entries[i].expected, expected)
 	}
 	return entries, nil
 }
 
-// decodeOne runs the production decode path and flattens it to a single
-// payload: "" means nothing decoded.
-func decodeOne(path string) (string, error) {
-	contents, err := ScanImage(path)
-	if err != nil {
-		return "", err
+// score compares what an image decoded against what it was expected to yield.
+// matched counts payloads found that were expected, spurious counts payloads
+// found that were not. Both are multiset counts, so two codes carrying the
+// same payload need both to be found to score two.
+func score(expected, decoded []string) (matched, spurious int) {
+	remaining := make(map[string]int, len(expected))
+	for _, e := range expected {
+		remaining[e]++
 	}
-	if len(contents) == 0 {
-		return "", nil
+	for _, d := range decoded {
+		if remaining[d] > 0 {
+			remaining[d]--
+			matched++
+		} else {
+			spurious++
+		}
 	}
-	return contents[0], nil
+	return matched, spurious
 }
 
 func TestCorpus(t *testing.T) {
@@ -102,49 +133,99 @@ func TestCorpus(t *testing.T) {
 		t.Fatalf("manifest %s lists no images", filepath.Join(abs, manifestName))
 	}
 
-	var correct, wrong, missed, errored int
-	// failures collects one line per non-correct row, for eyeballing afterwards.
+	// Per-image outcomes.
+	var exact, partial, missed, falsePositive, correctNegative, errored int
+	// Per-code outcomes, which is where recall actually lives: an image with
+	// three codes where two decode is neither a pass nor a plain failure.
+	var codesExpected, codesMatched, codesSpurious int
 	var failures []string
 
+	// The harness measures the CLI path — ScanImage, i.e. ScanFast — on
+	// purpose. Ground truth is built with ScanExhaustive by corpusgen, so the
+	// gap between the two numbers is exactly the set of codes the fast path
+	// misses and Vision recovers, and what a browser build can never reach.
+	// It cannot pass an expected count: ScanMode has no field for one.
+	//
 	// ponytail: sequential. Thousands of photos will take minutes — parallelise
 	// with the scanWorkers pool from scanner.go if that becomes the bottleneck.
 	for _, e := range entries {
-		got, derr := decodeOne(e.path)
-		switch {
-		case derr != nil:
+		decoded, derr := ScanImage(e.path)
+		codesExpected += len(e.expected)
+
+		if derr != nil {
 			errored++
-			failures = append(failures, fmt.Sprintf("ERROR   %s: %v", e.name, derr))
-		case e.expected == expectedFail:
-			if got == "" {
-				correct++
-			} else {
-				wrong++
-				failures = append(failures, fmt.Sprintf("FALSEPOS %s: expected no QR, decoded %q", e.name, got))
-			}
-		case got == e.expected:
-			correct++
-		case got == "":
+			failures = append(failures, fmt.Sprintf("ERROR    %s: %v", e.name, derr))
+			continue
+		}
+
+		matched, spurious := score(e.expected, decoded)
+		codesMatched += matched
+		codesSpurious += spurious
+
+		switch {
+		case len(e.expected) == 0 && len(decoded) == 0:
+			correctNegative++
+		case len(e.expected) == 0:
+			falsePositive++
+			failures = append(failures, fmt.Sprintf("FALSEPOS %s: expected no QR, decoded %q", e.name, decoded))
+		case spurious > 0:
+			falsePositive++
+			failures = append(failures, fmt.Sprintf("FALSEPOS %s: %d/%d expected codes, plus %d not in the manifest: decoded %q",
+				e.name, matched, len(e.expected), spurious, decoded))
+		case matched == len(e.expected):
+			exact++
+		case matched == 0:
 			missed++
-			failures = append(failures, fmt.Sprintf("MISSED  %s: expected %q", e.name, e.expected))
+			failures = append(failures, fmt.Sprintf("MISSED   %s: 0/%d codes, expected %q", e.name, len(e.expected), e.expected))
 		default:
-			wrong++
-			failures = append(failures, fmt.Sprintf("WRONG   %s: expected %q, decoded %q", e.name, e.expected, got))
+			partial++
+			failures = append(failures, fmt.Sprintf("PARTIAL  %s: %d/%d codes, missing %q",
+				e.name, matched, len(e.expected), missingFrom(e.expected, decoded)))
 		}
 	}
-
-	total := len(entries)
-	rate := 100 * float64(correct) / float64(total)
 
 	sort.Strings(failures)
 	for _, line := range failures {
 		t.Log(line)
 	}
 
-	t.Logf("corpus:  %s", abs)
-	t.Logf("total:   %d", total)
-	t.Logf("correct: %d", correct)
-	t.Logf("wrong:   %d", wrong)
-	t.Logf("missed:  %d", missed)
-	t.Logf("errors:  %d", errored)
-	t.Logf("success rate: %.2f%%", rate)
+	images := len(entries)
+	t.Logf("corpus: %s", abs)
+	t.Logf("images:  %d total", images)
+	t.Logf("  exact:            %d", exact)
+	t.Logf("  partial:          %d", partial)
+	t.Logf("  missed:           %d", missed)
+	t.Logf("  false positive:   %d", falsePositive)
+	t.Logf("  correct negative: %d", correctNegative)
+	if errored > 0 {
+		t.Logf("  errors:           %d", errored)
+	}
+	t.Logf("codes:   %d expected, %d decoded, %d spurious", codesExpected, codesMatched, codesSpurious)
+	t.Logf("per-image exact rate: %.2f%%", pct(exact+correctNegative, images))
+	t.Logf("per-code recall:      %.2f%%", pct(codesMatched, codesExpected))
+}
+
+func pct(n, total int) float64 {
+	if total == 0 {
+		return 0
+	}
+	return 100 * float64(n) / float64(total)
+}
+
+// missingFrom returns the expected payloads that were not decoded, as a
+// multiset difference.
+func missingFrom(expected, decoded []string) []string {
+	have := make(map[string]int, len(decoded))
+	for _, d := range decoded {
+		have[d]++
+	}
+	var out []string
+	for _, e := range expected {
+		if have[e] > 0 {
+			have[e]--
+			continue
+		}
+		out = append(out, e)
+	}
+	return out
 }
