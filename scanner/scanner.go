@@ -609,9 +609,7 @@ func ScanImageMode(path string, mode ScanMode) ([]string, error) {
 	// count matches the detected count instead of when a stage happens to
 	// return something.
 	if exhaustive || len(hits) == 0 {
-		if text := decodeWithVision(path); text != "" {
-			hits = mergeHits(hits, []hit{{text: text}})
-		}
+		hits = mergeHits(hits, decodeWithVision(path))
 	}
 
 	// Last resort for real photos with no mask: zbarimg, if installed. It
