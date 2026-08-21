@@ -17,3 +17,6 @@ coverage*.out
 coverage*.html
 *_cov.out
 *_cov.html
+
+# Scratch output dir
+recreated_qr/

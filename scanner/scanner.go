@@ -453,6 +453,26 @@ func decodeMaskImage(img image.Image) string {
 	return ""
 }
 
+// ScanDecodedImage decodes an already-decoded image and returns the QR payloads
+// found in it, or nil if there are none.
+//
+// It is the path-free half of ScanImage. The companion .npy mask, Apple Vision,
+// and zbarimg all need a file path, so none of them run here — expect lower
+// recall than ScanImage on real photos, where on macOS Vision is what rescues
+// the warped and low-contrast ones. This is the entry point for callers holding
+// pixels but no file, such as a wasm build.
+//
+// The returned error is always nil today. It is in the signature because every
+// decode strategy lives in decodeRaster, which is where allocation-heavy work
+// belongs; under GOOS=js that can fail, and adding an error to an already
+// released public function would be a breaking change. Do not remove it.
+func ScanDecodedImage(img image.Image) ([]string, error) {
+	if text := decodeRaster(img); text != "" {
+		return []string{text}, nil
+	}
+	return nil, nil
+}
+
 // ScanImage tries multiple decode strategies in order until one succeeds.
 func ScanImage(path string) ([]string, error) {
 	// A companion .npy mask, when present, is the pixel-exact source QR. It
@@ -473,8 +493,14 @@ func ScanImage(path string) ([]string, error) {
 		return nil, fmt.Errorf("decode: %w", err)
 	}
 
-	if text := decodeRaster(img); text != "" {
-		return []string{text}, nil
+	// A decode failure here is a capacity failure, not a "no QR" answer, so it
+	// propagates instead of falling through to Vision/zbarimg. Always nil today.
+	contents, err := ScanDecodedImage(img)
+	if err != nil {
+		return nil, err
+	}
+	if len(contents) > 0 {
+		return contents, nil
 	}
 
 	// Real photos (warped/low-contrast/small-module QRs) defeat gozxing. On

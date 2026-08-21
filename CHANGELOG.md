@@ -9,6 +9,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 - Homebrew formula is published to `thousandflowers/homebrew-tap` automatically on every release (goreleaser `brews:`), so `brew` users stop drifting behind
+- `scanner.ScanDecodedImage(image.Image) ([]string, error)` — decodes from pixels with no file path, for callers such as a wasm build. `ScanImage` now delegates its raster stage to it. Lower recall than `ScanImage`: the `.npy` mask, Apple Vision, and zbarimg all need a path and do not run
+- Ground-truth decode benchmark behind the `corpus` build tag: `go test -tags corpus ./scanner -run TestCorpus -v`. Reads a `corpus.csv` manifest, reports total/correct/wrong/missed/errors and a success rate. `QR_CORPUS_DIR` points it at an uncommitted private photo set
 
 ### Fixed
 - Build failure on macOS with `CGO_ENABLED=0`: both Apple Vision files were excluded by their build tags, leaving `decodeWithVision` undefined. The stub is now selected by `!darwin || !cgo` and the cgo implementation by `darwin && cgo`
