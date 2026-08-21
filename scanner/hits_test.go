@@ -3,6 +3,7 @@ package scanner
 import (
 	"image"
 	"image/color"
+	"image/draw"
 	"image/png"
 	"os"
 	"path/filepath"
@@ -283,4 +284,104 @@ func TestScanImageModeFindsEveryCode(t *testing.T) {
 			}
 		})
 	}
+}
+
+// unionAllStrategies decodes with every strategy and no early exit — what
+// decodeRaster did before finder-pattern accounting was added.
+func unionAllStrategies(img image.Image) []string {
+	var hits []hit
+	for _, st := range strategies {
+		hits = mergeHits(hits, decodeAttempt(img, st))
+	}
+	sortHits(hits)
+	return hitTexts(hits)
+}
+
+// The invariant that makes the early exit safe: stopping once as many codes
+// have been decoded as the detector could see must return exactly what running
+// every strategy returns. This is what separates an evidence-based stop from
+// the guesswork it replaced — a heuristic would quietly return less on some
+// input, and only a comparison against the full union can show that it does
+// not.
+func TestEarlyExitMatchesFullUnion(t *testing.T) {
+	red := color.RGBA{255, 0, 0, 255}
+	green := color.RGBA{0, 130, 0, 255}
+	white := color.RGBA{255, 255, 255, 255}
+
+	blank := image.NewGray(image.Rect(0, 0, 200, 200))
+	for i := range blank.Pix {
+		blank.Pix[i] = 210
+	}
+
+	cases := map[string]image.Image{
+		"single code": canvas(t, 500, 500, map[image.Point]image.Image{
+			{X: 100, Y: 100}: qrImage(t, "ONLY", 300),
+		}),
+		"two distinct codes": canvas(t, 900, 500, map[image.Point]image.Image{
+			{X: 50, Y: 50}: qrImage(t, "A", 300), {X: 500, Y: 50}: qrImage(t, "B", 300),
+		}),
+		"two identical codes": canvas(t, 900, 500, map[image.Point]image.Image{
+			{X: 50, Y: 50}: qrImage(t, "TWIN", 300), {X: 500, Y: 50}: qrImage(t, "TWIN", 300),
+		}),
+		"four codes": canvas(t, 900, 900, map[image.Point]image.Image{
+			{X: 50, Y: 50}: qrImage(t, "tl", 300), {X: 500, Y: 50}: qrImage(t, "tr", 300),
+			{X: 50, Y: 500}: qrImage(t, "bl", 300), {X: 500, Y: 500}: qrImage(t, "br", 300),
+		}),
+		"no code at all":   blank,
+		"colour on colour": colourCanvas(t, red, green, white),
+	}
+
+	for name, img := range cases {
+		t.Run(name, func(t *testing.T) {
+			want := unionAllStrategies(img)
+			hits, err := decodeRaster(img)
+			if err != nil {
+				t.Fatalf("decodeRaster: %v", err)
+			}
+			got := hitTexts(hits)
+			if len(got) != len(want) {
+				t.Fatalf("early exit returned %d codes %v, full union returned %d %v", len(got), got, len(want), want)
+			}
+			for i := range want {
+				if got[i] != want[i] {
+					t.Errorf("position %d: early exit %q, full union %q", i, got[i], want[i])
+				}
+			}
+		})
+	}
+}
+
+// colourCanvas puts an ordinary black code beside one drawn in fg on bg.
+func colourCanvas(t *testing.T, fg, bg, page color.RGBA) image.Image {
+	t.Helper()
+	dst := image.NewRGBA(image.Rect(0, 0, 900, 500))
+	for y := range 500 {
+		for x := range 900 {
+			dst.Set(x, y, page)
+		}
+	}
+	draw.Draw(dst, image.Rect(50, 50, 350, 350), qrImage(t, "PLAIN-BLACK", 300), image.Point{}, draw.Src)
+	draw.Draw(dst, image.Rect(500, 50, 800, 350), colorQR(t, "COLOURED", 300, fg, bg), image.Point{}, draw.Src)
+	return dst
+}
+
+// colorQR renders a QR in fg on bg.
+func colorQR(t *testing.T, content string, size int, fg, bg color.RGBA) image.Image {
+	t.Helper()
+	m, err := qrcode.NewQRCodeWriter().Encode(content, gozxing.BarcodeFormat_QR_CODE, size, size, nil)
+	if err != nil {
+		t.Fatalf("encode %q: %v", content, err)
+	}
+	w, h := m.GetWidth(), m.GetHeight()
+	img := image.NewRGBA(image.Rect(0, 0, w, h))
+	for y := range h {
+		for x := range w {
+			c := bg
+			if m.Get(x, y) {
+				c = fg
+			}
+			img.Set(x, y, c)
+		}
+	}
+	return img
 }

@@ -21,6 +21,7 @@ import (
 
 	"github.com/makiuchi-d/gozxing"
 	multiqr "github.com/makiuchi-d/gozxing/multi/qrcode"
+	multidetector "github.com/makiuchi-d/gozxing/multi/qrcode/detector"
 	"github.com/makiuchi-d/gozxing/qrcode"
 )
 
@@ -318,6 +319,7 @@ func decodeAttempt(img image.Image, s decodeStrategy) []hit {
 	hints := map[gozxing.DecodeHintType]interface{}{
 		gozxing.DecodeHintType_TRY_HARDER: true,
 	}
+
 	results, err := multiqr.NewQRCodeMultiReader().DecodeMultiple(bmp, hints)
 	if err != nil {
 		return nil
@@ -426,23 +428,95 @@ var strategies = []decodeStrategy{
 	{"r", false, 2},   // red channel, hybrid 2x
 }
 
-// decodeRaster runs every pure-Go strategy over a decoded image and returns
+// projectionChannels are the distinct colour projections the strategies use,
+// derived from the strategy list so the two cannot drift apart.
+func projectionChannels() []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, s := range strategies {
+		if !seen[s.channel] {
+			seen[s.channel] = true
+			out = append(out, s.channel)
+		}
+	}
+	return out
+}
+
+// countCandidates estimates how many QR codes the image holds, by locating
+// finder patterns rather than decoding anything. Finder patterns are cheap to
+// find and a payload is expensive to recover, which is what makes an evidence
+// based stopping rule affordable.
+//
+// It looks across every colour projection the strategies use, not just
+// luminance, and takes the largest count any of them shows. That breadth is the
+// whole point: a code whose contrast lives in one channel can be nearly absent
+// from the luminance image — red on green of the same brightness is the extreme
+// case — so a count taken from luminance alone would miss it, and a decode loop
+// trusting that count would stop before the channel strategy that could read
+// it ever ran. Taking the maximum means a projection that hides a code can
+// never lower a target another projection has already raised.
+//
+// Returns 0 when nothing is detected anywhere, which disables early exit
+// entirely rather than ending the search.
+func countCandidates(img image.Image) int {
+	hints := map[gozxing.DecodeHintType]interface{}{
+		gozxing.DecodeHintType_TRY_HARDER: true,
+	}
+	most := 0
+	for _, channel := range projectionChannels() {
+		src := projectChannel(img, channel)
+		// Global histogram: cheapest binarizer, and the most forgiving on the
+		// flat single-channel projections this pass is built around.
+		bmp, err := gozxing.NewBinaryBitmap(gozxing.NewGlobalHistgramBinarizer(
+			gozxing.NewLuminanceSourceFromImage(src)))
+		if err != nil || bmp == nil {
+			continue
+		}
+		matrix, merr := bmp.GetBlackMatrix()
+		if merr != nil || matrix == nil {
+			continue
+		}
+		infos, ferr := multidetector.NewMultiFinderPatternFinder(matrix, nil).FindMulti(hints)
+		if ferr != nil {
+			// A detector error must cost time, never recall: leaving the count
+			// where it is only fails to stop the loop early.
+			continue
+		}
+		if len(infos) > most {
+			most = len(infos)
+		}
+	}
+	return most
+}
+
+// decodeRaster runs the pure-Go strategies over a decoded image and returns
 // the union of what they found, deduped and in reading order.
 //
-// There is deliberately no early exit. The strategy list is a greedy cover, not
-// a ranking: strategies are complementary, so one finding nothing says nothing
-// about the next. With several codes in a frame, stopping at the first success
-// would return whichever subset the first working strategy happened to see —
-// a silent under-report, indistinguishable from a frame that really held one
-// code. Running all ten costs roughly ten times the old best case and buys the
-// only answer that can be trusted.
-// The error return is nil in every current path. It is here so the cascade's
-// allocation-heavy stages have somewhere to report running out of room; see
-// the contract at ScanImageMode.
+// The strategy list is a greedy cover, not a ranking: strategies are
+// complementary, so one finding nothing says nothing about the next. Stopping
+// at the first success would return whichever subset the first working strategy
+// happened to see — a silent under-report, indistinguishable from a frame that
+// really held one code. Running all ten instead costs roughly thirty times the
+// old best case on real photos, which is why the loop stops on evidence.
+//
+// countCandidates says how many codes are visible before any decoding starts;
+// once that many have been decoded there is nothing left to look for. The
+// guards are that at least one strategy always runs, and that a count of zero
+// disables early exit rather than triggering it, so uncertainty costs time
+// instead of recall.
+//
+// This is evidence about what the detector can see, not proof about what is on
+// the page: a code invisible to every projection is invisible to the count too.
+// It is strictly better than stopping at the first success, and it is what
+// makes the union affordable.
 func decodeRaster(img image.Image) ([]hit, error) {
+	target := countCandidates(img)
 	var hits []hit
 	for _, s := range strategies {
 		hits = mergeHits(hits, decodeAttempt(img, s))
+		if target > 0 && len(hits) >= target {
+			break
+		}
 	}
 	sortHits(hits)
 	return hits, nil
