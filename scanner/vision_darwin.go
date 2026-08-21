@@ -14,8 +14,9 @@ package scanner
 #include <stdlib.h>
 
 // decodeQRVisionAll returns a malloc'd, length-prefixed buffer describing every
-// QR found in the image at cpath, writing its length to outLen, or NULL if
-// none. Caller owns the buffer and must free() it.
+// QR found in the image at cpath, writing its length to outLen. It returns NULL
+// only when the file could not be read at all; a readable image with no QR in
+// it yields a valid, empty list. Caller owns the buffer and must free() it.
 char* decodeQRVisionAll(const char* cpath, int* outLen);
 */
 import "C"
@@ -42,18 +43,22 @@ var visionByteOrder = binary.NativeEndian
 // Vision then works in an upright frame that Go's image.Decode never sees, and
 // emitting points in a frame the caller cannot reconcile would make dedup
 // report one code as two. Payload matching covers those instead.
-func decodeWithVision(path string) []hit {
+// The second return reports whether Vision could read the file at all. Callers
+// use it to tell "this decoder could not open it" apart from "it opened fine
+// and holds no QR", which matters because Core Image reads formats Go's
+// image.Decode does not — HEIC above all.
+func decodeWithVision(path string) ([]hit, bool) {
 	cpath := C.CString(path)
 	defer C.free(unsafe.Pointer(cpath))
 
 	var clen C.int
 	buf := C.decodeQRVisionAll(cpath, &clen)
 	if buf == nil {
-		return nil
+		return nil, false
 	}
 	defer C.free(unsafe.Pointer(buf))
 	if clen <= 0 {
-		return nil
+		return nil, true
 	}
 	// CIDetector and Vision are both run over each variant and routinely find
 	// the same code, so the raw records hold duplicates. Deduping here means
@@ -61,7 +66,7 @@ func decodeWithVision(path string) []hit {
 	// to whichever caller happens to merge it.
 	hits := mergeHits(nil, parseVisionBuffer(C.GoBytes(unsafe.Pointer(buf), clen)))
 	sortHits(hits)
-	return hits
+	return hits, true
 }
 
 // parseVisionBuffer decodes the wire format written by serialize() in

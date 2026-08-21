@@ -46,9 +46,17 @@ type Summary struct {
 }
 
 // supportedExtensions is the set of image file extensions we attempt to scan.
+//
+// HEIC/HEIF are listed even though Go's image.Decode cannot read them. Every
+// iPhone has shot HEIC by default since 2017, so skipping the extension would
+// silently ignore most of a modern camera roll. On macOS, Apple Vision reads
+// them straight from the path and they decode normally; elsewhere they are
+// reported as an unreadable format, which is the honest answer and far better
+// than pretending the files were not there.
 var supportedExtensions = map[string]bool{
 	".png": true, ".jpg": true, ".jpeg": true,
 	".gif": true, ".bmp": true, ".webp": true,
+	".heic": true, ".heif": true,
 }
 
 // zbarimgPath is resolved at init so decodeWithZbarimg works regardless
@@ -577,25 +585,37 @@ func ScanImageMode(path string, mode ScanMode) ([]string, error) {
 		}
 	}
 
+	// The file has to be readable at all; nothing downstream can work otherwise.
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	img, _, decodeErr := image.Decode(f)
+	f.Close()
 
-	img, _, err := image.Decode(f)
-	if err != nil {
-		return nil, fmt.Errorf("decode: %w", err)
+	// Neither a raster decode failure nor a raster capacity failure is a "no QR"
+	// answer, so neither may collapse the cascade: the error is remembered and
+	// the path-based decoders still get their turn, because one of them may well
+	// succeed where the raster could not even start. It is reported only if
+	// nothing decodes at all.
+	//
+	// This matters well beyond exotic files. Go's image decoders do not cover
+	// HEIC, which every iPhone has shot by default since 2017, so image.Decode
+	// fails on most of a modern camera roll. Apple Vision reads those straight
+	// from the path, so on macOS they decode fine — but only if a failure here
+	// lets the scan continue instead of ending it.
+	//
+	// It is also the contract the allocation-heavy cascade stages (CLAHE,
+	// multiscale tiling) will land into: a strategy that runs out of room must
+	// cost recall, not the whole scan.
+	var rasterErr error
+	if decodeErr != nil {
+		rasterErr = fmt.Errorf("decode: %w", decodeErr)
+	} else {
+		var rasterHits []hit
+		rasterHits, rasterErr = decodeRaster(img)
+		hits = mergeHits(hits, rasterHits)
 	}
-
-	// A raster failure is a capacity failure, not a "no QR" answer, so it must
-	// not collapse the cascade: the error is remembered and the path-based
-	// decoders still get their turn, because one of them may well succeed where
-	// the raster ran out of room. It is reported only if nothing decodes at all.
-	// ScanDecodedImage cannot fail today; this is the contract the allocation
-	// heavy stages (CLAHE, multiscale tiling) will land into.
-	rasterHits, rasterErr := decodeRaster(img)
-	hits = mergeHits(hits, rasterHits)
 
 	// Real photos (warped/low-contrast/small-module QRs) defeat gozxing. On
 	// macOS, Apple Vision recovers many of them and ships with the OS; it is a
@@ -608,8 +628,11 @@ func ScanImageMode(path string, mode ScanMode) ([]string, error) {
 	// says how many codes are present, so escalation can stop when the decoded
 	// count matches the detected count instead of when a stage happens to
 	// return something.
+	visionReadable := false
 	if exhaustive || len(hits) == 0 {
-		hits = mergeHits(hits, decodeWithVision(path))
+		var visionHits []hit
+		visionHits, visionReadable = decodeWithVision(path)
+		hits = mergeHits(hits, visionHits)
 	}
 
 	// Last resort for real photos with no mask: zbarimg, if installed. It
@@ -618,7 +641,11 @@ func ScanImageMode(path string, mode ScanMode) ([]string, error) {
 		hits = mergeHits(hits, decodeWithZbarimg(path))
 	}
 
-	if len(hits) == 0 && rasterErr != nil {
+	// Report the raster failure only if nothing decoded AND no other decoder
+	// managed to read the file. When Vision read it and simply found no code,
+	// "no QR here" is the honest answer — calling that an error would turn a
+	// whole HEIC camera roll into a wall of failures.
+	if len(hits) == 0 && rasterErr != nil && !visionReadable {
 		return nil, rasterErr
 	}
 	sortHits(hits)

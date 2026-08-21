@@ -205,6 +205,8 @@ char *decodeQRVisionAll(const char *cpath, int *outLen) {
 
         CIImage *base = [CIImage imageWithContentsOfURL:url];
         if (base == nil) {
+            // NULL means this decoder could not read the file at all, which is
+            // what lets the caller tell "unreadable" apart from "no QR here".
             return NULL;
         }
         double originalLongSide = MAX(base.extent.size.width, base.extent.size.height);
@@ -267,6 +269,9 @@ char *decodeQRVisionAll(const char *cpath, int *outLen) {
                 }
             }
         }
-        return NULL;
+        // Read fine, found nothing: an empty list, not a failure. Core Image
+        // opens HEIC and other formats Go cannot, so this answer is what tells
+        // the caller a raster decode failure was not the end of the story.
+        return serialize(found, outLen);
     }
 }

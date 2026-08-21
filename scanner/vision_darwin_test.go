@@ -15,7 +15,10 @@ import (
 // real-world photos) can't be asserted deterministically from committed data.
 func TestDecodeWithVision(t *testing.T) {
 	const want = "https://example.com/vision-test"
-	got := decodeWithVision("testdata/vision_qr.png")
+	got, readable := decodeWithVision("testdata/vision_qr.png")
+	if !readable {
+		t.Error("Vision reported a readable PNG as unreadable")
+	}
 	if len(got) != 1 || got[0].text != want {
 		t.Fatalf("decodeWithVision = %v, want [%q]", hitTexts(got), want)
 	}
@@ -25,8 +28,12 @@ func TestDecodeWithVision(t *testing.T) {
 }
 
 func TestDecodeWithVisionMissingFile(t *testing.T) {
-	if got := decodeWithVision("testdata/does-not-exist.png"); len(got) != 0 {
+	got, readable := decodeWithVision("testdata/does-not-exist.png")
+	if len(got) != 0 {
 		t.Fatalf("decodeWithVision on missing file = %v, want empty", hitTexts(got))
+	}
+	if readable {
+		t.Error("a missing file was reported as readable")
 	}
 }
 
@@ -47,7 +54,10 @@ func TestDecodeWithVisionFindsEveryCode(t *testing.T) {
 	}
 	f.Close()
 
-	got := decodeWithVision(path)
+	got, readable := decodeWithVision(path)
+	if !readable {
+		t.Fatal("Vision could not read a plain PNG")
+	}
 	if len(got) != 2 {
 		t.Fatalf("decodeWithVision found %d codes (%v), want 2", len(got), hitTexts(got))
 	}
@@ -94,5 +104,47 @@ func TestParseVisionBufferTruncated(t *testing.T) {
 	}
 	if got := parseVisionBuffer(nil); got != nil {
 		t.Errorf("parseVisionBuffer(nil) = %v, want nil", got)
+	}
+}
+
+// A readable image holding no QR must come back as "read fine, found nothing",
+// not as a failure. Everything downstream depends on telling those apart.
+func TestDecodeWithVisionReadableButEmpty(t *testing.T) {
+	blank := image.NewGray(image.Rect(0, 0, 64, 64))
+	for i := range blank.Pix {
+		blank.Pix[i] = 200
+	}
+	path := filepath.Join(t.TempDir(), "blank.png")
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := png.Encode(f, blank); err != nil {
+		f.Close()
+		t.Fatal(err)
+	}
+	f.Close()
+
+	got, readable := decodeWithVision(path)
+	if len(got) != 0 {
+		t.Errorf("decodeWithVision on a blank image = %v, want none", hitTexts(got))
+	}
+	if !readable {
+		t.Error("a readable blank image was reported as unreadable")
+	}
+}
+
+// HEIC is the default capture format on every iPhone since 2017 and Go's
+// image.Decode cannot read it. Vision can, straight from the path — but only
+// if a raster decode failure lets the scan continue instead of ending it.
+// This is the end-to-end proof of that control flow, through the public API.
+func TestScanImageDecodesHEIC(t *testing.T) {
+	const want = "https://example.com/vision-test"
+	got, err := ScanImage("testdata/vision_qr.heic")
+	if err != nil {
+		t.Fatalf("ScanImage on HEIC: %v", err)
+	}
+	if len(got) != 1 || got[0] != want {
+		t.Fatalf("ScanImage on HEIC = %v, want [%q]", got, want)
 	}
 }
