@@ -51,13 +51,20 @@ type Summary struct {
 // HEIC/HEIF are listed even though Go's image.Decode cannot read them. Every
 // iPhone has shot HEIC by default since 2017, so skipping the extension would
 // silently ignore most of a modern camera roll. On macOS, Apple Vision reads
-// them straight from the path and they decode normally; elsewhere they are
-// reported as an unreadable format, which is the honest answer and far better
-// than pretending the files were not there.
+// them straight from the path and they decode normally; elsewhere they need a
+// build with -tags heic, and without it they report an unreadable format, which
+// is the honest answer and far better than pretending the files were not there.
+//
+// NEF is a MACOS-ONLY path and is listed on the same reasoning. Core Image
+// reads Nikon raw directly, so those files scan on macOS; nothing in the pure
+// Go path decodes them and -tags heic does not help, since raw demosaicing and
+// per-camera colour are a different problem from a HEIF container. On Linux and
+// Windows a .nef reports an unreadable format. That is expected, not a bug.
 var supportedExtensions = map[string]bool{
 	".png": true, ".jpg": true, ".jpeg": true,
 	".gif": true, ".bmp": true, ".webp": true,
 	".heic": true, ".heif": true,
+	".nef": true,
 }
 
 // zbarimgPath is resolved at init so decodeWithZbarimg works regardless
@@ -600,8 +607,14 @@ func decodeMaskImage(img image.Image) string {
 // the warped and low-contrast ones. This is the entry point for callers holding
 // pixels but no file, such as a wasm build.
 //
-// Every raster strategy always runs; see decodeRaster for why there is no
-// early exit.
+// Every raster strategy always runs unless the finder-pattern count says every
+// visible code has been decoded; see decodeRaster.
+//
+// This is also the answer for HEIC in a browser. gen2brain/heic does run under
+// GOOS=js, but at roughly 4.5 minutes per 12MP photo against 0.1s native, so a
+// wasm build should not decode HEIC in Go at all: let the browser do it with
+// createImageBitmap and pass the pixels here. That is this seam's first
+// concrete payoff — a caller holding pixels and no file, exactly as intended.
 //
 // The returned error is always nil today. It is in the signature because every
 // decode strategy lives in decodeRaster, which is where allocation-heavy work

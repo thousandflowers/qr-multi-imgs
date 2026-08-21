@@ -42,6 +42,7 @@ var supportedExtensions = map[string]bool{
 	".png": true, ".jpg": true, ".jpeg": true,
 	".gif": true, ".bmp": true, ".webp": true,
 	".heic": true, ".heif": true,
+	".nef": true,
 }
 
 func defaultJobs() int {
