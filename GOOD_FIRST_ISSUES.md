@@ -1,6 +1,6 @@
 # Good first issues
 
-Three tasks that are real, small, and grounded in the current code. Open
+Four tasks that are real, small, and grounded in the current code. Open
 them by hand at
 [New issue](https://github.com/thousandflowers/qr-multi-imgs/issues/new)
 and label each **`good first issue`** + **`help wanted`** — GitHub's
@@ -148,4 +148,52 @@ The TUI is readable on a light background, and `NO_COLOR=1
 qr-multi-imgs ./folder` renders without escape sequences.
 
 Good first issue — contained to the style block, no scanner logic touched.
+~~~
+
+---
+
+## 4. Make the zbarimg test hermetic
+
+**Title**
+
+```
+Make TestDecodeWithZbarimg independent of the host's zbarimg
+```
+
+**Body**
+
+~~~markdown
+`TestDecodeWithZbarimg` in `scanner/scanner_test.go` passes, skips, or
+fails depending on which zbarimg happens to be installed on the machine
+running it. On macOS/arm64, zbar 0.23.93 segfaults on a perfectly valid
+PNG, so the test currently skips with "zbarimg present but unusable on
+this host". That skip is a patch for a broken host, not a fix — on most
+machines the test now asserts nothing at all.
+
+The fix is to stop calling the real binary.
+
+### What to do
+
+1. Write a fake zbarimg into `t.TempDir()`: a tiny shell script that
+   prints a known payload and exits 0. Remember to `chmod +x` it.
+2. Prepend that directory to `PATH` with `t.Setenv("PATH", ...)`.
+3. Assert `decodeWithZbarimg`'s own behaviour against it — argument
+   construction, trailing-newline trimming, and the empty-output path —
+   with no dependency on a real zbar install.
+
+### Careful about
+
+`zbarimgPath` is resolved once in `init()` (`scanner/scanner.go`) via
+`exec.LookPath`, so a `PATH` override set inside a test will never be
+seen. Making that lookup re-resolvable — or injectable — is the substance
+of this task, not an aside. Keep it small and keep production behaviour
+identical: zbarimg is an optional last-resort fallback and must stay one.
+
+### Done when
+
+`go test -count=1 ./scanner -run TestDecodeWithZbarimg` asserts real
+behaviour on a machine with no zbar installed at all, and still passes on
+one with a working zbar.
+
+Good first issue — one fake binary, one seam, no new dependency.
 ~~~

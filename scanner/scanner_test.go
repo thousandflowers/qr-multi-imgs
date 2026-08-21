@@ -303,6 +303,10 @@ func TestDecodeMaskImage_noQR(t *testing.T) {
 	}
 }
 
+// TODO(hermetic): this test's result depends on which zbarimg the host has —
+// the skip below is a patch for a broken host, not a fix. The real fix is a
+// fake zbarimg injected through PATH, which also means zbarimgPath must stop
+// being resolved once in init(). Written up as task 4 in GOOD_FIRST_ISSUES.md.
 func TestDecodeWithZbarimg(t *testing.T) {
 	if zbarimgPath == "" {
 		t.Skip("zbarimg not found in PATH")

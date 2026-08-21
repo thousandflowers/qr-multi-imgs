@@ -493,8 +493,15 @@ func ScanImage(path string) ([]string, error) {
 		return nil, fmt.Errorf("decode: %w", err)
 	}
 
-	// A decode failure here is a capacity failure, not a "no QR" answer, so it
-	// propagates instead of falling through to Vision/zbarimg. Always nil today.
+	// TODO(cascade): the moment any strategy inside decodeRaster can fail,
+	// ScanImage must remember the error and still try Vision and zbarimg,
+	// reporting it only if every strategy fails. A failing strategy must not
+	// collapse the cascade. Do this FIRST, before any CLAHE or multiscale
+	// tiling code — not once allocation starts failing in the field.
+	//
+	// Until then ScanDecodedImage cannot fail, so propagating here is a no-op:
+	// a capacity failure is not a "no QR" answer, and there is no error to
+	// remember yet.
 	contents, err := ScanDecodedImage(img)
 	if err != nil {
 		return nil, err
