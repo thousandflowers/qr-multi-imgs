@@ -10,6 +10,9 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 - Homebrew formula is published to `thousandflowers/homebrew-tap` automatically on every release (goreleaser `brews:`), so `brew` users stop drifting behind
 
+### Fixed
+- Build failure on macOS with `CGO_ENABLED=0`: both Apple Vision files were excluded by their build tags, leaving `decodeWithVision` undefined. The stub is now selected by `!darwin || !cgo` and the cgo implementation by `darwin && cgo`
+
 ## [v1.4.1] — 2026-06-26
 
 ### Fixed
