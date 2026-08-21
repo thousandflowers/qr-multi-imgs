@@ -623,7 +623,13 @@ func (m model) viewList() string {
 		if !r.HasQR {
 			icon = warnStyle.Render("--")
 		} else if len(r.Contents) > 0 {
+			// One row has space for one payload, so an image holding several
+			// codes says so rather than showing the first and looking like an
+			// image that held one. The rest are listed in the detail view.
 			content = "  " + truncate(r.Contents[0], 55)
+			if extra := len(r.Contents) - 1; extra > 0 {
+				content += mutedStyle.Render(fmt.Sprintf(" (+%d more)", extra))
+			}
 		}
 		if r.Error != "" {
 			icon = errStyle.Render("ERR")
