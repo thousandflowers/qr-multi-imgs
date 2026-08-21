@@ -20,3 +20,6 @@ coverage*.html
 
 # Scratch output dir
 recreated_qr/
+
+# GoReleaser build output
+dist/
