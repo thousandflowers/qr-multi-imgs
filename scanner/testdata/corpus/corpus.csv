@@ -1,0 +1,7 @@
+# Ground-truth manifest for TestCorpus. One row per image.
+#   path     relative to this manifest's directory
+#   expected the exact decoded payload, or EXPECTED_FAIL if the image has no QR
+# Standard CSV quoting applies, so payloads may contain commas or newlines.
+path,expected
+sample_qr.png,https://example.com/vision-test
+sample_noqr.png,EXPECTED_FAIL

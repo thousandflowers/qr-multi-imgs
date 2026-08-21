@@ -1,0 +1,7 @@
+# Never commit real photos. Ignore everything except the manifest and the two
+# tiny synthetic samples that keep TestCorpus runnable out of the box.
+*
+!.gitignore
+!corpus.csv
+!sample_qr.png
+!sample_noqr.png
