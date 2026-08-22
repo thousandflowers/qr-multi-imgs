@@ -280,7 +280,7 @@ func TestScanFolderCmd_success(t *testing.T) {
 	// Create a dummy image file (not a real image — ScanFolder doesn't validate content at the dir level)
 	os.WriteFile(filepath.Join(dir, "test.png"), []byte("dummy"), 0644)
 
-	msg := startScan(dir)()
+	msg := startScan([]string{dir})()
 	started, ok := msg.(scanStartedMsg)
 	if !ok {
 		t.Fatalf("startScan: expected scanStartedMsg, got %T", msg)
@@ -301,7 +301,7 @@ func TestScanFolderCmd_success(t *testing.T) {
 
 func TestEmptyFolderGoesToDoneNotPanic(t *testing.T) {
 	dir := t.TempDir() // no images
-	msg := startScan(dir)()
+	msg := startScan([]string{dir})()
 	started := msg.(scanStartedMsg)
 	var complete scanCompleteMsg
 	for {
@@ -334,7 +334,7 @@ func TestViewScanningShowsBarAndFile(t *testing.T) {
 }
 
 func TestScanFolderCmd_nonexistentDir(t *testing.T) {
-	msg := startScan("/tmp/nonexistent_qr_test_12345")()
+	msg := startScan([]string{"/tmp/nonexistent_qr_test_12345"})()
 	if _, ok := msg.(actionErrorMsg); !ok {
 		t.Fatalf("startScan(nonexistent): expected actionErrorMsg, got %T", msg)
 	}
@@ -914,10 +914,10 @@ func TestModelInit_withInitialPath(t *testing.T) {
 	dir := t.TempDir()
 	os.WriteFile(filepath.Join(dir, "test.png"), []byte("dummy"), 0644)
 	m := testModel()
-	m.initialScanPath = dir
+	m.initialScanPaths = []string{dir}
 	cmd := m.Init()
 	if cmd == nil {
-		t.Fatal("Init() with initialScanPath should return a command")
+		t.Fatal("Init() with initialScanPaths should return a command")
 	}
 }
 
@@ -1034,15 +1034,28 @@ func TestUpdateFolderInput_default(t *testing.T) {
 	}
 }
 
-func TestUpdateFolderInput_enter_fileNotDir(t *testing.T) {
+func TestUpdateFolderInput_enter_singleFile(t *testing.T) {
 	f := filepath.Join(t.TempDir(), "afile.txt")
 	os.WriteFile(f, []byte("x"), 0644)
 	m := testModel()
 	m.input.SetValue(f)
 	m2, cmd := m.updateFolderInput(tea.KeyMsg{Type: tea.KeyEnter})
 	mm := m2.(model)
+	if mm.page != pageScanning {
+		t.Errorf("expected pageScanning for an explicitly named file, got %d", mm.page)
+	}
+	if cmd == nil {
+		t.Error("expected a scan cmd")
+	}
+}
+
+func TestUpdateFolderInput_enter_missingPath(t *testing.T) {
+	m := testModel()
+	m.input.SetValue(filepath.Join(t.TempDir(), "nope.png"))
+	m2, cmd := m.updateFolderInput(tea.KeyMsg{Type: tea.KeyEnter})
+	mm := m2.(model)
 	if mm.page != pageError {
-		t.Errorf("expected pageError for file path, got %d", mm.page)
+		t.Errorf("expected pageError for a missing path, got %d", mm.page)
 	}
 	if cmd != nil {
 		t.Error("expected nil cmd")
@@ -2196,7 +2209,7 @@ func TestParseArgs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotHelp, gotVer := parseArgs(tt.args)
+			gotHelp, gotVer, _ := parseArgs(tt.args)
 			if gotHelp != tt.wantHelp {
 				t.Errorf("parseArgs() showHelp = %v, want %v", gotHelp, tt.wantHelp)
 			}
@@ -2255,8 +2268,8 @@ func TestInitModel_default(t *testing.T) {
 	if m.page != pageFolderInput {
 		t.Errorf("expected pageFolderInput, got %d", m.page)
 	}
-	if m.initialScanPath != "" {
-		t.Errorf("expected empty initialScanPath, got %q", m.initialScanPath)
+	if len(m.initialScanPaths) != 0 {
+		t.Errorf("expected no initialScanPaths, got %q", m.initialScanPaths)
 	}
 }
 
@@ -2265,8 +2278,8 @@ func TestInitModel_withPath(t *testing.T) {
 	if m.page != pageScanning {
 		t.Errorf("expected pageScanning for valid dir, got %d", m.page)
 	}
-	if m.initialScanPath == "" {
-		t.Error("expected non-empty initialScanPath")
+	if len(m.initialScanPaths) != 1 {
+		t.Errorf("expected one initialScanPath, got %q", m.initialScanPaths)
 	}
 }
 
@@ -2277,12 +2290,28 @@ func TestInitModel_withInvalidPath(t *testing.T) {
 	}
 }
 
-func TestInitModel_nonDirPath(t *testing.T) {
+func TestInitModel_filePath(t *testing.T) {
 	f := filepath.Join(t.TempDir(), "afile.txt")
 	os.WriteFile(f, []byte("x"), 0644)
 	m := initModel([]string{"qr-multi-imgs", f})
-	if m.page != pageFolderInput {
-		t.Errorf("expected pageFolderInput for file path, got %d", m.page)
+	if m.page != pageScanning {
+		t.Errorf("expected pageScanning for a named file, got %d", m.page)
+	}
+	if len(m.initialScanPaths) != 1 {
+		t.Errorf("expected one target, got %q", m.initialScanPaths)
+	}
+}
+
+func TestInitModel_severalTargets(t *testing.T) {
+	dir := t.TempDir()
+	f := filepath.Join(t.TempDir(), "afile.png")
+	os.WriteFile(f, []byte("x"), 0644)
+	m := initModel([]string{"qr-multi-imgs", dir, f})
+	if m.page != pageScanning {
+		t.Errorf("expected pageScanning, got %d", m.page)
+	}
+	if len(m.initialScanPaths) != 2 {
+		t.Errorf("expected two targets, got %q", m.initialScanPaths)
 	}
 }
 
@@ -2321,5 +2350,105 @@ func TestMain_version(t *testing.T) {
 	out := captureStdout(main)
 	if !strings.Contains(out, version) {
 		t.Error("main() --version should print version")
+	}
+}
+
+// ─── splitPaths ──────────────────────────────────────────────────────────────
+
+// Dropping several files on a terminal emits one line holding all of them, with
+// spaces inside a path escaped or quoted. Splitting on whitespace alone would
+// cut those paths in half.
+func TestSplitPaths(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want []string
+	}{
+		{"empty", "", nil},
+		{"blank", "   ", nil},
+		{"single", "/tmp/a.png", []string{"/tmp/a.png"}},
+		{"two", "/tmp/a.png /tmp/b.png", []string{"/tmp/a.png", "/tmp/b.png"}},
+		{"collapses runs of spaces", "/tmp/a.png   /tmp/b.png", []string{"/tmp/a.png", "/tmp/b.png"}},
+		{"double quoted", `"/tmp/My Photos/a.png"`, []string{"/tmp/My Photos/a.png"}},
+		{"single quoted", `'/tmp/My Photos/a.png'`, []string{"/tmp/My Photos/a.png"}},
+		{"quoted beside bare", `"/tmp/My Photos/a.png" /tmp/b.png`,
+			[]string{"/tmp/My Photos/a.png", "/tmp/b.png"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := splitPaths(tt.in)
+			if len(got) != len(tt.want) {
+				t.Fatalf("splitPaths(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Fatalf("splitPaths(%q) = %q, want %q", tt.in, got, tt.want)
+				}
+			}
+		})
+	}
+}
+
+// Backslash escapes a space on Unix, which is what a drag-and-drop emits there.
+// On Windows it is the path separator and must survive untouched.
+func TestSplitPaths_backslash(t *testing.T) {
+	got := splitPaths(`/tmp/My\ Photos/a.png`)
+	if runtime.GOOS == "windows" {
+		if len(got) != 2 {
+			t.Fatalf("on Windows a backslash is a separator, not an escape: %q", got)
+		}
+		return
+	}
+	if len(got) != 1 || got[0] != "/tmp/My Photos/a.png" {
+		t.Fatalf("expected the escaped space to join the path, got %q", got)
+	}
+}
+
+func TestSplitPaths_windowsPathKeepsSeparators(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("only meaningful where backslash is the path separator")
+	}
+	got := splitPaths(`C:\Users\me\a.png`)
+	if len(got) != 1 || got[0] != `C:\Users\me\a.png` {
+		t.Fatalf("a Windows path must survive splitting intact, got %q", got)
+	}
+}
+
+// ─── resolveInput ────────────────────────────────────────────────────────────
+
+func TestResolveInput_severalTargets(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(t.TempDir(), "a.png")
+	os.WriteFile(file, []byte("x"), 0644)
+
+	got, err := resolveInput(dir + " " + file)
+	if err != nil {
+		t.Fatalf("resolveInput: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("expected both targets, got %q", got)
+	}
+}
+
+func TestResolveInput_emptyMeansCurrentDir(t *testing.T) {
+	got, err := resolveInput("")
+	if err != nil {
+		t.Fatalf("resolveInput(\"\"): %v", err)
+	}
+	wd, _ := os.Getwd()
+	if len(got) != 1 || got[0] != wd {
+		t.Fatalf("empty input should mean the current directory, got %q", got)
+	}
+}
+
+func TestResolveInput_reportsTheBadTarget(t *testing.T) {
+	dir := t.TempDir()
+	missing := filepath.Join(dir, "nope.png")
+	_, err := resolveInput(dir + " " + missing)
+	if err == nil {
+		t.Fatal("a missing target must be reported, not skipped")
+	}
+	if !strings.Contains(err.Error(), "nope.png") {
+		t.Fatalf("the error should name the offending path, got %v", err)
 	}
 }

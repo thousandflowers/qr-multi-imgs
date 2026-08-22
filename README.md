@@ -121,7 +121,7 @@ cd qr-multi-imgs && go build
 **Build:** pure Go on Linux/Windows. The macOS build links Apple's Vision
 framework via cgo (ships with the OS — nothing to install) for photographed,
 perspective-warped QR codes.  
-**Supported formats:** PNG / JPEG / GIF / BMP / WebP everywhere; HEIC / HEIF / NEF on macOS, where Apple Vision and Core Image read them from disk (elsewhere HEIC needs a `-tags heic` build, and NEF is macOS-only). A folder holding a mix of these scans in a single pass.  
+**Supported formats:** PNG / JPEG / GIF / BMP / WebP / TIFF everywhere; HEIC / HEIF / NEF on macOS, where Apple Vision and Core Image read them from disk (elsewhere HEIC needs a `-tags heic` build, and NEF is macOS-only). A folder holding a mix of these scans in a single pass.  
 **Supported platforms:** macOS, Linux, **Windows** (clipboard via external tool).
 
 ---
