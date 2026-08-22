@@ -21,7 +21,7 @@ non-data package. Measured on `main`:
 | total | 89.2% |
 
 Everything else passes: MIT license, `go.mod` at the root, SemVer release
-(`v1.4.1`), English README, pkg.go.dev reachable, active commits.
+(`v1.5.0`), English README, pkg.go.dev reachable, active commits.
 
 ## Section
 
@@ -76,7 +76,7 @@ Decoding is gozxing (pure Go); on macOS it additionally uses Apple's Vision
 framework for photographed codes. There is no system dependency to install
 on any platform.
 
-MIT licensed, Go 1.26, released as v1.4.1 with prebuilt binaries for macOS,
+MIT licensed, Go 1.26, released as v1.5.0 with prebuilt binaries for macOS,
 Linux and Windows.
 ```
 
