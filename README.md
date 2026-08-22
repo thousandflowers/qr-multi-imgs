@@ -180,6 +180,12 @@ rather than documented and hoped for:
 brew install thousandflowers/tap/qr-multi-imgs
 ```
 
+The tap formula is bumped after a release with `scripts/bump_tap.py qr-multi-imgs`,
+which uses whatever auth `gh` already has. It deliberately does not run inside CI:
+publishing the formula from there needs a long-lived cross-repo token, and that
+token fails at the *end* of a release — after the GitHub release exists — which
+leaves `brew` a version behind while the release looks fine.
+
 ### Any platform — Go install
 
 ```bash
