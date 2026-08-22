@@ -1116,7 +1116,9 @@ Input methods:
 
 Supported formats:
   Everywhere      PNG, JPG, JPEG, GIF, BMP, WebP, TIFF
-  macOS only      HEIC, HEIF, NEF (read by Apple Vision / Core Image)
+  macOS adds      every format the system decodes — HEIC, PSD, JXL, AVIF and
+                  camera raw from any supported camera (CR2, CR3, ARW, DNG,
+                  NEF, RAF, ORF, RW2 ...). Asked at startup, not hardcoded.
   Mixed formats scan in one pass — no per-format mode.
 Project: https://github.com/thousandflowers/qr-multi-imgs`)
 }

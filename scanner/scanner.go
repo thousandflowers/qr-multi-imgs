@@ -84,6 +84,21 @@ var scanWorkers = func() int {
 
 func init() {
 	zbarimgPath, _ = exec.LookPath("zbarimg")
+
+	// On macOS the system decodes more than the portable codecs do — every
+	// camera raw ImageIO knows, and whatever a future OS adds. Merging what it
+	// reports beats maintaining a list that goes stale silently.
+	for _, ext := range systemExtensions() {
+		supportedExtensions["."+ext] = true
+	}
+}
+
+// SupportsExtension reports whether a file with this name would be picked up by
+// a folder scan. The answer depends on the platform and, on macOS, on what the
+// running system can decode, so callers must ask rather than keep their own
+// copy of the list.
+func SupportsExtension(name string) bool {
+	return supportedExtensions[strings.ToLower(filepath.Ext(name))]
 }
 
 // ScanFolder scans all supported image files in dir and returns a Summary.
