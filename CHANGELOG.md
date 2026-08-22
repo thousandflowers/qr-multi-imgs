@@ -8,6 +8,42 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **What a code means, not the string it contains.** Every payload is run past a
+  table of recognisers and comes back as a kind with named fields: a link shows its
+  site and the reference inside it, a Wi-Fi code shows network and security, a SEPA
+  payment shows payee, IBAN and amount, a contact shows a name a person would say
+  out loud rather than `Rossi;Mario`. Adding a format means adding a row, not a
+  branch
+- **Secrets stay covered.** A two-factor setup code (`otpauth://`) carries the seed
+  that generates every future code for that account, and a Wi-Fi payload carries the
+  password. Both are marked secret, rendered as dots until deliberately revealed, and
+  a seed can never end up in a file name — a scan is often done with other people
+  looking at the screen
+- **Rename and download as one archive.** New names are built from the meaningful
+  part of each code — for a link that is the reference, not the campaign path — with
+  collisions numbered rather than dropped. The ZIP is written by hand, store-only,
+  because the images are already compressed and the page's CSP forbids fetching a
+  library. The image-to-code manifest travels *inside* the archive, since that
+  mapping is the valuable part of a batch scan
+- **Search inside the decoded content**, across payloads and file names together,
+  alongside the with/without/unreadable filters and a new "only duplicates" one
+- **Duplicates are named.** A payload found in several images says so on every one of
+  them, and the statistics carry a "unique" figure beside the total
+- **Italian**, picked from the browser's own preference with a switch in the header.
+  Both languages are complete and a self-test fails if a key is missing from either
+- **Camera and paste** as first-class inputs, plus a "take a photo" button that opens
+  the camera directly on a phone
+- Unreadable and code-less images now carry advice a non-technical person can act on
+  rather than only a count
+
+### Changed
+- Developer-facing machinery — the command line, the local API, acting on files on
+  disk — moved behind an "Advanced" disclosure. It is the right tool for scripted and
+  batch use and it is documented as such, but it is noise for someone who came to
+  read one receipt
+- CSV export carries the full path, the payload type, how many images share the code,
+  and a first-seen timestamp; JSON export is structured per code rather than per image
+
 - The web app is laid out like the utility sites people already know: a fixed
   header, a headline that says what it does, and a two-column tool with the input
   on the left and a results panel that is present from the start rather than
