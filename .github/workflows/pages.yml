@@ -30,6 +30,26 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+
+      # The decoder the page runs. It is built here rather than committed: a
+      # 4.6 MB binary does not belong in git, and web/ is embedded in the CLI,
+      # which has no use for it.
+      - name: Build the wasm engine
+        run: GOOS=js GOARCH=wasm go build -ldflags="-s -w" -o web/qr.wasm ./wasm
+
+      - name: Check wasm_exec.js matches this toolchain
+        run: |
+          # The loader is version-locked to the compiler that produced the
+          # module; a stale copy fails at instantiation with nothing useful said.
+          if ! diff -q "$(go env GOROOT)/lib/wasm/wasm_exec.js" web/wasm_exec.js; then
+            echo "::error::web/wasm_exec.js is from a different Go release than the one building qr.wasm. Refresh it: cp \"\$(go env GOROOT)/lib/wasm/wasm_exec.js\" web/wasm_exec.js"
+            exit 1
+          fi
+
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

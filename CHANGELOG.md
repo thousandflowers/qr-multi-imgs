@@ -7,6 +7,27 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- A web app that needs nothing installed:
+  <https://thousandflowers.github.io/qr-multi-imgs/>. Drop a single photo, a
+  folder, or several folders; every code comes back with a thumbnail, a copy
+  button and a link where the payload is a URL, filterable and downloadable as
+  JSON/CSV/TXT. Folder drops are walked recursively, and `readEntries` is looped
+  to exhaustion rather than called once, which would have silently truncated any
+  folder past about a hundred files
+- The decoder is a WebAssembly build of the same Go code (`wasm/`), 4.6 MB and
+  about 1.4 MB over the wire, running in a pool of Web Workers — one per core up
+  to three — so a folder of photos does not freeze the page. It is built by the
+  Pages workflow rather than committed, and CI compiles the `js/wasm` target on
+  every run so it cannot rot unnoticed
+- The split of labour is deliberate: the browser turns files into pixels, since
+  it already ships native decoders for everything it can display (JPEG through
+  AVIF, and HEIC on Safari), and Go does the part a browser has no answer for.
+  That is what `scanner.ScanDecodedImage` was added for, and it means no image
+  decoders are duplicated into the wasm binary
+- The page's `connect-src` allows only its own origin and the loopback, so it
+  cannot send a filename or a payload to any third party even if tampered with
+
 ### Changed
 - Releasing no longer depends on a secret that does not exist. goreleaser's
   `brews:` block needed a long-lived token with push rights on the tap repo, stored
