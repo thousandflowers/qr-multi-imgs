@@ -27,3 +27,4 @@ dist/
 # Local scratch
 benchtmp/
 dbg/
+scanner/zz_mirror_probe_test.go
