@@ -686,6 +686,28 @@ func TestView_list(t *testing.T) {
 	}
 }
 
+// A row can only show one payload, so an image holding several must say how
+// many more there are. Showing the first silently is the same under-report
+// multi-code decoding exists to prevent.
+func TestView_listShowsExtraCodeCount(t *testing.T) {
+	m := testModel()
+	m.page = pageList
+	m.summary = &scanner.Summary{
+		Results: []scanner.ScanResult{
+			{FilePath: "three.png", HasQR: true, Contents: []string{"first", "second", "third"}},
+			{FilePath: "one.png", HasQR: true, Contents: []string{"only"}},
+		},
+	}
+
+	v := m.View()
+	if !strings.Contains(v, "(+2 more)") {
+		t.Errorf("list view does not report the other two codes:\n%s", v)
+	}
+	if strings.Contains(v, "(+0 more)") {
+		t.Error("single-code row should carry no suffix")
+	}
+}
+
 func TestView_listWithError(t *testing.T) {
 	m := testModel()
 	m.page = pageList

@@ -10,9 +10,17 @@
 go test -tags corpus ./scanner -run TestCorpus -v
 ```
 
-It prints total / correct / wrong / missed / errors, the success rate, and one
-line per failing file. It never fails on a low score — it measures, it does not
-gate. It only fails if the manifest is missing or empty.
+It scores each image as exact, partial, missed, false positive, or correct
+negative, and separately counts codes so per-code recall is visible next to the
+per-image rate — an image with three codes where two decode is neither a pass
+nor a plain failure. One line per failing file. It never fails on a low score:
+it measures, it does not gate. It only fails if the manifest is missing,
+empty, or malformed.
+
+It measures the CLI path (`ScanImage`, i.e. `ScanFast`) deliberately. Ground
+truth is built with `ScanExhaustive`, so the gap between the two numbers is
+exactly the set of codes the fast path misses and Apple Vision recovers — and
+what a browser build can never reach.
 
 Against a private photo set that is never committed:
 
@@ -38,14 +46,27 @@ path,expected
 receipts/lidl-2024-03.jpg,https://example.com/r/8fa21
 receipts/blurry-boarding-pass.jpg,EXPECTED_FAIL
 posters/gradient-qr.png,"hello, world"
+photos/two-receipts.jpg,https://example.com/r/aaa
+photos/two-receipts.jpg,https://example.com/r/bbb
+photos/duplicate-receipts.jpg,https://example.com/r/ccc
+photos/duplicate-receipts.jpg,https://example.com/r/ccc
 ```
 
+- **An image holding several codes gets several rows sharing its path**, one
+  row per payload, in reading order (top to bottom, then left to right).
+- **Two rows with the same path and the same payload mean two physically
+  distinct codes that happen to carry identical content** — two copies of one
+  receipt in a frame. They are not a mistake and must not be collapsed: the
+  decoder must find both to score both.
 - `expected` is the exact decoded payload — no trimming, so trailing whitespace
   in a payload must be quoted and preserved.
 - `EXPECTED_FAIL` means the image contains no QR. Decoding anything from it is
   scored as a false positive, not a success.
 - Rows starting with `#` are comments. The `path,expected` header is optional.
 - Standard CSV quoting, so payloads may contain commas, quotes, and newlines.
+- Exactly two fields per row, always. Ragged rows are rejected rather than
+  guessed at, so an unescaped comma in a hand-typed payload is caught instead
+  of silently becoming an extra expected code.
 
 Extracting ground truth is manual by design: decoding the image with this tool
 to fill in `expected` would make the benchmark measure nothing. Read the payload

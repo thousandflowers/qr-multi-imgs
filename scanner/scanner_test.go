@@ -314,7 +314,7 @@ func TestDecodeWithZbarimg(t *testing.T) {
 	content := "ZBARIMG-FALLBACK"
 	path := createTestQR(t, content)
 	got := decodeWithZbarimg(path)
-	if got == "" {
+	if len(got) == 0 {
 		// A zbar that crashes is the same as a zbar that is not installed:
 		// decodeWithZbarimg swallows the error either way, and the fallback
 		// is optional by design. Some builds (0.23.93 on macOS/arm64) segfault
@@ -324,16 +324,16 @@ func TestDecodeWithZbarimg(t *testing.T) {
 			t.Skipf("zbarimg present but unusable on this host: %v", err)
 		}
 	}
-	if got != content {
-		t.Errorf("decodeWithZbarimg = %q, want %q", got, content)
+	if len(got) != 1 || got[0].text != content {
+		t.Errorf("decodeWithZbarimg = %v, want [%q]", hitTexts(got), content)
 	}
 }
 
 func TestDecodeWithZbarimg_noQR(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "blank.png")
 	writeBlankPNG(t, path)
-	if got := decodeWithZbarimg(path); got != "" {
-		t.Errorf("expected empty for non-QR, got %q", got)
+	if got := decodeWithZbarimg(path); len(got) != 0 {
+		t.Errorf("expected empty for non-QR, got %v", hitTexts(got))
 	}
 }
 

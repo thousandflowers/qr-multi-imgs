@@ -20,6 +20,8 @@ import (
 	_ "golang.org/x/image/webp"
 
 	"github.com/makiuchi-d/gozxing"
+	multiqr "github.com/makiuchi-d/gozxing/multi/qrcode"
+	multidetector "github.com/makiuchi-d/gozxing/multi/qrcode/detector"
 	"github.com/makiuchi-d/gozxing/qrcode"
 )
 
@@ -45,9 +47,24 @@ type Summary struct {
 }
 
 // supportedExtensions is the set of image file extensions we attempt to scan.
+//
+// HEIC/HEIF are listed even though Go's image.Decode cannot read them. Every
+// iPhone has shot HEIC by default since 2017, so skipping the extension would
+// silently ignore most of a modern camera roll. On macOS, Apple Vision reads
+// them straight from the path and they decode normally; elsewhere they need a
+// build with -tags heic, and without it they report an unreadable format, which
+// is the honest answer and far better than pretending the files were not there.
+//
+// NEF is a MACOS-ONLY path and is listed on the same reasoning. Core Image
+// reads Nikon raw directly, so those files scan on macOS; nothing in the pure
+// Go path decodes them and -tags heic does not help, since raw demosaicing and
+// per-camera colour are a different problem from a HEIF container. On Linux and
+// Windows a .nef reports an unreadable format. That is expected, not a bug.
 var supportedExtensions = map[string]bool{
 	".png": true, ".jpg": true, ".jpeg": true,
 	".gif": true, ".bmp": true, ".webp": true,
+	".heic": true, ".heif": true,
+	".nef": true,
 }
 
 // zbarimgPath is resolved at init so decodeWithZbarimg works regardless
@@ -284,7 +301,12 @@ type decodeStrategy struct {
 	scale   int    // integer nearest-neighbor upscale
 }
 
-func decodeAttempt(img image.Image, s decodeStrategy) string {
+// decodeAttempt runs one strategy and returns every code it found.
+//
+// Result points come back in the coordinate space of the transformed image, so
+// an upscaled strategy reports them at scale x their true position. They are
+// divided back here, at capture time, to honour hit's coordinate contract.
+func decodeAttempt(img image.Image, s decodeStrategy) []hit {
 	src := projectChannel(img, s.channel)
 	if s.scale > 1 {
 		src = nearestNeighborScale(src, s.scale)
@@ -298,17 +320,42 @@ func decodeAttempt(img image.Image, s decodeStrategy) string {
 		bmp, _ = gozxing.NewBinaryBitmapFromImage(src)
 	}
 	if bmp == nil {
-		return ""
+		return nil
 	}
 
 	hints := map[gozxing.DecodeHintType]interface{}{
 		gozxing.DecodeHintType_TRY_HARDER: true,
 	}
-	result, err := qrcode.NewQRCodeReader().Decode(bmp, hints)
-	if err != nil || result == nil {
-		return ""
+
+	results, err := multiqr.NewQRCodeMultiReader().DecodeMultiple(bmp, hints)
+	if err != nil {
+		return nil
 	}
-	return result.GetText()
+
+	hits := make([]hit, 0, len(results))
+	for _, r := range results {
+		if r == nil {
+			continue
+		}
+		// Payload is returned exactly as decoded — trimming would corrupt QRs
+		// whose payload is or ends with whitespace.
+		hits = append(hits, hit{text: r.GetText(), points: rescalePoints(r.GetResultPoints(), s.scale)})
+	}
+	return hits
+}
+
+// rescalePoints maps result points from an upscaled image back to original
+// coordinates. See hit's coordinate contract.
+func rescalePoints(points []gozxing.ResultPoint, scale int) []gozxing.ResultPoint {
+	if scale <= 1 || len(points) == 0 {
+		return points
+	}
+	f := float64(scale)
+	out := make([]gozxing.ResultPoint, len(points))
+	for i, p := range points {
+		out[i] = gozxing.NewResultPoint(p.GetX()/f, p.GetY()/f)
+	}
+	return out
 }
 
 // projectChannel returns img unchanged for "lum" (gozxing computes luminance),
@@ -388,17 +435,98 @@ var strategies = []decodeStrategy{
 	{"r", false, 2},   // red channel, hybrid 2x
 }
 
-// decodeRaster runs the pure-Go strategy loop over a decoded image and returns
-// the first successful decode, or "" if every strategy fails.
-func decodeRaster(img image.Image) string {
+// projectionChannels are the distinct colour projections the strategies use,
+// derived from the strategy list so the two cannot drift apart.
+func projectionChannels() []string {
+	seen := map[string]bool{}
+	var out []string
 	for _, s := range strategies {
-		// Return the payload exactly as decoded — trimming would corrupt QRs
-		// whose payload is or ends with whitespace.
-		if text := decodeAttempt(img, s); text != "" {
-			return text
+		if !seen[s.channel] {
+			seen[s.channel] = true
+			out = append(out, s.channel)
 		}
 	}
-	return ""
+	return out
+}
+
+// countCandidates estimates how many QR codes the image holds, by locating
+// finder patterns rather than decoding anything. Finder patterns are cheap to
+// find and a payload is expensive to recover, which is what makes an evidence
+// based stopping rule affordable.
+//
+// It looks across every colour projection the strategies use, not just
+// luminance, and takes the largest count any of them shows. That breadth is the
+// whole point: a code whose contrast lives in one channel can be nearly absent
+// from the luminance image — red on green of the same brightness is the extreme
+// case — so a count taken from luminance alone would miss it, and a decode loop
+// trusting that count would stop before the channel strategy that could read
+// it ever ran. Taking the maximum means a projection that hides a code can
+// never lower a target another projection has already raised.
+//
+// Returns 0 when nothing is detected anywhere, which disables early exit
+// entirely rather than ending the search.
+func countCandidates(img image.Image) int {
+	hints := map[gozxing.DecodeHintType]interface{}{
+		gozxing.DecodeHintType_TRY_HARDER: true,
+	}
+	most := 0
+	for _, channel := range projectionChannels() {
+		src := projectChannel(img, channel)
+		// Global histogram: cheapest binarizer, and the most forgiving on the
+		// flat single-channel projections this pass is built around.
+		bmp, err := gozxing.NewBinaryBitmap(gozxing.NewGlobalHistgramBinarizer(
+			gozxing.NewLuminanceSourceFromImage(src)))
+		if err != nil || bmp == nil {
+			continue
+		}
+		matrix, merr := bmp.GetBlackMatrix()
+		if merr != nil || matrix == nil {
+			continue
+		}
+		infos, ferr := multidetector.NewMultiFinderPatternFinder(matrix, nil).FindMulti(hints)
+		if ferr != nil {
+			// A detector error must cost time, never recall: leaving the count
+			// where it is only fails to stop the loop early.
+			continue
+		}
+		if len(infos) > most {
+			most = len(infos)
+		}
+	}
+	return most
+}
+
+// decodeRaster runs the pure-Go strategies over a decoded image and returns
+// the union of what they found, deduped and in reading order.
+//
+// The strategy list is a greedy cover, not a ranking: strategies are
+// complementary, so one finding nothing says nothing about the next. Stopping
+// at the first success would return whichever subset the first working strategy
+// happened to see — a silent under-report, indistinguishable from a frame that
+// really held one code. Running all ten instead costs roughly thirty times the
+// old best case on real photos, which is why the loop stops on evidence.
+//
+// countCandidates says how many codes are visible before any decoding starts;
+// once that many have been decoded there is nothing left to look for. The
+// guards are that at least one strategy always runs, and that a count of zero
+// disables early exit rather than triggering it, so uncertainty costs time
+// instead of recall.
+//
+// This is evidence about what the detector can see, not proof about what is on
+// the page: a code invisible to every projection is invisible to the count too.
+// It is strictly better than stopping at the first success, and it is what
+// makes the union affordable.
+func decodeRaster(img image.Image) ([]hit, error) {
+	target := countCandidates(img)
+	var hits []hit
+	for _, s := range strategies {
+		hits = mergeHits(hits, decodeAttempt(img, s))
+		if target > 0 && len(hits) >= target {
+			break
+		}
+	}
+	sortHits(hits)
+	return hits, nil
 }
 
 // maskRenderScale upscales each QR module to this many pixels before decoding.
@@ -418,17 +546,34 @@ func decodeNPYMask(path string) string {
 	return decodeMaskImage(renderMask(mask, maskRenderScale))
 }
 
-// decodeWithZbarimg shells out to zbarimg on the original image — a best-effort
-// fallback for real photos that ship no mask, used only when zbarimg is
-// installed. The pure-Go paths above mean it is never required.
-func decodeWithZbarimg(path string) string {
+// decodeWithZbarimg shells out to zbarimg on the original image — a
+// best-effort fallback for real photos that ship no mask, used only when
+// zbarimg is installed. The pure-Go paths mean it is never required.
+//
+// zbarimg prints one line per code, so every line is returned. It reports no
+// coordinates with --raw, so its hits carry no geometry and are merged by
+// payload; see sameCode.
+func decodeWithZbarimg(path string) []hit {
 	if zbarimgPath == "" {
-		return ""
+		return nil
 	}
-	if out, err := exec.Command(zbarimgPath, "-q", "--raw", path).Output(); err == nil && len(out) > 0 {
-		return strings.TrimRight(string(out), "\n\r")
+	out, err := exec.Command(zbarimgPath, "-q", "--raw", path).Output()
+	if err != nil || len(out) == 0 {
+		return nil
 	}
-	return ""
+	// A trailing newline terminates the last code rather than starting an
+	// empty one, so it is stripped before splitting.
+	text := strings.TrimRight(string(out), "\n\r")
+	if text == "" {
+		return nil
+	}
+	var hits []hit
+	for _, line := range strings.Split(text, "\n") {
+		if line = strings.TrimRight(line, "\r"); line != "" {
+			hits = append(hits, hit{text: line})
+		}
+	}
+	return hits
 }
 
 // decodeMaskImage decodes a clean, axis-aligned QR render using gozxing. It
@@ -453,8 +598,8 @@ func decodeMaskImage(img image.Image) string {
 	return ""
 }
 
-// ScanDecodedImage decodes an already-decoded image and returns the QR payloads
-// found in it, or nil if there are none.
+// ScanDecodedImage decodes an already-decoded image and returns every QR
+// payload in it, in reading order, or nil if there are none.
 //
 // It is the path-free half of ScanImage. The companion .npy mask, Apple Vision,
 // and zbarimg all need a file path, so none of them run here — expect lower
@@ -462,67 +607,136 @@ func decodeMaskImage(img image.Image) string {
 // the warped and low-contrast ones. This is the entry point for callers holding
 // pixels but no file, such as a wasm build.
 //
+// Every raster strategy always runs unless the finder-pattern count says every
+// visible code has been decoded; see decodeRaster.
+//
+// This is also the answer for HEIC in a browser. gen2brain/heic does run under
+// GOOS=js, but at roughly 4.5 minutes per 12MP photo against 0.1s native, so a
+// wasm build should not decode HEIC in Go at all: let the browser do it with
+// createImageBitmap and pass the pixels here. That is this seam's first
+// concrete payoff — a caller holding pixels and no file, exactly as intended.
+//
 // The returned error is always nil today. It is in the signature because every
 // decode strategy lives in decodeRaster, which is where allocation-heavy work
 // belongs; under GOOS=js that can fail, and adding an error to an already
 // released public function would be a breaking change. Do not remove it.
 func ScanDecodedImage(img image.Image) ([]string, error) {
-	if text := decodeRaster(img); text != "" {
-		return []string{text}, nil
-	}
-	return nil, nil
+	hits, err := decodeRaster(img)
+	return hitTexts(hits), err
 }
 
-// ScanImage tries multiple decode strategies in order until one succeeds.
+// ScanMode selects how much work ScanImageMode does before giving up.
+//
+// There are exactly two modes and neither carries an expected number of codes.
+// That omission is deliberate: telling the decoder how many codes to find and
+// then measuring how many it found is circular, and would let a benchmark
+// report a recall figure it was handed rather than one it earned. Keeping the
+// count out of the type makes that mistake unavailable rather than discouraged.
+type ScanMode int
+
+const (
+	// ScanFast unions every raster strategy, then falls back to Apple Vision
+	// and zbarimg only when the raster path found nothing at all. This is what
+	// the CLI uses: it keeps folder scans quick on the common case of one code
+	// per image.
+	ScanFast ScanMode = iota
+
+	// ScanExhaustive runs every stage unconditionally and unions all of them,
+	// with no early exit anywhere. Much slower — Vision alone costs about a
+	// second per image — and meant for building ground truth, where being
+	// right matters more than being quick.
+	ScanExhaustive
+)
+
+// ScanImage decodes every QR code in the image at path, in reading order,
+// using ScanFast. It returns nil with no error when the image holds no code.
 func ScanImage(path string) ([]string, error) {
-	// A companion .npy mask, when present, is the pixel-exact source QR. It
+	return ScanImageMode(path, ScanFast)
+}
+
+// ScanImageMode decodes every QR code in the image at path under the given
+// mode. See ScanMode for what the modes cost.
+func ScanImageMode(path string, mode ScanMode) ([]string, error) {
+	exhaustive := mode == ScanExhaustive
+
+	// A companion .npy mask, when present, is the pixel-exact source QR, and it
 	// decodes faster and more reliably than recovering sub-pixel modules from
-	// the raster, so try it first — this is what keeps dense-code scans quick.
+	// the raster. One mask describes one code, so in ScanFast it still short
+	// circuits — that is what keeps dense-code scans quick. ScanExhaustive
+	// folds it into the union instead and keeps going.
+	var hits []hit
 	if text := decodeNPYMask(path); text != "" {
-		return []string{text}, nil
+		hits = append(hits, hit{text: text})
+		if !exhaustive {
+			return hitTexts(hits), nil
+		}
 	}
 
+	// The file has to be readable at all; nothing downstream can work otherwise.
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	img, _, decodeErr := image.Decode(f)
+	f.Close()
 
-	img, _, err := image.Decode(f)
-	if err != nil {
-		return nil, fmt.Errorf("decode: %w", err)
-	}
-
-	// TODO(cascade): the moment any strategy inside decodeRaster can fail,
-	// ScanImage must remember the error and still try Vision and zbarimg,
-	// reporting it only if every strategy fails. A failing strategy must not
-	// collapse the cascade. Do this FIRST, before any CLAHE or multiscale
-	// tiling code — not once allocation starts failing in the field.
+	// Neither a raster decode failure nor a raster capacity failure is a "no QR"
+	// answer, so neither may collapse the cascade: the error is remembered and
+	// the path-based decoders still get their turn, because one of them may well
+	// succeed where the raster could not even start. It is reported only if
+	// nothing decodes at all.
 	//
-	// Until then ScanDecodedImage cannot fail, so propagating here is a no-op:
-	// a capacity failure is not a "no QR" answer, and there is no error to
-	// remember yet.
-	contents, err := ScanDecodedImage(img)
-	if err != nil {
-		return nil, err
-	}
-	if len(contents) > 0 {
-		return contents, nil
+	// This matters well beyond exotic files. Go's image decoders do not cover
+	// HEIC, which every iPhone has shot by default since 2017, so image.Decode
+	// fails on most of a modern camera roll. Apple Vision reads those straight
+	// from the path, so on macOS they decode fine — but only if a failure here
+	// lets the scan continue instead of ending it.
+	//
+	// It is also the contract the allocation-heavy cascade stages (CLAHE,
+	// multiscale tiling) will land into: a strategy that runs out of room must
+	// cost recall, not the whole scan.
+	var rasterErr error
+	if decodeErr != nil {
+		rasterErr = fmt.Errorf("decode: %w", decodeErr)
+	} else {
+		var rasterHits []hit
+		rasterHits, rasterErr = decodeRaster(img)
+		hits = mergeHits(hits, rasterHits)
 	}
 
 	// Real photos (warped/low-contrast/small-module QRs) defeat gozxing. On
-	// macOS, Apple Vision recovers many of them and ships with the OS; it's a
+	// macOS, Apple Vision recovers many of them and ships with the OS; it is a
 	// no-op elsewhere. Try it before zbarimg, which is weaker and can segfault.
-	if text := decodeWithVision(path); text != "" {
-		return []string{text}, nil
+	//
+	// TODO(cascade): this gate is where ScanFast trades recall for speed, and
+	// the gap between it and ScanExhaustive is exactly what Vision recovers.
+	// Closing it provably rather than by guesswork is what finder-pattern
+	// accounting is for: a cheap MultiFinderPatternFinder pass over the image
+	// says how many codes are present, so escalation can stop when the decoded
+	// count matches the detected count instead of when a stage happens to
+	// return something.
+	visionReadable := false
+	if exhaustive || len(hits) == 0 {
+		var visionHits []hit
+		visionHits, visionReadable = decodeWithVision(path)
+		hits = mergeHits(hits, visionHits)
 	}
 
-	// Last resort for real photos with no mask: zbarimg, if installed.
-	if text := decodeWithZbarimg(path); text != "" {
-		return []string{text}, nil
+	// Last resort for real photos with no mask: zbarimg, if installed. It
+	// reports no geometry, so it can only be merged by payload.
+	if exhaustive || len(hits) == 0 {
+		hits = mergeHits(hits, decodeWithZbarimg(path))
 	}
 
-	return nil, nil
+	// Report the raster failure only if nothing decoded AND no other decoder
+	// managed to read the file. When Vision read it and simply found no code,
+	// "no QR here" is the honest answer — calling that an error would turn a
+	// whole HEIC camera roll into a wall of failures.
+	if len(hits) == 0 && rasterErr != nil && !visionReadable {
+		return nil, rasterErr
+	}
+	sortHits(hits)
+	return hitTexts(hits), nil
 }
 
 // FormatBytes returns a human-readable string for a byte count.

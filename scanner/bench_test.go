@@ -32,7 +32,11 @@ func decodeGoOnly(path string) string {
 	if err != nil {
 		return ""
 	}
-	return decodeRaster(img)
+	hits, err := decodeRaster(img)
+	if err != nil || len(hits) == 0 {
+		return ""
+	}
+	return hits[0].text
 }
 
 func listPNGs(dir string, limit int) []string {
@@ -186,4 +190,86 @@ func TestCanonicalRecall(t *testing.T) {
 		t.Logf("%-11s match %d/%d = %.1f%%", name, hit, n, 100*float64(hit)/float64(n))
 	}
 	t.Logf("OVERALL    match %d/%d = %.1f%%", totHit, totN, 100*float64(totHit)/float64(totN))
+}
+
+// TestRasterRecall measures the pure-Go raster path on a flat dataset and
+// cross-tabs it against module density, read from each sample's .npy shape.
+// This is the measurement behind the README's image-only figure, and the one
+// that shows density alone is not what defeats the decoder — distortion is.
+//
+//	QR_DATASET=/path/to/dataset go test ./scanner -run TestRasterRecall -v
+func TestRasterRecall(t *testing.T) {
+	ds, limit := datasetDir(t)
+	paths := listPNGs(ds, limit)
+
+	type bucket struct{ raster, npy, n int }
+	buckets := map[string]*bucket{}
+	order := []string{"<=40", "41-60", "61-80", "81-100", "101-120", ">120"}
+	for _, k := range order {
+		buckets[k] = &bucket{}
+	}
+	bucketFor := func(modules int) string {
+		switch {
+		case modules <= 40:
+			return "<=40"
+		case modules <= 60:
+			return "41-60"
+		case modules <= 80:
+			return "61-80"
+		case modules <= 100:
+			return "81-100"
+		case modules <= 120:
+			return "101-120"
+		default:
+			return ">120"
+		}
+	}
+
+	var mu sync.Mutex
+	var rasterOK, npyOK, total int
+	runPar(paths, func(p string) {
+		want := companionText(ds, p)
+		if want == "" {
+			return
+		}
+		modules := 0
+		if mask, err := readBoolNPY(strings.TrimSuffix(p, filepath.Ext(p)) + ".npy"); err == nil {
+			modules = len(mask)
+		}
+		r := decodeGoOnly(p) == want
+		n := decodeNPYMask(p) == want
+
+		mu.Lock()
+		defer mu.Unlock()
+		total++
+		if r {
+			rasterOK++
+		}
+		if n {
+			npyOK++
+		}
+		if modules > 0 {
+			b := buckets[bucketFor(modules)]
+			b.n++
+			if r {
+				b.raster++
+			}
+			if n {
+				b.npy++
+			}
+		}
+	})
+
+	t.Logf("total=%d", total)
+	t.Logf("raster only (pure Go, no npy/Vision/zbar): %d/%d = %.2f%%", rasterOK, total, 100*float64(rasterOK)/float64(total))
+	t.Logf("npy mask only:                             %d/%d = %.2f%%", npyOK, total, 100*float64(npyOK)/float64(total))
+	t.Logf("%-9s %7s %10s %10s", "modules", "samples", "raster", "npy")
+	for _, k := range order {
+		b := buckets[k]
+		if b.n == 0 {
+			continue
+		}
+		t.Logf("%-9s %7d %9.1f%% %9.1f%%", k, b.n,
+			100*float64(b.raster)/float64(b.n), 100*float64(b.npy)/float64(b.n))
+	}
 }
