@@ -33,6 +33,16 @@ jobs:
         if: runner.os == 'Linux'
         run: GOOS=js GOARCH=wasm go build -o /dev/null ./wasm
 
+      # The page's own logic — what a payload means, how a file gets named,
+      # whether both languages are complete — is not Go, so `go test` would
+      # never notice it breaking. Each module is its own runnable check.
+      - name: Check the browser modules
+        if: runner.os == 'Linux'
+        run: |
+          node web/payload.js --test
+          node web/zip.js --test
+          node web/i18n.js --test
+
       - name: Test
         run: go test -v -count=1 -coverprofile=${{ runner.temp }}/coverage.txt . ./exporter ./scanner
 
