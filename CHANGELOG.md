@@ -7,13 +7,59 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [v1.5.0] — 2026-08-22
+
 ### Added
-- Homebrew formula is published to `thousandflowers/homebrew-tap` automatically on every release (goreleaser `brews:`), so `brew` users stop drifting behind
-- `scanner.ScanDecodedImage(image.Image) ([]string, error)` — decodes from pixels with no file path, for callers such as a wasm build. `ScanImage` now delegates its raster stage to it. Lower recall than `ScanImage`: the `.npy` mask, Apple Vision, and zbarimg all need a path and do not run
-- Ground-truth decode benchmark behind the `corpus` build tag: `go test -tags corpus ./scanner -run TestCorpus -v`. Reads a `corpus.csv` manifest, reports total/correct/wrong/missed/errors and a success rate. `QR_CORPUS_DIR` points it at an uncommitted private photo set
+- Every QR in an image is decoded, not just the first. A list row reports how many
+  other codes an image holds, and the export manifest expresses several codes per
+  image; the benchmark harness scores per code rather than per image
+- Apple Vision returns every code it finds, with corner locations. The cgo bridge
+  used to return a single `char*`, so multi-code decoding silently truncated to one
+  on the path that matters most for real photos. Points are emitted in original-image
+  pixels, top-left origin; geometry is dropped for EXIF-oriented images, which fall
+  back to payload matching
+- `.heic` / `.heif` support on macOS through Apple Vision, and `.nef` (Nikon raw)
+  which Core Image reads directly. Off macOS both report an unreadable format
+- Optional pure-Go HEIC behind `-tags heic` (`gen2brain/heic`, libheif via wazero),
+  **off by default**: the wrapper is MIT but the embedded libheif is LGPL-3.0 with no
+  NOTICE, so no released artifact contains the codec. Verified — a goreleaser snapshot
+  holds no occurrence of wazero, gen2brain, libheif or de265. Tagged binary costs
+  11.56 MB against 7.21 MB. Tracking gen2brain/heic#17
+- `cmd/corpusgen` bootstraps a `corpus.csv` manifest from unlabelled images
+- Homebrew formula is published to `thousandflowers/homebrew-tap` automatically on
+  every release (goreleaser `brews:`), so `brew` users stop drifting behind
+- `scanner.ScanDecodedImage(image.Image) ([]string, error)` — decodes from pixels with
+  no file path, for callers such as a wasm build. `ScanImage` now delegates its raster
+  stage to it. Lower recall than `ScanImage`: the `.npy` mask, Apple Vision, and
+  zbarimg all need a path and do not run
+- Ground-truth decode benchmark behind the `corpus` build tag:
+  `go test -tags corpus ./scanner -run TestCorpus -v`. Reads a `corpus.csv` manifest,
+  reports total/correct/wrong/missed/errors and a success rate. `QR_CORPUS_DIR` points
+  it at an uncommitted private photo set
+
+### Changed
+- The raster strategy loop stops on finder-pattern evidence. Decoding every code meant
+  unioning all ten strategies, which cost 31.8x on real photos holding a code (40 of
+  them: 3.9s → 122.6s, 10.4 img/s → 0.3). A pre-pass counts the QR candidates visible
+  across every colour projection and the loop stops once it has decoded that many —
+  evidence rather than guesswork. Same 40 photos, best of six runs: 18.4s, 2.2 img/s,
+  4.8x. Still slower than v1.4.1's single-code scan; that is the price of not
+  under-reporting. A count of zero or a detector error disables early exit rather than
+  triggering it, so uncertainty costs time instead of recall. The `.npy` path is
+  untouched
 
 ### Fixed
-- Build failure on macOS with `CGO_ENABLED=0`: both Apple Vision files were excluded by their build tags, leaving `decodeWithVision` undefined. The stub is now selected by `!darwin || !cgo` and the cgo implementation by `darwin && cgo`
+- HEIC images decode on macOS instead of being skipped or erroring. Three separate
+  causes: `ScanImage` returned the `image.Decode` error before any path-based decoder
+  ran; Vision could not distinguish "cannot open" from "opened, found nothing", so a
+  HEIC with no QR came back as `decode: image: unknown format`; and
+  `supportedExtensions` did not list `.heic`/`.heif`, so the walk skipped them. On a
+  real library, a folder of 13 HEIC went from 0 images seen to 13 scanned. This
+  matters on a real camera roll — a sample library here holds 727 HEIC against 42 jpeg
+  and 14 png
+- Build failure on macOS with `CGO_ENABLED=0`: both Apple Vision files were excluded by
+  their build tags, leaving `decodeWithVision` undefined. The stub is now selected by
+  `!darwin || !cgo` and the cgo implementation by `darwin && cgo`
 
 ## [v1.4.1] — 2026-06-26
 

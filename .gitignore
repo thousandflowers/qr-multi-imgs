@@ -23,3 +23,7 @@ recreated_qr/
 
 # GoReleaser build output
 dist/
+
+# Local scratch
+benchtmp/
+dbg/
