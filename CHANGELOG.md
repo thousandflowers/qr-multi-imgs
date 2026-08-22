@@ -8,6 +8,18 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- The web app is laid out like the utility sites people already know: a fixed
+  header, a headline that says what it does, and a two-column tool with the input
+  on the left and a results panel that is present from the start rather than
+  appearing after the first scan. Statistics read as a strip of figures, each code
+  sits in its own field with a copy button beside it
+- **Paste**: press paste anywhere on the page, or use the button. This is what
+  people reach for after taking a screenshot of a code, and every scanner worth
+  using supports it
+- **Camera**: read codes live through the webcam, as a tab beside the file input.
+  Frames go through the same engine, one in flight at a time so a backlog of
+  moments the user has moved past cannot build up, and repeated payloads are
+  reported once rather than every frame
 - A web app that needs nothing installed:
   <https://thousandflowers.github.io/qr-multi-imgs/>. Drop a single photo, a
   folder, or several folders; every code comes back with a thumbnail, a copy

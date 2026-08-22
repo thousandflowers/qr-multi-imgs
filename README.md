@@ -126,10 +126,13 @@ Measured on an Apple M2 Pro (10 cores, 16 GB).
 
 **<https://thousandflowers.github.io/qr-multi-imgs/>**
 
-Drop a single photo, a folder, or several folders. Every QR code in every image
-comes back with a thumbnail, a copy button, and a link when the payload is one.
-Filter to the images that had a code, or the ones that did not, and download the
-lot as JSON, CSV or plain text.
+Drop a single photo, a folder, or several folders — most scanners take one
+picture at a time, which is the point of this one. You can also paste a
+screenshot, or read codes live through the camera.
+
+Every QR code in every image comes back with a thumbnail, a copy button, and a
+link when the payload is one. Filter to the images that had a code, or the ones
+that did not, and download the lot as JSON, CSV or plain text.
 
 **Nothing is uploaded, and that is enforced rather than promised.** The page
 carries a `Content-Security-Policy` whose `connect-src` allows only its own
