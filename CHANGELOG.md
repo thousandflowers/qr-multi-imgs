@@ -59,7 +59,13 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
   `actionOutcome`, and the TUI commands are one-line wrappers over them, so the HTTP
   API runs the same code rather than a second copy of it
 
-## [v1.5.0] — 2026-08-22
+## [v1.5.0] — never released
+
+Tagged nowhere: the release workflow at the commit this section describes still
+required a tap token that does not exist, and GitHub Actions runs the workflow
+file from the tagged commit rather than from the default branch. Everything
+below shipped in v1.6.0 instead.
+
 
 ### Added
 - Every QR in an image is decoded, not just the first. A list row reports how many
