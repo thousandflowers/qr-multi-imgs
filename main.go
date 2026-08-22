@@ -962,7 +962,10 @@ Input methods:
   Type a path, drag & drop a folder, or press Ctrl+D to paste clipboard.
   Press Enter on an empty input to scan the current directory.
 
-Supported formats: PNG, JPG, JPEG, GIF, BMP, WebP
+Supported formats:
+  Everywhere      PNG, JPG, JPEG, GIF, BMP, WebP
+  macOS only      HEIC, HEIF, NEF (read by Apple Vision / Core Image)
+  Mixed folders scan in one pass — no per-format mode.
 Project: https://github.com/thousandflowers/qr-multi-imgs`)
 }
 
