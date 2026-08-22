@@ -42,9 +42,10 @@ the 100% had nothing to do with the decoder.
 ## 4 — the actual finding
 
 ```
-the misses weren't decodable. 100+ QR modules rendered into 256px = ~2px per
-module. after the dataset's blur, the information isn't in the raster anymore.
-no decoder gets those.
+i assumed density killed them — 100+ modules in 256px is <2px per module. wrong.
+measured it: a clean 153-module QR at 256px decodes fine from the pixels. it's
+the dataset's distortion that destroys the grid; density only sets how little of
+it is enough. box blur: 61 modules survives r=2, 153 fails at r=1.
 
 but the dataset ships the generator's bit matrix as .npy next to each image. so
 for those, read the matrix, not the pixels. 132 lines of Go.

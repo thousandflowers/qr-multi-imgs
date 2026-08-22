@@ -966,8 +966,26 @@ func TestUpdate_errorPageEscape(t *testing.T) {
 // ─── version ─────────────────────────────────────────────────────────────────
 
 func TestVersionVariable(t *testing.T) {
-	if version == "" {
-		t.Fatal("version variable should not be empty")
+	if versionString() == "" {
+		t.Fatal("versionString() should never be empty")
+	}
+}
+
+// The release binary is stamped via -ldflags; a plain build is not, and must
+// still report something. Both paths matter: an unstamped release would ship a
+// stale hardcoded number, an empty fallback would print "qr-multi-imgs ".
+func TestVersionString_stampedWins(t *testing.T) {
+	orig := version
+	t.Cleanup(func() { version = orig })
+
+	version = "9.9.9"
+	if got := versionString(); got != "9.9.9" {
+		t.Errorf("stamped version = %q, want 9.9.9", got)
+	}
+
+	version = ""
+	if got := versionString(); got == "" {
+		t.Error("unstamped build must still report a version")
 	}
 }
 
@@ -2256,8 +2274,8 @@ func TestPrintHelp_output(t *testing.T) {
 
 func TestPrintVersion_output(t *testing.T) {
 	out := captureStdout(printVersion)
-	if !strings.Contains(out, version) {
-		t.Errorf("printVersion = %q, should contain %q", out, version)
+	if !strings.Contains(out, versionString()) {
+		t.Errorf("printVersion = %q, should contain %q", out, versionString())
 	}
 }
 
@@ -2348,7 +2366,7 @@ func TestMain_version(t *testing.T) {
 	defer func() { osExit = oldExit; os.Args = oldArgs }()
 
 	out := captureStdout(main)
-	if !strings.Contains(out, version) {
+	if !strings.Contains(out, versionString()) {
 		t.Error("main() --version should print version")
 	}
 }

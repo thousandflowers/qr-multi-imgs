@@ -37,11 +37,18 @@ near the misses.
 
 ### Why the misses are not decodable
 
-The hard samples encode enough data to need 100+ modules per side, rendered at
-256px. That is ~2.5 px per module before the dataset warps and blurs it. After
-the transform the module grid is below the sampling limit — the information is
-not in the raster. It is not that gozxing is worse than zbar or zxing-cpp;
-there is nothing left for any of them to read.
+My first answer was that the hard samples are too dense to sample: 100+ modules
+per side rendered at 256px is well under two pixels per module. That answer is
+wrong, and measuring it is what showed me. A clean 153x153-module QR rendered at
+256px — 1.67 px per module — decodes fine straight from the pixels. Density
+alone never breaks the raster path.
+
+What breaks it is the dataset's distortion, and density only decides how little
+of it is enough. Under a box blur: 61 modules survives radius 2 and fails at 3,
+97 and 125 fail at 2, 153 fails already at 1. So it is not that gozxing is worse
+than zbar or zxing-cpp — on these samples the module grid is genuinely gone.
+(Measured across the union of every channel, binarizer and scale: ~28% gozxing,
+~30.3% zbarimg on the adversarial subset.)
 
 ### What actually worked
 

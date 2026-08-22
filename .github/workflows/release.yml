@@ -22,6 +22,19 @@ jobs:
         with:
           go-version: "1.26"
 
+      # The formula bump runs at the END of goreleaser, after the GitHub
+      # release is already published. Without the token that leaves brew
+      # pinned to the previous version with a green-looking release, so
+      # refuse before anything ships.
+      - name: Require the tap token
+        env:
+          TAP_GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          if [ -z "$TAP_GITHUB_TOKEN" ]; then
+            echo "::error::GH_PAT is not set. goreleaser would publish the release and then fail to bump the Homebrew formula. Set it with: gh secret set GH_PAT --repo thousandflowers/qr-multi-imgs"
+            exit 1
+          fi
+
       - uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
