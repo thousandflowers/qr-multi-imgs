@@ -118,6 +118,60 @@ Measured on an Apple M2 Pro (10 cores, 16 GB).
 
 ---
 
+## Web UI
+
+Same actions as the TUI, in a browser, driven by the copy of the program running
+on your own machine:
+
+```bash
+qr-multi-imgs --serve
+```
+
+It prints two links. Both open the **same page** — the binary embeds the very
+file GitHub Pages serves, so there is no second copy drifting out of step:
+
+| | | needs |
+|---|---|---|
+| **Local UI** | `http://127.0.0.1:8787/#t=...` | nothing; works in every browser |
+| **Hosted UI** | `thousandflowers.github.io/qr-multi-imgs/#t=...&api=...` | one permission, see below |
+
+**Nothing is uploaded, and that is enforced rather than promised.** Your images
+are read by the local process and never leave the machine. The page carries a
+`Content-Security-Policy` whose `connect-src` allows only its own origin and the
+loopback, so it *cannot* send a path, a filename or a payload anywhere else even
+if the page were tampered with. It loads no font, script or image from any third
+party.
+
+### About the hosted page and your local machine
+
+A page served from `https://` reaching `http://127.0.0.1` is allowed by the
+mixed-content rules — the loopback counts as a trustworthy origin — but Chrome
+additionally gates it behind a **Local Network Access permission**. Measured on
+Chrome 151: `navigator.permissions.query({name: "local-network-access"})` reports
+`prompt`, so the browser asks and the choice is yours. The page therefore does
+not reach out on load; press **Connect** and accept the prompt, because a
+permission request only appears reliably when a click asked for it. Refuse it,
+or use a browser that declines outright, and the Local UI link still works with
+no permission at all.
+
+### Why it cannot be turned against you
+
+The API deletes files, so it is built on three properties, each enforced in code
+rather than documented and hoped for:
+
+1. **Loopback only.** `--serve=0.0.0.0:8787` is refused, not honoured.
+2. **A random token in a request header.** A header forces a CORS preflight, so
+   a hostile page cannot fire a request and ignore the answer. The token travels
+   in the URL *fragment*, which browsers never put in a request, a `Referer` or
+   a server log. Origins outside the allowlist are rejected before the token is
+   even read.
+3. **Destructive calls name a session, never a path.** `organize`, `delete` and
+   `recreate` take the id of a scan *this* server performed. The worst a stolen
+   token can do is repeat an action on files you already chose to scan — there
+   is no request shape that says "delete this arbitrary path".
+
+---
+
 ## Install
 
 ### macOS — Homebrew

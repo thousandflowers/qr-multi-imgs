@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Nothing leaves the machine, and that is enforced rather than promised:
+     connect-src allows only this page's own origin and the loopback, so the
+     page cannot send a path, a payload or a filename anywhere else. There are
+     no fonts, scripts or images fetched from any third party either. -->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'none';
+  script-src 'unsafe-inline';
+  style-src 'unsafe-inline';
+  img-src 'self' data:;
+  connect-src 'self' http://127.0.0.1:* http://localhost:*;
+  base-uri 'none';
+  form-action 'none'">
+<title>qr-multi-imgs</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #fbfbfa; --fg: #1a1a18; --dim: #6b6b66; --line: #e2e2dd;
+  --card: #fff; --accent: #b4530a; --ok: #2f6f3e; --bad: #a5241c;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#161614; --fg:#e8e8e3; --dim:#8f8f87; --line:#2e2e2a;
+          --card:#1e1e1b; --accent:#e08b3e; --ok:#7bbd8a; --bad:#e0736a; }
+}
+* { box-sizing: border-box; }
+body { margin:0; padding:2rem 1.25rem 4rem; background:var(--bg); color:var(--fg);
+  font:15px/1.55 ui-sans-serif, -apple-system, system-ui, sans-serif; }
+main { max-width: 62rem; margin: 0 auto; }
+h1 { font-size:1.35rem; margin:0 0 .25rem; letter-spacing:-.01em; }
+h1 span { color:var(--dim); font-weight:400; font-size:.85rem; font-family:var(--mono); }
+p.sub { color:var(--dim); margin:0 0 1.5rem; font-size:.9rem; }
+section { background:var(--card); border:1px solid var(--line); border-radius:10px;
+  padding:1.1rem 1.2rem; margin-bottom:1rem; }
+label { display:block; font-size:.8rem; color:var(--dim); margin-bottom:.4rem;
+  text-transform:uppercase; letter-spacing:.06em; }
+textarea, input, select { width:100%; font-family:var(--mono); font-size:.88rem;
+  background:var(--bg); color:var(--fg); border:1px solid var(--line);
+  border-radius:6px; padding:.55rem .65rem; }
+textarea { min-height:5.5rem; resize:vertical; }
+.row { display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; margin-top:.75rem; }
+button { font:inherit; font-size:.88rem; padding:.45rem .9rem; border-radius:6px;
+  border:1px solid var(--line); background:var(--bg); color:var(--fg); cursor:pointer; }
+button:hover:not(:disabled) { border-color:var(--accent); color:var(--accent); }
+button:disabled { opacity:.4; cursor:not-allowed; }
+button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+button.primary:hover:not(:disabled) { filter:brightness(1.08); color:#fff; }
+button.danger:hover:not(:disabled) { border-color:var(--bad); color:var(--bad); }
+select { width:auto; padding:.45rem .5rem; }
+#bar { height:4px; background:var(--line); border-radius:2px; overflow:hidden; margin:.9rem 0 .4rem; }
+#bar i { display:block; height:100%; width:0; background:var(--accent); transition:width .12s linear; }
+#status { font-family:var(--mono); font-size:.8rem; color:var(--dim); min-height:1.2em;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.stats { display:flex; gap:1.6rem; flex-wrap:wrap; margin:.2rem 0 .9rem; }
+.stats div { font-size:.8rem; color:var(--dim); }
+.stats b { display:block; font-size:1.3rem; color:var(--fg); font-weight:600; }
+table { width:100%; border-collapse:collapse; font-size:.85rem; }
+th { text-align:left; font-size:.72rem; text-transform:uppercase; letter-spacing:.06em;
+  color:var(--dim); font-weight:500; padding:.4rem .5rem; border-bottom:1px solid var(--line); }
+td { padding:.45rem .5rem; border-bottom:1px solid var(--line); vertical-align:top; }
+td.file { max-width:24rem; }
+td.file b { font-family:var(--mono); font-size:.78rem; font-weight:600; word-break:break-all; }
+td.file span { display:block; font-family:var(--mono); font-size:.7rem; color:var(--dim);
+  word-break:break-all; margin-top:.15rem; }
+td.codes { font-family:var(--mono); font-size:.78rem; word-break:break-all; }
+td.codes div + div { margin-top:.25rem; padding-top:.25rem; border-top:1px dotted var(--line); }
+.tag { font-size:.7rem; padding:.1rem .4rem; border-radius:99px; border:1px solid var(--line); color:var(--dim); }
+.no { color:var(--dim); }
+.err { color:var(--bad); }
+#msg { white-space:pre-wrap; font-family:var(--mono); font-size:.82rem; margin-top:.75rem; }
+#offline { border-color:var(--bad); }
+#offline code { background:var(--bg); padding:.1rem .35rem; border-radius:4px; font-size:.85em; }
+.hide { display:none !important; }
+footer { color:var(--dim); font-size:.78rem; margin-top:1.5rem; text-align:center; }
+footer a { color:var(--dim); }
+</style>
+</head>
+<body>
+<main>
+  <h1>qr-multi-imgs <span id="ver"></span></h1>
+  <p class="sub">This page drives the copy running on your own machine. Nothing is uploaded — your images never leave the computer.</p>
+
+  <section id="offline">
+    <label>Not connected</label>
+    <p style="margin:.2rem 0 .6rem">Start the local app, then open the URL it prints:</p>
+    <p style="margin:0 0 .8rem"><code>qr-multi-imgs --serve</code></p>
+    <button id="retry" class="primary">Connect to the local app</button>
+    <p class="sub" style="margin:.8rem 0 0" id="offlineWhy"></p>
+  </section>
+
+  <section id="app" class="hide">
+    <label for="paths">Folders and files to scan — one per line</label>
+    <textarea id="paths" spellcheck="false" placeholder="/Users/you/Pictures&#10;/Users/you/Desktop/invoice.pdf"></textarea>
+    <div class="row">
+      <button id="scan" class="primary">Scan</button>
+      <span id="status"></span>
+    </div>
+    <div id="bar" class="hide"><i></i></div>
+  </section>
+
+  <section id="results" class="hide">
+    <div class="stats">
+      <div><b id="sTotal">0</b>images</div>
+      <div><b id="sWith">0</b>with QR</div>
+      <div><b id="sCodes">0</b>codes</div>
+      <div><b id="sWithout">0</b>without</div>
+      <div><b id="sErr">0</b>errors</div>
+      <div><b id="sTime">0s</b>elapsed</div>
+    </div>
+
+    <div class="row">
+      <select id="expFmt"><option>json</option><option>csv</option><option>txt</option></select>
+      <button id="export">Export</button>
+      <select id="qrFmt"><option>png</option><option>jpg</option><option>svg</option></select>
+      <button id="recreate">Recreate QR images</button>
+      <button id="organize">Organize into with_qr / without_qr</button>
+      <button id="delete" class="danger">Delete images without QR</button>
+    </div>
+    <div id="msg"></div>
+
+    <table id="table">
+      <thead><tr><th>File</th><th>Codes</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <footer>
+    <a href="https://github.com/thousandflowers/qr-multi-imgs">github.com/thousandflowers/qr-multi-imgs</a>
+  </footer>
+</main>
+
+<script>
+// The token lives in the fragment because browsers never send a fragment to a
+// server: not in the request line, not in Referer, not in any log.
+const frag = new URLSearchParams(location.hash.slice(1));
+const token = frag.get("t") || "";
+const api = (frag.get("api") || location.origin).replace(/\/$/, "");
+
+const $ = (id) => document.getElementById(id);
+let session = null;
+
+async function call(path, body) {
+  const res = await fetch(api + path, {
+    method: body === undefined ? "GET" : "POST",
+    headers: { "X-QMI-Token": token, "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error((await res.text()).trim() || res.status);
+  return res;
+}
+
+const sameOrigin = api === location.origin;
+
+// Reaching 127.0.0.1 from a page served over https needs the browser's local
+// network permission, and a permission prompt only appears reliably when a
+// click asked for it. So the first attempt is silent, and anything after that
+// is behind the Connect button.
+async function connect(fromClick) {
+  if (!token) {
+    $("offlineWhy").textContent =
+      "This URL carries no token. Use the link `qr-multi-imgs --serve` prints.";
+    $("retry").classList.add("hide");
+    return;
+  }
+  if (fromClick) $("offlineWhy").textContent = "Connecting to " + api + " ...";
+  try {
+    const info = await (await call("/api/health")).json();
+    $("ver").textContent = "v" + info.version;
+    $("offline").classList.add("hide");
+    $("app").classList.remove("hide");
+  } catch (e) {
+    $("offlineWhy").textContent = sameOrigin
+      ? "Tried " + api + " — " + e.message + ". Is the app still running?"
+      : "Tried " + api + " — " + e.message +
+        ". A page on " + location.origin + " may only reach your machine after you " +
+        "allow local network access when the browser asks. Press Connect and accept the " +
+        "prompt, or open the Local UI address the command printed, which needs no permission.";
+  }
+}
+
+function fmtBytes(b) {
+  const u = ["B", "KB", "MB", "GB"];
+  let i = 0;
+  while (b >= 1024 && i < u.length - 1) { b /= 1024; i++; }
+  return b.toFixed(i ? 1 : 0) + " " + u[i];
+}
+
+function render(sum) {
+  const codes = sum.results.reduce((n, r) => n + (r.qr_contents ? r.qr_contents.length : 0), 0);
+  $("sTotal").textContent = sum.total;
+  $("sWith").textContent = sum.with_qr;
+  $("sCodes").textContent = codes;
+  $("sWithout").textContent = sum.without_qr;
+  $("sErr").textContent = sum.errors;
+  $("sTime").textContent = (sum.duration_ms / 1000).toFixed(1) + "s";
+
+  const tb = $("table").querySelector("tbody");
+  tb.replaceChildren();
+  for (const r of sum.results) {
+    const tr = document.createElement("tr");
+    const name = document.createElement("td");
+    name.className = "file";
+    const cut = r.file_path.lastIndexOf("/");
+    const base = document.createElement("b");
+    base.textContent = cut < 0 ? r.file_path : r.file_path.slice(cut + 1);
+    name.appendChild(base);
+    if (cut > 0) {
+      const dir = document.createElement("span");
+      dir.textContent = r.file_path.slice(0, cut);
+      name.appendChild(dir);
+    }
+    name.title = r.file_path;
+    const cell = document.createElement("td");
+    cell.className = "codes";
+    if (r.error) {
+      cell.className += " err";
+      cell.textContent = r.error;
+    } else if (r.qr_contents && r.qr_contents.length) {
+      for (const c of r.qr_contents) {
+        const d = document.createElement("div");
+        d.textContent = c;
+        cell.appendChild(d);
+      }
+    } else {
+      const n = document.createElement("span");
+      n.className = "no";
+      n.textContent = "no QR";
+      cell.appendChild(n);
+    }
+    tr.append(name, cell);
+    tb.appendChild(tr);
+  }
+  $("results").classList.remove("hide");
+}
+
+function setActionsEnabled(on) {
+  for (const b of document.querySelectorAll("#results button")) b.disabled = !on;
+}
+
+// The scan replies with newline-delimited JSON so progress arrives as it
+// happens. EventSource cannot set the token header, so this is a plain fetch.
+async function scan() {
+  const paths = $("paths").value.split("\n").map(s => s.trim()).filter(Boolean);
+  if (!paths.length) { $("status").textContent = "Give at least one path."; return; }
+
+  $("scan").disabled = true;
+  setActionsEnabled(false);
+  $("msg").className = "";
+  $("msg").textContent = "";
+  $("bar").classList.remove("hide");
+  $("bar").firstElementChild.style.width = "0";
+  session = null;
+
+  try {
+    const res = await call("/api/scan", { paths });
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let nl;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, nl).trim();
+        buf = buf.slice(nl + 1);
+        if (!line) continue;
+        const ev = JSON.parse(line);
+        if (ev.total) {
+          $("bar").firstElementChild.style.width = (100 * ev.done / ev.total) + "%";
+          $("status").textContent = ev.done + " / " + ev.total + (ev.file ? "  " + ev.file : "");
+        }
+        if (ev.summary) {
+          session = ev.session;
+          $("status").textContent = ev.summary.total + " images, " +
+            fmtBytes(ev.summary.total_size) + ", " + (ev.summary.duration_ms / 1000).toFixed(1) + "s";
+          render(ev.summary);
+        }
+      }
+    }
+  } catch (e) {
+    $("status").textContent = "";
+    $("msg").className = "err";
+    $("msg").textContent = String(e.message || e);
+  } finally {
+    $("scan").disabled = false;
+    setActionsEnabled(session !== null);
+    $("bar").classList.add("hide");
+  }
+}
+
+async function action(path, extra, confirmText) {
+  if (!session) { $("msg").textContent = "Scan something first."; return; }
+  if (confirmText && !confirm(confirmText)) return;
+  setActionsEnabled(false);
+  try {
+    const out = await (await call(path, Object.assign({ session }, extra))).json();
+    $("msg").className = "";
+    $("msg").textContent = out.message + (out.errors ? "\n\nErrors:\n" + out.errors.join("\n") : "");
+  } catch (e) {
+    $("msg").textContent = "Failed: " + (e.message || e);
+  } finally {
+    setActionsEnabled(true);
+  }
+}
+
+$("retry").onclick = () => connect(true);
+$("scan").onclick = scan;
+$("paths").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) scan();
+});
+$("export").onclick = () => action("/api/export", { format: $("expFmt").value });
+$("recreate").onclick = () => action("/api/recreate", { format: $("qrFmt").value });
+$("organize").onclick = () => action("/api/organize", {},
+  "Move every scanned image into a with_qr / without_qr folder beside it?");
+$("delete").onclick = () => action("/api/delete", {},
+  "Permanently delete every scanned image that has no QR code. This cannot be undone. Continue?");
+
+connect(false);
+</script>
+</body>
+</html>
