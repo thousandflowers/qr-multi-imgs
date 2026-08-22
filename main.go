@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -36,23 +37,23 @@ const (
 )
 
 type model struct {
-	page            page
-	summary         *scanner.Summary
-	input           textinput.Model
-	spinner         spinner.Model
-	progress        progress.Model
-	scanCh          <-chan scanner.Progress
-	scanDone        int
-	scanTotal       int
-	scanFile        string
-	exportFmt       string
-	qrRecreateFmt   string
-	errMsg          string
-	actionMsg       string
-	width           int
-	height          int
-	cursor          int
-	initialScanPath string
+	page             page
+	summary          *scanner.Summary
+	input            textinput.Model
+	spinner          spinner.Model
+	progress         progress.Model
+	scanCh           <-chan scanner.Progress
+	scanDone         int
+	scanTotal        int
+	scanFile         string
+	exportFmt        string
+	qrRecreateFmt    string
+	errMsg           string
+	actionMsg        string
+	width            int
+	height           int
+	cursor           int
+	initialScanPaths []string
 }
 
 var (
@@ -68,8 +69,8 @@ var (
 
 func (m model) Init() tea.Cmd {
 	cmds := []tea.Cmd{textinput.Blink, m.spinner.Tick}
-	if m.initialScanPath != "" {
-		cmds = append(cmds, safeCmd(startScan(m.initialScanPath)))
+	if len(m.initialScanPaths) > 0 {
+		cmds = append(cmds, safeCmd(startScan(m.initialScanPaths)))
 	}
 	return tea.Batch(cmds...)
 }
@@ -97,17 +98,109 @@ func safeCmd(fn func() tea.Msg) tea.Cmd {
 	}
 }
 
+// validateScanTarget checks that path exists and is readable. Unlike
+// validateScanPath it accepts a file: naming one is an explicit request, and
+// only a folder scan needs the path to be a folder.
+func validateScanTarget(path string) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return statError(path, err)
+	}
+	if info.IsDir() {
+		return validateScanPath(path)
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("cannot read file %s: %w", path, err)
+	}
+	f.Close()
+	return nil
+}
+
+// statError turns a failed stat into the message the user sees.
+func statError(path string, err error) error {
+	if errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("path does not exist: %s", path)
+	}
+	if errors.Is(err, os.ErrPermission) {
+		return fmt.Errorf("permission denied: %s", path)
+	}
+	return fmt.Errorf("cannot access %s: %w", path, err)
+}
+
+// resolveInput turns one line of input — typed, pasted, or several files
+// dropped at once — into validated scan targets. Empty input means the current
+// directory, which is what Enter on an empty prompt has always done.
+func resolveInput(raw string) ([]string, error) {
+	tokens := splitPaths(raw)
+	if len(tokens) == 0 {
+		tokens = []string{""}
+	}
+	paths := make([]string, 0, len(tokens))
+	for _, tok := range tokens {
+		path, err := resolvePath(tok)
+		if err != nil {
+			return nil, err
+		}
+		if err := validateScanTarget(path); err != nil {
+			return nil, err
+		}
+		paths = append(paths, path)
+	}
+	return paths, nil
+}
+
+// splitPaths splits an input line into paths. Dropping several files on a
+// terminal emits them space-separated, with spaces inside a path either
+// backslash-escaped or the whole path quoted, so strings.Fields would cut
+// "/My Photos/a.png" in half.
+//
+// Backslash is an escape everywhere except Windows, where it is the path
+// separator and escaping there would eat "C:\Users\me".
+func splitPaths(raw string) []string {
+	const backslashEscapes = runtime.GOOS != "windows"
+
+	var out []string
+	var cur strings.Builder
+	var quote rune
+	escaped := false
+
+	flush := func() {
+		if s := cur.String(); s != "" {
+			out = append(out, s)
+		}
+		cur.Reset()
+	}
+	for _, r := range raw {
+		switch {
+		case escaped:
+			cur.WriteRune(r)
+			escaped = false
+		case backslashEscapes && r == '\\':
+			escaped = true
+		case quote != 0:
+			if r == quote {
+				quote = 0
+			} else {
+				cur.WriteRune(r)
+			}
+		case r == '\'' || r == '"':
+			quote = r
+		case r == ' ' || r == '\t':
+			flush()
+		default:
+			cur.WriteRune(r)
+		}
+	}
+	flush()
+	return out
+}
+
 // validateScanPath checks that path exists, is a directory, and is readable.
 func validateScanPath(path string) error {
 	info, err := os.Stat(path)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return fmt.Errorf("directory does not exist: %s", path)
-		}
-		if errors.Is(err, os.ErrPermission) {
-			return fmt.Errorf("permission denied: %s", path)
-		}
-		return fmt.Errorf("cannot access %s: %w", path, err)
+		return statError(path, err)
 	}
 	if !info.IsDir() {
 		return fmt.Errorf("not a directory: %s", path)
@@ -260,21 +353,15 @@ func (m model) updateScanning(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) updateFolderInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.Type {
 	case tea.KeyEnter:
-		rawPath := m.input.Value()
-		path, err := resolvePath(rawPath)
+		paths, err := resolveInput(m.input.Value())
 		if err != nil {
 			m.page = pageError
 			m.errMsg = err.Error() + "\n\nPress Enter to go back and try a different path."
 			return m, nil
 		}
-		m.input.SetValue(path)
-		if err := validateScanPath(path); err != nil {
-			m.page = pageError
-			m.errMsg = err.Error() + "\n\nPress Enter to go back and try a different path."
-			return m, nil
-		}
+		m.input.SetValue(strings.Join(paths, " "))
 		m.page = pageScanning
-		return m, safeCmd(startScan(path))
+		return m, safeCmd(startScan(paths))
 
 	case tea.KeyCtrlC, tea.KeyEscape:
 		return m, tea.Quit
@@ -539,7 +626,7 @@ func (m model) viewScanning() string {
 	if m.scanFile != "" {
 		b.WriteString(fmt.Sprintf("%s Scanning: %s\n", m.spinner.View(), truncate(filepath.Base(m.scanFile), 60)))
 	} else {
-		b.WriteString(fmt.Sprintf("%s Scanning folder for QR codes...\n", m.spinner.View()))
+		b.WriteString(fmt.Sprintf("%s Scanning for QR codes...\n", m.spinner.View()))
 	}
 	return b.String()
 }
@@ -554,10 +641,7 @@ func (m model) viewResults() string {
 	b.WriteString("\n")
 
 	s := m.summary
-	folder := filepath.Dir(s.Results[0].FilePath)
-	if folder == "." {
-		folder, _ = os.Getwd()
-	}
+	folder := scanLabel(s)
 
 	summaryBody := fmt.Sprintf(
 		"\U0001f4c1  %s\n\nTotal: %d  │  %s %d with QR  │  %s %d empty  │  %s %d errors  │  \u23f1 %s",
@@ -719,9 +803,9 @@ func (m model) viewError() string {
 
 // ─── QR Scanning (TUI bridge) ───────────────────────────────────────────────
 
-func startScan(path string) tea.Cmd {
+func startScan(paths []string) tea.Cmd {
 	return func() tea.Msg {
-		ch, err := scanner.ScanFolderStream(path)
+		ch, err := scanner.ScanPathsStream(paths)
 		if err != nil {
 			return actionErrorMsg{err}
 		}
@@ -770,19 +854,22 @@ func deleteWithoutQR(s *scanner.Summary) tea.Cmd {
 
 func organizeByQR(s *scanner.Summary) tea.Cmd {
 	return func() tea.Msg {
-		base := filepath.Dir(s.Results[0].FilePath)
-		withDir := filepath.Join(base, "with_qr")
-		withoutDir := filepath.Join(base, "without_qr")
-		os.MkdirAll(withDir, 0755)
-		os.MkdirAll(withoutDir, 0755)
-
 		var movedWith, movedWithout int
 		var errs []string
 
+		// Each file is organized inside its own folder. A scan can now cover
+		// several folders at once, and moving a file out of the one it came
+		// from to join another scan's results would be a surprise no undo
+		// covers. With a single folder scanned this is what it always did.
 		for _, r := range s.Results {
-			destDir := withoutDir
+			bucket := "without_qr"
 			if r.HasQR {
-				destDir = withDir
+				bucket = "with_qr"
+			}
+			destDir := filepath.Join(filepath.Dir(r.FilePath), bucket)
+			if err := os.MkdirAll(destDir, 0755); err != nil {
+				errs = append(errs, fmt.Sprintf("%s: %v", filepath.Base(r.FilePath), err))
+				continue
 			}
 
 			destPath := filepath.Join(destDir, filepath.Base(r.FilePath))
@@ -814,15 +901,19 @@ func organizeByQR(s *scanner.Summary) tea.Cmd {
 
 func recreateQRs(s *scanner.Summary, format string) tea.Cmd {
 	return func() tea.Msg {
-		base := filepath.Dir(s.Results[0].FilePath)
-		outDir := filepath.Join(base, "recreated_qr")
-		os.MkdirAll(outDir, 0755)
-
 		var created int
 		var errs []string
 
+		// Written beside the source image, for the same reason organize keeps
+		// files in their own folder: a multi-folder scan has no single place
+		// that would not surprise someone.
 		for _, r := range s.Results {
 			if !r.HasQR || len(r.Contents) == 0 {
+				continue
+			}
+			outDir := filepath.Join(filepath.Dir(r.FilePath), "recreated_qr")
+			if err := os.MkdirAll(outDir, 0755); err != nil {
+				errs = append(errs, fmt.Sprintf("%s: %v", filepath.Base(r.FilePath), err))
 				continue
 			}
 
@@ -843,7 +934,7 @@ func recreateQRs(s *scanner.Summary, format string) tea.Cmd {
 			}
 		}
 
-		msg := fmt.Sprintf("Created %d QR image(s) in %s/ (format: %s)", created, filepath.Base(outDir), format)
+		msg := fmt.Sprintf("Created %d QR image(s) in recreated_qr/ (format: %s)", created, format)
 		if len(errs) > 0 {
 			msg += "\n\nErrors:\n" + strings.Join(errs, "\n")
 		}
@@ -851,9 +942,59 @@ func recreateQRs(s *scanner.Summary, format string) tea.Cmd {
 	}
 }
 
+// resultDirs lists the distinct directories the results came from, in the order
+// they first appear. A scan can cover several folders at once, so anything that
+// used to assume one folder asks here instead.
+func resultDirs(s *scanner.Summary) []string {
+	var dirs []string
+	seen := make(map[string]bool)
+	for _, r := range s.Results {
+		dir := filepath.Dir(r.FilePath)
+		if seen[dir] {
+			continue
+		}
+		seen[dir] = true
+		dirs = append(dirs, dir)
+	}
+	return dirs
+}
+
+// exportDir is where a single output file goes: the scanned folder when the
+// results all came from one, and the working directory when they did not, since
+// no scanned folder owns an export covering the others.
+func exportDir(s *scanner.Summary) string {
+	dirs := resultDirs(s)
+	if len(dirs) == 1 {
+		return dirs[0]
+	}
+	if wd, err := os.Getwd(); err == nil {
+		return wd
+	}
+	return "."
+}
+
+// scanLabel names what was scanned in the summary header. Naming only the first
+// folder would quietly misreport a scan that covered several.
+func scanLabel(s *scanner.Summary) string {
+	dirs := resultDirs(s)
+	switch len(dirs) {
+	case 0:
+		wd, _ := os.Getwd()
+		return wd
+	case 1:
+		if dirs[0] == "." {
+			wd, _ := os.Getwd()
+			return wd
+		}
+		return dirs[0]
+	default:
+		return fmt.Sprintf("%s  (+%d more folders)", dirs[0], len(dirs)-1)
+	}
+}
+
 func exportResults(s *scanner.Summary, format string) tea.Cmd {
 	return func() tea.Msg {
-		base := filepath.Dir(s.Results[0].FilePath)
+		base := exportDir(s)
 		path, err := exporter.Export(s.Results, exporter.ExportFormat(format), base)
 		if err != nil {
 			return actionErrorMsg{err}
@@ -911,7 +1052,7 @@ var version = "1.5.0"
 var osExit = os.Exit
 
 func main() {
-	showHelp, showVersion := parseArgs(os.Args[1:])
+	showHelp, showVersion, _ := parseArgs(os.Args[1:])
 	if showHelp {
 		printHelp()
 		osExit(0)
@@ -928,27 +1069,36 @@ func main() {
 	}
 }
 
-// parseArgs extracts flags from CLI args without side effects.
-func parseArgs(args []string) (showHelp, showVersion bool) {
+// parseArgs extracts flags and scan targets from CLI args without side effects.
+// Every non-flag argument is a target, so a mix of folders and single files can
+// be scanned in one pass.
+func parseArgs(args []string) (showHelp, showVersion bool, paths []string) {
 	for _, a := range args {
-		switch a {
-		case "-h", "--help":
+		switch {
+		case a == "-h" || a == "--help":
 			showHelp = true
-		case "-v", "--version":
+		case a == "-v" || a == "--version":
 			showVersion = true
+		case a == "" || strings.HasPrefix(a, "-"):
+			// An unknown flag is not a path; ignore it rather than trying to
+			// stat "--colour" and reporting a confusing missing-file error.
+		default:
+			paths = append(paths, a)
 		}
 	}
 	return
 }
 
 func printHelp() {
-	fmt.Println(`qr-multi-imgs — scan a folder of images for QR codes
+	fmt.Println(`qr-multi-imgs — scan folders and images for QR codes
 
 Usage:
-  qr-multi-imgs                   interactive TUI (type or drag folder path)
-  qr-multi-imgs /path/to/images   scan directly, skip folder prompt
-  qr-multi-imgs --help            this help text
-  qr-multi-imgs --version         show version
+  qr-multi-imgs                        interactive TUI (type or drag paths)
+  qr-multi-imgs /path/to/images        scan a folder, skip the prompt
+  qr-multi-imgs shot.png invoice.pdf   scan single files
+  qr-multi-imgs photos/ ~/Desktop/a.heic scans/  mix folders and files
+  qr-multi-imgs --help                 this help text
+  qr-multi-imgs --version              show version
 
 Actions inside the TUI:
   l   List all scan results
@@ -959,13 +1109,19 @@ Actions inside the TUI:
   q   Quit
 
 Input methods:
-  Type a path, drag & drop a folder, or press Ctrl+D to paste clipboard.
-  Press Enter on an empty input to scan the current directory.
+  Type paths, drag & drop several folders or files at once, or press Ctrl+D
+  to paste the clipboard. Press Enter on an empty input to scan the current
+  directory. Several targets scan together into one set of results; a named
+  file is scanned whatever its extension.
 
 Supported formats:
-  Everywhere      PNG, JPG, JPEG, GIF, BMP, WebP
-  macOS only      HEIC, HEIF, NEF (read by Apple Vision / Core Image)
-  Mixed folders scan in one pass — no per-format mode.
+  Everywhere      PNG, JPG, JPEG, GIF, BMP, WebP, TIFF
+  macOS adds      every format the system decodes — HEIC, PSD, JXL, AVIF and
+                  camera raw from any supported camera (CR2, CR3, ARW, DNG,
+                  NEF, RAF, ORF, RW2 ...). Asked at startup, not hardcoded.
+                  PDF too: every page is rendered and read, so a multi-page
+                  document reports the codes from all of them.
+  Mixed formats scan in one pass — no per-format mode.
 Project: https://github.com/thousandflowers/qr-multi-imgs`)
 }
 
@@ -986,15 +1142,26 @@ func initModel(args []string) model {
 	m.input.CharLimit = 512
 	m.input.Width = 80
 
-	if len(args) > 1 && args[1] != "" && args[1][0] != '-' {
-		path, err := resolvePath(args[1])
-		if err == nil {
-			if err := validateScanPath(path); err == nil {
+	if len(args) > 1 {
+		_, _, targets := parseArgs(args[1:])
+		resolved := make([]string, 0, len(targets))
+		bad := false
+		for _, target := range targets {
+			path, err := resolvePath(target)
+			if err != nil {
+				bad = true
+				break
+			}
+			resolved = append(resolved, path)
+			if err := validateScanTarget(path); err != nil {
+				bad = true
+			}
+		}
+		if len(targets) > 0 {
+			m.input.SetValue(strings.Join(resolved, " "))
+			if !bad {
 				m.page = pageScanning
-				m.initialScanPath = path
-				m.input.SetValue(path)
-			} else {
-				m.input.SetValue(path)
+				m.initialScanPaths = resolved
 			}
 		}
 	}

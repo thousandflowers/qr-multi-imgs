@@ -13,10 +13,10 @@ import (
 	"runtime"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	_ "golang.org/x/image/bmp"
+	_ "golang.org/x/image/tiff"
 	_ "golang.org/x/image/webp"
 
 	"github.com/makiuchi-d/gozxing"
@@ -63,6 +63,7 @@ type Summary struct {
 var supportedExtensions = map[string]bool{
 	".png": true, ".jpg": true, ".jpeg": true,
 	".gif": true, ".bmp": true, ".webp": true,
+	".tif": true, ".tiff": true,
 	".heic": true, ".heif": true,
 	".nef": true,
 }
@@ -83,86 +84,31 @@ var scanWorkers = func() int {
 
 func init() {
 	zbarimgPath, _ = exec.LookPath("zbarimg")
+
+	// On macOS the system decodes more than the portable codecs do — every
+	// camera raw ImageIO knows, and whatever a future OS adds. Merging what it
+	// reports beats maintaining a list that goes stale silently.
+	for _, ext := range systemExtensions() {
+		supportedExtensions["."+ext] = true
+	}
+}
+
+// SupportsExtension reports whether a file with this name would be picked up by
+// a folder scan. The answer depends on the platform and, on macOS, on what the
+// running system can decode, so callers must ask rather than keep their own
+// copy of the list.
+func SupportsExtension(name string) bool {
+	return supportedExtensions[strings.ToLower(filepath.Ext(name))]
 }
 
 // ScanFolder scans all supported image files in dir and returns a Summary.
+// It is ScanPaths over one directory, kept because a folder is still the common
+// case and because it rejects a file path, which ScanPaths deliberately allows.
 func ScanFolder(dir string) (*Summary, error) {
-	start := time.Now()
-
-	info, err := os.Stat(dir)
-	if err != nil {
+	if err := mustBeDir(dir); err != nil {
 		return nil, err
 	}
-	if !info.IsDir() {
-		return nil, fmt.Errorf("not a directory: %s", dir)
-	}
-
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, err
-	}
-
-	type job struct {
-		path string
-		fi   os.FileInfo
-	}
-
-	jobs := make(chan job, len(entries))
-	results := make(chan ScanResult, len(entries))
-
-	var wg sync.WaitGroup
-	for range scanWorkers {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for j := range jobs {
-				r := ScanResult{FilePath: j.path, FileSize: j.fi.Size()}
-				contents, err := ScanImage(j.path)
-				if err != nil {
-					r.Error = err.Error()
-				} else if len(contents) > 0 {
-					r.HasQR = true
-					r.Contents = contents
-				}
-				results <- r
-			}
-		}()
-	}
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		ext := strings.ToLower(filepath.Ext(entry.Name()))
-		if !supportedExtensions[ext] {
-			continue
-		}
-		fi, err := entry.Info()
-		if err != nil {
-			continue
-		}
-		jobs <- job{path: filepath.Join(dir, entry.Name()), fi: fi}
-	}
-	close(jobs)
-
-	go func() {
-		wg.Wait()
-		close(results)
-	}()
-
-	list := collectResults(results)
-	s := tallySummary(list, start)
-	sortResults(s)
-	return s, nil
-}
-
-// collectResults drains the results channel into a slice.
-func collectResults(ch <-chan ScanResult) []ScanResult {
-	var list []ScanResult
-	for r := range ch {
-		list = append(list, r)
-	}
-	return list
+	return ScanPaths([]string{dir})
 }
 
 // tallySummary computes summary counts from the result list.
@@ -210,86 +156,11 @@ type Progress struct {
 // ScanFolderStream scans like ScanFolder but emits a Progress per finished file
 // on the returned channel, ending with one event carrying the Summary. Path
 // validation is synchronous so errors surface before scanning starts.
-// ponytail: duplicates ScanFolder's small worker-pool boilerplate to avoid a
-// blind rewrite of the existing function; fold them together if it drifts.
 func ScanFolderStream(dir string) (<-chan Progress, error) {
-	start := time.Now()
-	info, err := os.Stat(dir)
-	if err != nil {
+	if err := mustBeDir(dir); err != nil {
 		return nil, err
 	}
-	if !info.IsDir() {
-		return nil, fmt.Errorf("not a directory: %s", dir)
-	}
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, err
-	}
-
-	type job struct {
-		path string
-		fi   os.FileInfo
-	}
-	var jobList []job
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		if !supportedExtensions[strings.ToLower(filepath.Ext(entry.Name()))] {
-			continue
-		}
-		fi, err := entry.Info()
-		if err != nil {
-			continue
-		}
-		jobList = append(jobList, job{path: filepath.Join(dir, entry.Name()), fi: fi})
-	}
-	total := len(jobList)
-
-	out := make(chan Progress, total+1)
-	go func() {
-		defer close(out)
-		jobs := make(chan job, total)
-		results := make(chan ScanResult, total)
-		var wg sync.WaitGroup
-		for range scanWorkers {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				for j := range jobs {
-					r := ScanResult{FilePath: j.path, FileSize: j.fi.Size()}
-					contents, err := ScanImage(j.path)
-					if err != nil {
-						r.Error = err.Error()
-					} else if len(contents) > 0 {
-						r.HasQR = true
-						r.Contents = contents
-					}
-					results <- r
-				}
-			}()
-		}
-		for _, j := range jobList {
-			jobs <- j
-		}
-		close(jobs)
-		go func() {
-			wg.Wait()
-			close(results)
-		}()
-
-		var list []ScanResult
-		done := 0
-		for r := range results {
-			list = append(list, r)
-			done++
-			out <- Progress{Done: done, Total: total, File: r.FilePath}
-		}
-		s := tallySummary(list, start)
-		sortResults(s)
-		out <- Progress{Done: total, Total: total, Summary: s}
-	}()
-	return out, nil
+	return ScanPathsStream([]string{dir})
 }
 
 // decodeStrategy is one decode configuration: a color-channel projection, a

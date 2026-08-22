@@ -197,19 +197,172 @@ static char *serialize(NSArray<QRRecord *> *records, int *outLen) {
     return out;
 }
 
+// decodeLadder runs the escalating enhancement ladder over one image and
+// appends whatever it finds. It stops at the first stage that yields records:
+// the stages are ordered cheapest-first and a later one only ever re-finds the
+// same codes more expensively.
+static void decodeLadder(CIImage *base, BOOL keepGeometry,
+                         NSMutableArray<QRRecord *> *found) {
+    // Normalize the long side so module size lands in the detector's sweet
+    // spot regardless of source resolution.
+    double normalizeScale = 1.0;
+    double maxSide = MAX(base.extent.size.width, base.extent.size.height);
+    if (maxSide > 0) {
+        normalizeScale = kNormalizeLongSide / maxSide;
+        base = scaleImage(base, normalizeScale);
+    }
+
+    CIContext *ctx = [CIContext contextWithOptions:nil];
+    NSUInteger before = found.count;
+
+    // Fast path: normalized native resolution.
+    collectQR(base, ctx, normalizeScale, keepGeometry, found);
+    if (found.count > before) {
+        return;
+    }
+
+    // Enhancement ladder at native size.
+    CIImage *globals[] = {
+        documentEnhance(base), otsuThreshold(base), contrastGray(base, 2.5),
+        gammaAdjust(base, 0.6), sharpen(base),
+    };
+    for (int i = 0; i < 5; i++) {
+        collectQR(globals[i], ctx, normalizeScale, keepGeometry, found);
+        if (found.count > before) {
+            return;
+        }
+    }
+
+    // Upscale ladder: plain, document-cleaned, and contrast-stretched.
+    const double scales[] = {2.0, 3.0};
+    for (int s = 0; s < 2; s++) {
+        CIImage *up = scaleImage(base, scales[s]);
+        CIImage *variants[] = {up, documentEnhance(up), contrastGray(up, 2.0)};
+        for (int v = 0; v < 3; v++) {
+            collectQR(variants[v], ctx, normalizeScale * scales[s], keepGeometry, found);
+            if (found.count > before) {
+                return;
+            }
+        }
+    }
+}
+
+// renderPDFPage rasterizes one page onto white at roughly kNormalizeLongSide on
+// its long side.
+//
+// White matters: a QR in a PDF is usually black vector art on no background at
+// all, and drawing that onto an uninitialised bitmap leaves black on black.
+//
+// CGPDFPageGetDrawingTransform is what handles a page's /Rotate and its crop
+// box origin; doing that arithmetic by hand is how rotated scans end up
+// mirrored or clipped.
+static CIImage *renderPDFPage(CGPDFPageRef page) {
+    CGRect box = CGPDFPageGetBoxRect(page, kCGPDFCropBox);
+    if (CGRectIsEmpty(box)) {
+        box = CGPDFPageGetBoxRect(page, kCGPDFMediaBox);
+    }
+    if (CGRectIsEmpty(box)) {
+        return nil;
+    }
+
+    int rotation = CGPDFPageGetRotationAngle(page);
+    double boxW = box.size.width, boxH = box.size.height;
+    if (rotation == 90 || rotation == 270) {
+        double swap = boxW;
+        boxW = boxH;
+        boxH = swap;
+    }
+
+    double maxSide = MAX(boxW, boxH);
+    double scale = maxSide > 0 ? kNormalizeLongSide / maxSide : 1.0;
+    size_t width = (size_t)round(boxW * scale);
+    size_t height = (size_t)round(boxH * scale);
+    if (width == 0 || height == 0) {
+        return nil;
+    }
+
+    CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
+    CGContextRef ctx = CGBitmapContextCreate(NULL, width, height, 8, 0, space,
+                                             (CGBitmapInfo)kCGImageAlphaNoneSkipLast);
+    CGColorSpaceRelease(space);
+    if (ctx == NULL) {
+        return nil;
+    }
+
+    CGContextSetRGBFillColor(ctx, 1.0, 1.0, 1.0, 1.0);
+    CGContextFillRect(ctx, CGRectMake(0, 0, width, height));
+    CGContextConcatCTM(ctx, CGPDFPageGetDrawingTransform(
+                                page, kCGPDFCropBox,
+                                CGRectMake(0, 0, width, height), 0, true));
+    CGContextDrawPDFPage(ctx, page);
+
+    CGImageRef cg = CGBitmapContextCreateImage(ctx);
+    CGContextRelease(ctx);
+    if (cg == NULL) {
+        return nil;
+    }
+    CIImage *image = [CIImage imageWithCGImage:cg];
+    CGImageRelease(cg);
+    return image;
+}
+
+// decodePDF finds every QR on every page. A PDF is not a raster format, so
+// nothing else in this program can read one: Go's image.Decode fails and
+// ImageIO does not list it, which is why it is rendered here rather than
+// decoded.
+//
+// Geometry is kept only for a one-page document. Corner coordinates from
+// different pages live in unrelated frames, so a code at the same spot on two
+// pages would dedup as one; falling back to payload comparison there merges two
+// copies of the same payload instead, which understates by far less.
+static BOOL decodePDF(NSURL *url, NSMutableArray<QRRecord *> *found) {
+    CGPDFDocumentRef doc = CGPDFDocumentCreateWithURL((__bridge CFURLRef)url);
+    if (doc == NULL) {
+        return NO;
+    }
+    size_t pages = CGPDFDocumentGetNumberOfPages(doc);
+    BOOL keepGeometry = (pages == 1);
+
+    for (size_t i = 1; i <= pages; i++) {
+        CGPDFPageRef page = CGPDFDocumentGetPage(doc, i);
+        if (page == NULL) {
+            continue;
+        }
+        @autoreleasepool {
+            CIImage *image = renderPDFPage(page);
+            if (image != nil) {
+                decodeLadder(image, keepGeometry, found);
+            }
+        }
+    }
+    CGPDFDocumentRelease(doc);
+    return YES;
+}
+
+static BOOL isPDF(NSURL *url) {
+    return [url.pathExtension caseInsensitiveCompare:@"pdf"] == NSOrderedSame;
+}
+
 char *decodeQRVisionAll(const char *cpath, int *outLen) {
     @autoreleasepool {
         *outLen = 0;
         NSString *path = [NSString stringWithUTF8String:cpath];
         NSURL *url = [NSURL fileURLWithPath:path];
+        NSMutableArray<QRRecord *> *found = [NSMutableArray array];
+
+        if (isPDF(url)) {
+            if (!decodePDF(url, found)) {
+                // NULL means this decoder could not read the file at all, which
+                // is what lets the caller tell "unreadable" apart from "no QR".
+                return NULL;
+            }
+            return serialize(found, outLen);
+        }
 
         CIImage *base = [CIImage imageWithContentsOfURL:url];
         if (base == nil) {
-            // NULL means this decoder could not read the file at all, which is
-            // what lets the caller tell "unreadable" apart from "no QR here".
             return NULL;
         }
-        double originalLongSide = MAX(base.extent.size.width, base.extent.size.height);
 
         // Apply EXIF orientation so rotated phone photos are read upright.
         // Doing so moves Vision into a frame the Go decoder never sees, so
@@ -227,48 +380,8 @@ char *decodeQRVisionAll(const char *cpath, int *outLen) {
             }
         }
 
-        // Normalize the long side so module size lands in the detector's sweet
-        // spot regardless of source resolution.
-        double normalizeScale = 1.0;
-        double maxSide = MAX(base.extent.size.width, base.extent.size.height);
-        if (maxSide > 0 && originalLongSide > 0) {
-            normalizeScale = kNormalizeLongSide / maxSide;
-            base = scaleImage(base, normalizeScale);
-        }
+        decodeLadder(base, keepGeometry, found);
 
-        CIContext *ctx = [CIContext contextWithOptions:nil];
-        NSMutableArray<QRRecord *> *found = [NSMutableArray array];
-
-        // Fast path: normalized native resolution.
-        collectQR(base, ctx, normalizeScale, keepGeometry, found);
-        if (found.count > 0) {
-            return serialize(found, outLen);
-        }
-
-        // Enhancement ladder at native size.
-        CIImage *globals[] = {
-            documentEnhance(base), otsuThreshold(base), contrastGray(base, 2.5),
-            gammaAdjust(base, 0.6), sharpen(base),
-        };
-        for (int i = 0; i < 5; i++) {
-            collectQR(globals[i], ctx, normalizeScale, keepGeometry, found);
-            if (found.count > 0) {
-                return serialize(found, outLen);
-            }
-        }
-
-        // Upscale ladder: plain, document-cleaned, and contrast-stretched.
-        const double scales[] = {2.0, 3.0};
-        for (int s = 0; s < 2; s++) {
-            CIImage *up = scaleImage(base, scales[s]);
-            CIImage *variants[] = {up, documentEnhance(up), contrastGray(up, 2.0)};
-            for (int v = 0; v < 3; v++) {
-                collectQR(variants[v], ctx, normalizeScale * scales[s], keepGeometry, found);
-                if (found.count > 0) {
-                    return serialize(found, outLen);
-                }
-            }
-        }
         // Read fine, found nothing: an empty list, not a failure. Core Image
         // opens HEIC and other formats Go cannot, so this answer is what tells
         // the caller a raster decode failure was not the end of the story.

@@ -33,18 +33,6 @@ import (
 // expectedFail is the manifest's label for an image that contains no QR.
 const expectedFail = "EXPECTED_FAIL"
 
-// supportedExtensions mirrors scanner.supportedExtensions, which is
-// unexported. Filtering by extension matters for more than speed: ScanImage
-// derives a companion mask path by swapping the extension for .npy, so handing
-// it a .npy file would make it decode that file as its own mask and land a
-// non-image in the manifest. Keep in sync with scanner/scanner.go.
-var supportedExtensions = map[string]bool{
-	".png": true, ".jpg": true, ".jpeg": true,
-	".gif": true, ".bmp": true, ".webp": true,
-	".heic": true, ".heif": true,
-	".nef": true,
-}
-
 func defaultJobs() int {
 	// Mirrors scanner's own pool: decoding is CPU-bound plus an occasional
 	// exec, so more workers than this stops helping.
@@ -170,7 +158,11 @@ func listImages(root string) ([]string, error) {
 		if d.IsDir() {
 			return nil
 		}
-		if !supportedExtensions[strings.ToLower(filepath.Ext(d.Name()))] {
+		// Filtering by extension matters for more than speed: ScanImage derives
+		// a companion mask path by swapping the extension for .npy, so handing
+		// it a .npy file would make it decode that file as its own mask and
+		// land a non-image in the manifest.
+		if !scanner.SupportsExtension(d.Name()) {
 			return nil
 		}
 		rel, rerr := filepath.Rel(root, path)
