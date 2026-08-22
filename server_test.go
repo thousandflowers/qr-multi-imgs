@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -38,6 +37,17 @@ func do(t *testing.T, s *apiServer, method, path, origin, token, body string) *h
 	rec := httptest.NewRecorder()
 	s.handler().ServeHTTP(rec, req)
 	return rec
+}
+
+// jsonBody marshals a request body properly. Concatenating a path into JSON
+// looks fine until a Windows temp dir arrives with backslashes in it.
+func jsonBody(t *testing.T, v any) string {
+	t.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatalf("marshal request body: %v", err)
+	}
+	return string(b)
 }
 
 func TestAPI_rejectsMissingToken(t *testing.T) {
@@ -218,7 +228,7 @@ func TestAPI_scanReturnsAUsableSession(t *testing.T) {
 	}
 	s := testServer(t)
 	rec := do(t, s, "POST", "/api/scan", allowedOrigin, s.token,
-		`{"paths":["`+dir+`"]}`)
+		jsonBody(t, map[string]any{"paths": []string{dir}}))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("scan = %d (%s)", rec.Code, rec.Body.String())
 	}
@@ -266,7 +276,8 @@ func TestAPI_organizeRecreateExportWriteWhereTheyShould(t *testing.T) {
 	}
 
 	s := testServer(t)
-	rec := do(t, s, "POST", "/api/scan", allowedOrigin, s.token, `{"paths":["`+dir+`"]}`)
+	rec := do(t, s, "POST", "/api/scan", allowedOrigin, s.token,
+		jsonBody(t, map[string]any{"paths": []string{dir}}))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("scan = %d (%s)", rec.Code, rec.Body.String())
 	}
@@ -277,14 +288,16 @@ func TestAPI_organizeRecreateExportWriteWhereTheyShould(t *testing.T) {
 	if err := json.Unmarshal([]byte(lines[len(lines)-1]), &last); err != nil {
 		t.Fatal(err)
 	}
-	body := `{"session":"` + last.Session + `","format":"%s"}`
+	body := func(format string) string {
+		return jsonBody(t, map[string]any{"session": last.Session, "format": format})
+	}
 
 	if rec := do(t, s, "POST", "/api/export", allowedOrigin, s.token,
-		fmt.Sprintf(body, "json")); rec.Code != http.StatusOK {
+		body("json")); rec.Code != http.StatusOK {
 		t.Fatalf("export = %d", rec.Code)
 	}
 	if rec := do(t, s, "POST", "/api/recreate", allowedOrigin, s.token,
-		fmt.Sprintf(body, "png")); rec.Code != http.StatusOK {
+		body("png")); rec.Code != http.StatusOK {
 		t.Fatalf("recreate = %d", rec.Code)
 	}
 	if entries, err := os.ReadDir(filepath.Join(dir, "recreated_qr")); err != nil || len(entries) == 0 {
@@ -292,7 +305,7 @@ func TestAPI_organizeRecreateExportWriteWhereTheyShould(t *testing.T) {
 	}
 
 	if rec := do(t, s, "POST", "/api/organize", allowedOrigin, s.token,
-		fmt.Sprintf(body, "")); rec.Code != http.StatusOK {
+		body("")); rec.Code != http.StatusOK {
 		t.Fatalf("organize = %d", rec.Code)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "with_qr", "code.png")); err != nil {
