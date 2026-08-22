@@ -44,25 +44,6 @@ archives:
 checksum:
   name_template: "checksums.txt"
 
-# Publishes the formula to the public tap on every release, so brew users
-# stop drifting behind (the formula was previously maintained by hand and
-# went stale/missing). Requires the GH_PAT repo secret (push rights on
-# thousandflowers/homebrew-tap), exposed as TAP_GITHUB_TOKEN in release.yml.
-brews:
-  - name: qr-multi-imgs
-    repository:
-      owner: thousandflowers
-      name: homebrew-tap
-      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
-    directory: Formula
-    homepage: https://github.com/thousandflowers/qr-multi-imgs
-    description: "TUI to scan QR codes from an images folder, organize and export results"
-    license: MIT
-    install: |
-      bin.install "qr-multi-imgs"
-    test: |
-      assert_match version.to_s, shell_output("#{bin}/qr-multi-imgs --version")
-
 changelog:
   sort: asc
   filters:

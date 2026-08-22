@@ -7,6 +7,26 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- Releasing no longer depends on a secret that does not exist. goreleaser's
+  `brews:` block needed a long-lived token with push rights on the tap repo, stored
+  as `GH_PAT` — and that secret has never been set here, so the block had never once
+  run. Worse, the formula push happens at the *end* of goreleaser, so a release would
+  publish and only then fail the bump, leaving `brew` on the old version behind a
+  green-looking release. The block is gone; `scripts/bump_tap.py` does the same job
+  with whatever auth `gh` already has, and the release job prints the exact command
+  in its summary
+- `scripts/bump_tap.py` reads the formula rather than knowing about any project: the
+  source repo comes from `homepage`, the current version from `version` or from the
+  tag inside a url, and each sha256 is recomputed from the file the url above it
+  actually points at — so a per-architecture formula cannot end up carrying one
+  arch's checksum on another's download, which is exactly the bug that shipped in
+  the skillreaper formula once. It refuses rather than guesses when the number of
+  sha256 lines and urls disagree. `--self-test` covers both, `--dry-run` prints the
+  formula it would write
+
+## [v1.6.0] — 2026-08-22
+
 ### Added
 - `qr-multi-imgs --serve` runs a local HTTP API and serves a web UI with the same
   actions as the TUI: scan several paths, export, recreate, organize, delete. Progress

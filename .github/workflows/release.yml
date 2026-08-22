@@ -22,19 +22,6 @@ jobs:
         with:
           go-version: "1.26"
 
-      # The formula bump runs at the END of goreleaser, after the GitHub
-      # release is already published. Without the token that leaves brew
-      # pinned to the previous version with a green-looking release, so
-      # refuse before anything ships.
-      - name: Require the tap token
-        env:
-          TAP_GITHUB_TOKEN: ${{ secrets.GH_PAT }}
-        run: |
-          if [ -z "$TAP_GITHUB_TOKEN" ]; then
-            echo "::error::GH_PAT is not set. goreleaser would publish the release and then fail to bump the Homebrew formula. Set it with: gh secret set GH_PAT --repo thousandflowers/qr-multi-imgs"
-            exit 1
-          fi
-
       - uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
@@ -42,6 +29,21 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # PAT with push rights on thousandflowers/homebrew-tap; used by the
-          # brews section of .goreleaser.yaml to publish the formula.
-          TAP_GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+
+      # The Homebrew formula is bumped from a machine, not from here. Pushing to
+      # the tap needs a long-lived token with write access to another repo, and
+      # that token only ever fails at the END of goreleaser — after the release
+      # is published — leaving brew on the old version behind a green release.
+      # scripts/bump_tap.py does the same job with the operator's own gh auth.
+      - name: Say what still has to happen
+        run: |
+          {
+            echo "### Released ${GITHUB_REF_NAME}"
+            echo
+            echo "Homebrew is still on the previous version. Bump the tap:"
+            echo
+            echo '```'
+            echo "scripts/bump_tap.py qr-multi-imgs --tag ${GITHUB_REF_NAME}"
+            echo "brew update && brew upgrade qr-multi-imgs && qr-multi-imgs --version"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
