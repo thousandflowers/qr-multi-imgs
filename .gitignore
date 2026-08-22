@@ -28,3 +28,7 @@ dist/
 benchtmp/
 dbg/
 scanner/zz_mirror_probe_test.go
+
+# Built by the Pages workflow; keeping it out of the repo also keeps it out
+# of the CLI binary, which embeds web/ and does not need the wasm engine.
+web/qr.wasm

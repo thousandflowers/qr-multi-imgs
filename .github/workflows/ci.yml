@@ -27,6 +27,12 @@ jobs:
       - name: Vet
         run: go vet ./...
 
+      # The browser engine is a separate build target, so nothing else here
+      # would notice it breaking until a Pages deploy failed.
+      - name: Build the wasm engine
+        if: runner.os == 'Linux'
+        run: GOOS=js GOARCH=wasm go build -o /dev/null ./wasm
+
       - name: Test
         run: go test -v -count=1 -coverprofile=${{ runner.temp }}/coverage.txt . ./exporter ./scanner
 

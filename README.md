@@ -2,6 +2,10 @@
 
 **Scan a folder → decode QR → organize, export, recreate — from a clean TUI.**
 
+**Or read your codes with nothing installed: [open the web app](https://thousandflowers.github.io/qr-multi-imgs/)**
+and drop a photo or a folder on it. The decoder is a WebAssembly build of this
+same Go code running inside your tab — your images are never uploaded.
+
 ![demo](demo.gif)
 
 [![Go](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go)](https://go.dev)
@@ -118,46 +122,60 @@ Measured on an Apple M2 Pro (10 cores, 16 GB).
 
 ---
 
-## Web UI
+## Web app — nothing to install
 
-Same actions as the TUI, in a browser, driven by the copy of the program running
-on your own machine:
+**<https://thousandflowers.github.io/qr-multi-imgs/>**
+
+Drop a single photo, a folder, or several folders. Every QR code in every image
+comes back with a thumbnail, a copy button, and a link when the payload is one.
+Filter to the images that had a code, or the ones that did not, and download the
+lot as JSON, CSV or plain text.
+
+**Nothing is uploaded, and that is enforced rather than promised.** The page
+carries a `Content-Security-Policy` whose `connect-src` allows only its own
+origin and the loopback, so it *cannot* send a filename or a payload anywhere
+else even if the page were tampered with. It loads no font, script or image from
+any third party. Your files never leave the tab.
+
+How the work is split matters. The browser turns each file into pixels — it
+already ships native decoders for everything it can display, JPEG through AVIF
+and HEIC on Safari — and a WebAssembly build of the same Go decoder does the
+part a browser has no answer for: finding and reading the codes. That is why the
+engine is 4.6 MB (1.4 MB over the wire) instead of carrying image decoders it
+would only duplicate. Decoding runs in a pool of Web Workers, one per core up to
+three, so a folder of photos does not freeze the page.
+
+What the browser cannot do is touch your disk. It reads the files you hand it
+and nothing else — no moving, no deleting. For that, run the program.
+
+## Driving the local program from a browser
 
 ```bash
 qr-multi-imgs --serve
 ```
 
-It prints two links. Both open the **same page** — the binary embeds the very
-file GitHub Pages serves, so there is no second copy drifting out of step:
+It prints two links. Both open the same page — `web/` is embedded in the binary
+and published to Pages, so there is one file, not two — but with the program
+running the page gains what a browser is not allowed to do on its own: organize
+into `with_qr/` and `without_qr/`, recreate the codes as images, delete the ones
+without a code, all where the files actually live.
 
 | | | needs |
 |---|---|---|
 | **Local UI** | `http://127.0.0.1:8787/#t=...` | nothing; works in every browser |
-| **Hosted UI** | `thousandflowers.github.io/qr-multi-imgs/#t=...&api=...` | one permission, see below |
+| **Hosted UI** | `thousandflowers.github.io/qr-multi-imgs/#t=...&api=...` | one permission, below |
 
-**Nothing is uploaded, and that is enforced rather than promised.** Your images
-are read by the local process and never leave the machine. The page carries a
-`Content-Security-Policy` whose `connect-src` allows only its own origin and the
-loopback, so it *cannot* send a path, a filename or a payload anywhere else even
-if the page were tampered with. It loads no font, script or image from any third
-party.
-
-### About the hosted page and your local machine
-
-A page served from `https://` reaching `http://127.0.0.1` is allowed by the
+A page served over `https://` reaching `http://127.0.0.1` clears the
 mixed-content rules — the loopback counts as a trustworthy origin — but Chrome
 additionally gates it behind a **Local Network Access permission**. Measured on
 Chrome 151: `navigator.permissions.query({name: "local-network-access"})` reports
-`prompt`, so the browser asks and the choice is yours. The page therefore does
-not reach out on load; press **Connect** and accept the prompt, because a
-permission request only appears reliably when a click asked for it. Refuse it,
-or use a browser that declines outright, and the Local UI link still works with
-no permission at all.
+`prompt`, so the browser asks and the choice is yours. Refuse it, or use a
+browser that declines outright, and the Local UI link still works with no
+permission at all.
 
-### Why it cannot be turned against you
+### Why the local API cannot be turned against you
 
-The API deletes files, so it is built on three properties, each enforced in code
-rather than documented and hoped for:
+It deletes files, so it rests on three properties, each enforced in code:
 
 1. **Loopback only.** `--serve=0.0.0.0:8787` is refused, not honoured.
 2. **A random token in a request header.** A header forces a CORS preflight, so
