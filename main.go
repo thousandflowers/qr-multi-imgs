@@ -830,115 +830,132 @@ func waitForProgress(ch <-chan scanner.Progress) tea.Cmd {
 
 // ─── Actions ────────────────────────────────────────────────────────────────
 
+// actionOutcome is what an action did, before it is phrased for anyone. The
+// TUI renders it as one string; the HTTP API sends the parts.
+type actionOutcome struct {
+	Message string   `json:"message"`
+	Errors  []string `json:"errors,omitempty"`
+}
+
+func (a actionOutcome) text() string {
+	if len(a.Errors) == 0 {
+		return a.Message
+	}
+	return a.Message + "\n\nErrors:\n" + strings.Join(a.Errors, "\n")
+}
+
+func deleteWithoutQRNow(s *scanner.Summary) actionOutcome {
+	var deleted int
+	var errs []string
+	for _, r := range s.Results {
+		if r.HasQR || r.Error != "" {
+			continue
+		}
+		if err := os.Remove(r.FilePath); err != nil {
+			errs = append(errs, fmt.Sprintf("%s: %v", filepath.Base(r.FilePath), err))
+		} else {
+			deleted++
+		}
+	}
+	msg := fmt.Sprintf("Deleted %d image(s) without QR code.", deleted)
+	return actionOutcome{Message: msg, Errors: errs}
+}
+
 func deleteWithoutQR(s *scanner.Summary) tea.Cmd {
 	return func() tea.Msg {
-		var deleted int
-		var errs []string
-		for _, r := range s.Results {
-			if r.HasQR || r.Error != "" {
-				continue
-			}
-			if err := os.Remove(r.FilePath); err != nil {
-				errs = append(errs, fmt.Sprintf("%s: %v", filepath.Base(r.FilePath), err))
-			} else {
-				deleted++
-			}
-		}
-		msg := fmt.Sprintf("Deleted %d image(s) without QR code.", deleted)
-		if len(errs) > 0 {
-			msg += "\n\nErrors:\n" + strings.Join(errs, "\n")
-		}
-		return actionDoneMsg{msg}
+		return actionDoneMsg{deleteWithoutQRNow(s).text()}
 	}
+}
+
+func organizeByQRNow(s *scanner.Summary) actionOutcome {
+	var movedWith, movedWithout int
+	var errs []string
+
+	// Each file is organized inside its own folder. A scan can now cover
+	// several folders at once, and moving a file out of the one it came
+	// from to join another scan's results would be a surprise no undo
+	// covers. With a single folder scanned this is what it always did.
+	for _, r := range s.Results {
+		bucket := "without_qr"
+		if r.HasQR {
+			bucket = "with_qr"
+		}
+		destDir := filepath.Join(filepath.Dir(r.FilePath), bucket)
+		if err := os.MkdirAll(destDir, 0755); err != nil {
+			errs = append(errs, fmt.Sprintf("%s: %v", filepath.Base(r.FilePath), err))
+			continue
+		}
+
+		destPath := filepath.Join(destDir, filepath.Base(r.FilePath))
+		if _, err := os.Stat(destPath); err == nil {
+			baseName := strings.TrimSuffix(
+				filepath.Base(r.FilePath), filepath.Ext(r.FilePath))
+			ext := filepath.Ext(r.FilePath)
+			destPath = filepath.Join(destDir,
+				fmt.Sprintf("%s_%x%s", baseName, time.Now().UnixNano(), ext))
+		}
+
+		if err := os.Rename(r.FilePath, destPath); err != nil {
+			errs = append(errs, fmt.Sprintf("%s: %v", filepath.Base(r.FilePath), err))
+		} else if r.HasQR {
+			movedWith++
+		} else {
+			movedWithout++
+		}
+	}
+
+	msg := fmt.Sprintf("Organized %d files:\n  with_qr: %d\n  without_qr: %d",
+		movedWith+movedWithout, movedWith, movedWithout)
+	return actionOutcome{Message: msg, Errors: errs}
 }
 
 func organizeByQR(s *scanner.Summary) tea.Cmd {
 	return func() tea.Msg {
-		var movedWith, movedWithout int
-		var errs []string
-
-		// Each file is organized inside its own folder. A scan can now cover
-		// several folders at once, and moving a file out of the one it came
-		// from to join another scan's results would be a surprise no undo
-		// covers. With a single folder scanned this is what it always did.
-		for _, r := range s.Results {
-			bucket := "without_qr"
-			if r.HasQR {
-				bucket = "with_qr"
-			}
-			destDir := filepath.Join(filepath.Dir(r.FilePath), bucket)
-			if err := os.MkdirAll(destDir, 0755); err != nil {
-				errs = append(errs, fmt.Sprintf("%s: %v", filepath.Base(r.FilePath), err))
-				continue
-			}
-
-			destPath := filepath.Join(destDir, filepath.Base(r.FilePath))
-			if _, err := os.Stat(destPath); err == nil {
-				baseName := strings.TrimSuffix(
-					filepath.Base(r.FilePath), filepath.Ext(r.FilePath))
-				ext := filepath.Ext(r.FilePath)
-				destPath = filepath.Join(destDir,
-					fmt.Sprintf("%s_%x%s", baseName, time.Now().UnixNano(), ext))
-			}
-
-			if err := os.Rename(r.FilePath, destPath); err != nil {
-				errs = append(errs, fmt.Sprintf("%s: %v", filepath.Base(r.FilePath), err))
-			} else if r.HasQR {
-				movedWith++
-			} else {
-				movedWithout++
-			}
-		}
-
-		msg := fmt.Sprintf("Organized %d files:\n  with_qr: %d\n  without_qr: %d",
-			movedWith+movedWithout, movedWith, movedWithout)
-		if len(errs) > 0 {
-			msg += "\n\nErrors:\n" + strings.Join(errs, "\n")
-		}
-		return actionDoneMsg{msg}
+		return actionDoneMsg{organizeByQRNow(s).text()}
 	}
+}
+
+func recreateQRsNow(s *scanner.Summary, format string) actionOutcome {
+	var created int
+	var errs []string
+
+	// Written beside the source image, for the same reason organize keeps
+	// files in their own folder: a multi-folder scan has no single place
+	// that would not surprise someone.
+	for _, r := range s.Results {
+		if !r.HasQR || len(r.Contents) == 0 {
+			continue
+		}
+		outDir := filepath.Join(filepath.Dir(r.FilePath), "recreated_qr")
+		if err := os.MkdirAll(outDir, 0755); err != nil {
+			errs = append(errs, fmt.Sprintf("%s: %v", filepath.Base(r.FilePath), err))
+			continue
+		}
+
+		for i, content := range r.Contents {
+			safeName := sanitizeFilename(content, 40)
+			if safeName == "" {
+				safeName = fmt.Sprintf("qr_%x", time.Now().UnixNano())
+			}
+			if i > 0 {
+				safeName = fmt.Sprintf("%s_%d", safeName, i+1)
+			}
+			outPath := filepath.Join(outDir, safeName+"."+format)
+			if err := exporter.WriteQRCodeFormat(content, outPath, exporter.QRCodeFormat(format)); err != nil {
+				errs = append(errs, fmt.Sprintf("%s: %v", safeName, err))
+			} else {
+				created++
+			}
+		}
+	}
+
+	msg := fmt.Sprintf("Created %d QR image(s) in recreated_qr/ (format: %s)", created, format)
+	return actionOutcome{Message: msg, Errors: errs}
 }
 
 func recreateQRs(s *scanner.Summary, format string) tea.Cmd {
 	return func() tea.Msg {
-		var created int
-		var errs []string
-
-		// Written beside the source image, for the same reason organize keeps
-		// files in their own folder: a multi-folder scan has no single place
-		// that would not surprise someone.
-		for _, r := range s.Results {
-			if !r.HasQR || len(r.Contents) == 0 {
-				continue
-			}
-			outDir := filepath.Join(filepath.Dir(r.FilePath), "recreated_qr")
-			if err := os.MkdirAll(outDir, 0755); err != nil {
-				errs = append(errs, fmt.Sprintf("%s: %v", filepath.Base(r.FilePath), err))
-				continue
-			}
-
-			for i, content := range r.Contents {
-				safeName := sanitizeFilename(content, 40)
-				if safeName == "" {
-					safeName = fmt.Sprintf("qr_%x", time.Now().UnixNano())
-				}
-				if i > 0 {
-					safeName = fmt.Sprintf("%s_%d", safeName, i+1)
-				}
-				outPath := filepath.Join(outDir, safeName+"."+format)
-				if err := exporter.WriteQRCodeFormat(content, outPath, exporter.QRCodeFormat(format)); err != nil {
-					errs = append(errs, fmt.Sprintf("%s: %v", safeName, err))
-				} else {
-					created++
-				}
-			}
-		}
-
-		msg := fmt.Sprintf("Created %d QR image(s) in recreated_qr/ (format: %s)", created, format)
-		if len(errs) > 0 {
-			msg += "\n\nErrors:\n" + strings.Join(errs, "\n")
-		}
-		return actionDoneMsg{msg}
+		return actionDoneMsg{recreateQRsNow(s, format).text()}
 	}
 }
 
@@ -1078,6 +1095,13 @@ func main() {
 		printVersion()
 		osExit(0)
 	}
+	if addr, ok := serveAddr(os.Args[1:]); ok {
+		if err := runServer(addr); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			osExit(1)
+		}
+		osExit(0)
+	}
 	m := initModel(os.Args)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
@@ -1114,6 +1138,8 @@ Usage:
   qr-multi-imgs /path/to/images        scan a folder, skip the prompt
   qr-multi-imgs shot.png invoice.pdf   scan single files
   qr-multi-imgs photos/ ~/Desktop/a.heic scans/  mix folders and files
+  qr-multi-imgs --serve                web UI + local API on 127.0.0.1:8787
+  qr-multi-imgs --serve=9000           same, on another port
   qr-multi-imgs --help                 this help text
   qr-multi-imgs --version              show version
 

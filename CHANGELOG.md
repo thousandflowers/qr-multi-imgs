@@ -7,6 +7,38 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- `qr-multi-imgs --serve` runs a local HTTP API and serves a web UI with the same
+  actions as the TUI: scan several paths, export, recreate, organize, delete. Progress
+  streams as newline-delimited JSON rather than Server-Sent Events, because
+  `EventSource` cannot set a request header and the token lives in one
+- The same `web/` directory is embedded in the binary and published to GitHub Pages,
+  so the hosted page and the one `--serve` hands you are the same file. The hosted
+  page drives the local process through `#api=`; nothing is uploaded either way
+- The page ships a `Content-Security-Policy` whose `connect-src` allows only its own
+  origin and the loopback, so it cannot send a path, filename or payload to any third
+  party even if tampered with, and it loads no external font, script or image
+
+### Security
+- The API listens on 127.0.0.1 and refuses any other bind address rather than
+  honouring it. Every call carries a random 32-character token in a header, which
+  forces a CORS preflight; the token rides in the URL fragment, which browsers never
+  place in a request, a `Referer` or a log. Origins outside the allowlist are rejected
+  before the token is read
+- Destructive endpoints name a session, never a path: `organize`, `delete` and
+  `recreate` act on the results of a scan this server performed, so a leaked token
+  cannot be pointed at an arbitrary directory
+- Measured, not assumed: Chrome 151 gates a public page's access to the loopback
+  behind a Local Network Access permission that reports `prompt`. The page waits for a
+  click before connecting, since a permission prompt only appears reliably when a
+  gesture asked for it
+
+### Changed
+- The TUI's delete, organize and recreate actions were `tea.Cmd` closures wrapping
+  logic nothing else could call. The logic now lives in plain functions returning an
+  `actionOutcome`, and the TUI commands are one-line wrappers over them, so the HTTP
+  API runs the same code rather than a second copy of it
+
 ## [v1.5.0] — 2026-08-22
 
 ### Added
