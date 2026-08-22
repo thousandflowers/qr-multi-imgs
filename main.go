@@ -1095,7 +1095,7 @@ func printHelp() {
 Usage:
   qr-multi-imgs                        interactive TUI (type or drag paths)
   qr-multi-imgs /path/to/images        scan a folder, skip the prompt
-  qr-multi-imgs shot.png ticket.heic   scan single files
+  qr-multi-imgs shot.png invoice.pdf   scan single files
   qr-multi-imgs photos/ ~/Desktop/a.heic scans/  mix folders and files
   qr-multi-imgs --help                 this help text
   qr-multi-imgs --version              show version
@@ -1119,6 +1119,8 @@ Supported formats:
   macOS adds      every format the system decodes — HEIC, PSD, JXL, AVIF and
                   camera raw from any supported camera (CR2, CR3, ARW, DNG,
                   NEF, RAF, ORF, RW2 ...). Asked at startup, not hardcoded.
+                  PDF too: every page is rendered and read, so a multi-page
+                  document reports the codes from all of them.
   Mixed formats scan in one pass — no per-format mode.
 Project: https://github.com/thousandflowers/qr-multi-imgs`)
 }

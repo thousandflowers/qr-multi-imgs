@@ -36,6 +36,11 @@ char* systemReadableExtensions(void) {
         }
         CFRelease(types);
 
+        // PDF is not an ImageIO raster type and never appears in that list, but
+        // this build renders its pages with Core Graphics and reads the codes
+        // off them, so as far as a folder scan is concerned it is readable.
+        [exts addObject:@"pdf"];
+
         // Size the buffer from the strings themselves: one NUL after each and
         // one more to terminate, so nothing assumes a bound on how many types
         // the OS reports.
