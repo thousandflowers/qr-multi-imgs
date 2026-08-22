@@ -36,10 +36,13 @@ QR images. First version: 1863 decoded, 1469 missed. 56%, in seven and a
 half minutes.
 
 I assumed the misses were a decoder-quality problem and went looking for a
-better decoder. They weren't. The hardest samples pack 100+ modules into a
-256px image, so a single QR module lands on roughly two pixels — after the
-dataset's blur and warp, the information is not in the raster anymore. No
-decoder gets those, because there is nothing left to decode.
+better decoder. They weren't — but my first explanation was wrong too. I
+thought density alone killed them: 100+ modules in a 256px image is under two
+pixels per module. So I measured it, and a clean 153x153-module QR at 256px
+decodes fine straight from the pixels. Density is not the killer. The dataset's
+distortion is; density only decides how little of it is enough. Under a box
+blur, 61 modules survives radius 2 and fails at 3, 97 and 125 fail at 2, and
+153 fails already at 1.
 
 What the dataset does ship is a companion .npy file per sample: the
 generator's own bit matrix. So for the images the pixels can't answer, the

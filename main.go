@@ -1046,7 +1046,24 @@ func sanitizeFilename(s string, maxLen int) string {
 
 // ─── Main ───────────────────────────────────────────────────────────────────
 
-var version = "1.5.0"
+// version is stamped at link time by goreleaser (-X main.version=1.5.0). A
+// plain `go build` or `go install` leaves it empty, so fall back to the module
+// version the toolchain records in the build info — that way `go install
+// ...@latest` reports the tag it actually installed instead of a hardcoded
+// string somebody forgot to bump.
+var version string
+
+func versionString() string {
+	if version != "" {
+		return version
+	}
+	if bi, ok := debug.ReadBuildInfo(); ok {
+		if v := bi.Main.Version; v != "" && v != "(devel)" {
+			return strings.TrimPrefix(v, "v")
+		}
+	}
+	return "dev"
+}
 
 // ponytail: overridable in tests; avoids os.Exit killing the test process.
 var osExit = os.Exit
@@ -1126,7 +1143,7 @@ Project: https://github.com/thousandflowers/qr-multi-imgs`)
 }
 
 func printVersion() {
-	fmt.Printf("qr-multi-imgs %s\n", version)
+	fmt.Printf("qr-multi-imgs %s\n", versionString())
 }
 
 // initModel creates and configures the initial TUI model from CLI args.

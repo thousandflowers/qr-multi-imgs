@@ -15,6 +15,8 @@ builds:
     env: [CGO_ENABLED=1]
     goos: [darwin]
     goarch: [amd64, arm64]
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
 
   # Linux/Windows stay pure Go (Vision is stubbed out), so they cross-compile
   # from the same macOS runner with no C toolchain.
@@ -25,6 +27,8 @@ builds:
     ignore:
       - goos: windows
         goarch: arm64
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
 
 archives:
   - formats: [tar.gz]
@@ -58,9 +62,6 @@ brews:
       bin.install "qr-multi-imgs"
     test: |
       assert_match version.to_s, shell_output("#{bin}/qr-multi-imgs --version")
-
-snapshot:
-  name_template: "{{ .Tag }}-next"
 
 changelog:
   sort: asc

@@ -32,6 +32,22 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
   no file path, for callers such as a wasm build. `ScanImage` now delegates its raster
   stage to it. Lower recall than `ScanImage`: the `.npy` mask, Apple Vision, and
   zbarimg all need a path and do not run
+- Several folders and single files scan in one pass: `scanner.ScanPaths` /
+  `ScanPathsStream` take a mixed target list and return one `Summary`, and the TUI
+  accepts several dropped paths at once. `ScanFolder`/`ScanFolderStream` remain as
+  wrappers over the now-shared walk-and-pool code. A named file is scanned whatever
+  its extension; a folder walk still filters; a path that does not exist is an error,
+  not a silent skip
+- The readable-format list is asked of the system rather than hardcoded. On macOS
+  `CGImageSourceCopyTypeIdentifiers` supplies it — 70 formats on a current release,
+  including every camera raw the OS knows (cr2, cr3, arw, dng, raf, orf, rw2, nef and
+  the rest) plus psd, jxl, avif, exr, hdr, dds, ico, icns, pict, jp2. The old list was
+  already wrong for anyone shooting Canon, Sony or Fuji and went stale with each new
+  camera. Elsewhere the built-in set applies
+- TIFF everywhere, via a package already in `go.mod`
+- PDFs are read, every page. Rendered through Core Graphics onto white — a QR is black
+  vector art over nothing, so an uninitialised bitmap gives black on black — honouring
+  `/Rotate` and the crop box via `CGPDFPageGetDrawingTransform`
 - Ground-truth decode benchmark behind the `corpus` build tag:
   `go test -tags corpus ./scanner -run TestCorpus -v`. Reads a `corpus.csv` manifest,
   reports total/correct/wrong/missed/errors and a success rate. `QR_CORPUS_DIR` points
@@ -49,6 +65,22 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
   untouched
 
 ### Fixed
+- Four places assumed a scan covered exactly one folder and misplaced or misreported
+  things once results spanned several: organize moved files beside the *first* result
+  (carrying images out of their own folder), recreate wrote `recreated_qr/` in the same
+  wrong place, export chose the first result's folder, and the header named it. Files
+  are now organized and recreated inside their own folder, export falls back to the
+  working directory when a scan spans folders, and the header says `demo  (+2 more
+  folders)`. Single-folder scans behave exactly as before
+- The version string is stamped at link time (`-ldflags -X main.version`) instead of
+  being a constant in `main.go` that had to be bumped by hand and had drifted before.
+  A `go install` build with no ldflags falls back to the module version in the build
+  info, so it reports the tag it actually installed
+- The release workflow now refuses to run without the tap token instead of publishing
+  the GitHub release and only then failing the Homebrew bump, which used to leave
+  `brew` pinned to the previous version behind a green-looking release
+- Removed `Formula/qr-multi-imgs.rb`, a stale v1.2.0 source-build formula that nothing
+  consumed and that contradicted the published tap
 - HEIC images decode on macOS instead of being skipped or erroring. Three separate
   causes: `ScanImage` returned the `image.Decode` error before any path-based decoder
   ran; Vision could not distinguish "cannot open" from "opened, found nothing", so a

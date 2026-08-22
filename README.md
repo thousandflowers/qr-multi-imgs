@@ -10,7 +10,7 @@
 [![CI](https://github.com/thousandflowers/qr-multi-imgs/actions/workflows/ci.yml/badge.svg)](https://github.com/thousandflowers/qr-multi-imgs/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/thousandflowers/qr-multi-imgs/graph/badge.svg)](https://codecov.io/gh/thousandflowers/qr-multi-imgs)
 ![Zero Deps](https://img.shields.io/badge/system%20deps-zero-brightgreen)
-![Speed](https://img.shields.io/badge/3332%20QR%20in%20~7s-M2%20Pro-orange) ![Detection](https://img.shields.io/badge/detection-100%25-brightgreen)
+![Speed](https://img.shields.io/badge/3332%20QR%20in%20~7s-M2%20Pro-orange)
 ![Windows](https://img.shields.io/badge/Windows-supported-0078D4?logo=windows)
 
 ```bash
@@ -52,15 +52,43 @@ Plenty of CLI QR scanners exist. None ship a TUI built for batch work.
 
 ## Benchmark
 
-Dataset: [lovasoa/qrcode-dataset](https://github.com/lovasoa/qrcode-dataset) — **3332 damaged & distorted QR images** designed to stress-test scanners.
+Dataset: [lovasoa/qrcode-dataset](https://github.com/lovasoa/qrcode-dataset) — **3332 damaged & distorted QR images** built to stress-test scanners. Each sample ships three files: the distorted `NNN.png`, the decoded `NNN.txt`, and `NNN.npy` — the generator's **source bit-matrix**.
 
-| | v1.0 (image only) | v1.1 (parallel + bit-matrix) |
+| | image pixels only | with the companion `.npy` |
 |---|---|---|
-| **Detection** | ~56% (missed 1469) | **3332/3332 (100%)** |
-| **Time** | ~7m30s | **~7s** |
+| **Detection** | ~57% | **3332/3332 (100%)** |
+| **Time** | ~7m30s (v1.0, serial) | **~7s** |
 | **Throughput** | ~7 img/s | **~475 img/s** |
 
-The leap to 100% is not parallelism — it's the companion bit-matrix. The dataset's densest codes pack 100+ modules into 256 px, so each module is sub-pixel and unrecoverable from the raster by any decoder. For those, qr-multi-imgs decodes the sample's `.npy` bit-matrix (written by the dataset generator) in pure Go — nothing to install, no `zbarimg` required. Codes still legible in the pixels (~56%) decode straight from the image; six workers cut the wall-clock.
+**Read that 100% honestly.** It is not image decoding. It is decoding the answer
+key this dataset happens to ship beside every image: when a `.npy` sits next to
+the file, qr-multi-imgs decodes that bit-matrix first, in pure Go. That is
+exactly what you want on this dataset and it never happens on your own photos.
+
+**On pixels alone the same dataset scores ~57%**, and that number splits hard:
+
+| subset | what it holds | image-only |
+|---|---|---|
+| `with_qr` | clean, stylized codes | ~100% |
+| `without_qr` | colored, dense, low-contrast adversarial codes | ~25.7% |
+
+The ~70% of `without_qr` left unread is not low-hanging fruit. The classical
+ceiling, measured across the union of every colour channel, binarizer and scale
+we could throw at it, is ~28% with gozxing and ~30.3% with `zbarimg`. Passing it
+needs an ML detector (WeChat/CNN), which means an OpenCV C dependency — the
+thing this tool exists to avoid.
+
+**Why the dense codes fail — measured, not assumed.** Not because the modules
+are sub-pixel: a clean 153x153-module QR rendered at 256 px (1.67 px per module,
+well under two) decodes fine straight from the pixels. What destroys it is the
+dataset's *distortion*; density only decides how little of it is enough. Under a
+box blur, 61 modules survives radius 2 and fails at 3, 97 and 125 fail at 2, and
+153 fails already at 1. In every one of those failures the `.npy` still decodes.
+
+**Since v1.5.0 a scan is slower on purpose.** Earlier versions stopped at the
+first code in an image; v1.5.0 returns every code in it. On 40 real photos that
+moved 3.9s to 18.4s. The unbounded strategy union would have cost 122.6s — the
+finder-pattern pre-pass is what keeps it at 18.
 
 ```bash
 # Reproduce — the dataset is generated, not stored in the repo:
@@ -68,6 +96,10 @@ git clone https://github.com/lovasoa/qrcode-dataset
 cd qrcode-dataset && pipenv install && pipenv run python generate_dataset.py
 qr-multi-imgs ./dataset
 ```
+
+Layout decides which number you measure: keep `png`, `npy` and `txt` co-located
+and the companion path resolves (100%); separate the images into subfolders and
+it does not, which measures the image-only path instead.
 
 Measured on an Apple M2 Pro (10 cores, 16 GB).
 
