@@ -143,6 +143,7 @@ select, input[type=search] { font:inherit; font-size:.83rem; padding:.45rem .5re
 input[type=search] { flex:1; min-width:9rem; }
 .grow { flex:1; }
 
+.nomatch { margin:0; padding:2.25rem 1rem; text-align:center; color:var(--faint); font-size:.88rem; }
 .empty { padding:3rem 1.25rem; text-align:center; color:var(--faint); }
 .empty svg { width:42px; height:42px; margin-bottom:.7rem; opacity:.5; }
 .empty p { margin:0; font-size:.9rem; }
@@ -385,6 +386,7 @@ li .shim { width:48px; height:48px; border-radius:7px; background:var(--soft);
           <button id="zip" class="primary"></button>
         </div>
 
+        <p id="noMatch" class="nomatch hide"></p>
         <ul id="list"></ul>
       </div>
     </section>
@@ -790,11 +792,12 @@ function paintStats() {
   $("sErr").textContent = errs;
 }
 
-let filter = "all";
+let activeTile = "fAll";
 const FILTERS = { fAll: "all", fWith: "with", fCodes: "with", fUniq: "unique", fWithout: "without", fErr: "error" };
+const filterOf = () => FILTERS[activeTile] || "all";
 
 function matchesFilter(r, firstOfPayload) {
-  switch (filter) {
+  switch (filterOf()) {
     case "with": return !r.error && r.codes.length > 0;
     case "without": return !r.pending && !r.error && r.codes.length === 0;
     case "error": return !!r.error;
@@ -837,14 +840,13 @@ function applyFilters() {
     if (r.el) r.el.classList.toggle("hide", !ok);
     if (ok) shown++;
   }
-  for (const id in FILTERS) $(id).setAttribute("aria-pressed", String(FILTERS[id] === filter));
+  for (const id in FILTERS) $(id).setAttribute("aria-pressed", String(id === activeTile));
   $("zip").textContent = t("rename.zip", { n: visibleRows().filter((r) => r.file && !r.pending).length });
-  if (!shown && rows.length) {
-    $("emptyText").textContent = t("res.noMatch");
-    $("empty").classList.remove("hide");
-  } else if (rows.length) {
-    $("empty").classList.add("hide");
-  }
+  // Once anything has been loaded the big empty state stays out of the way;
+  // an empty filter says so from inside the list instead.
+  if (rows.length) $("empty").classList.add("hide");
+  $("noMatch").textContent = t("res.noMatch");
+  $("noMatch").classList.toggle("hide", shown > 0 || !rows.length);
 }
 
 const ICONS = {
@@ -1192,7 +1194,8 @@ $("folder").onchange = () => fromInput($("folder"));
 $("camshot").onchange = () => fromInput($("camshot"));
 
 for (const id in FILTERS) {
-  $(id).onclick = () => { filter = FILTERS[id] === filter && filter !== "all" ? "all" : FILTERS[id]; applyFilters(); };
+  // Clicking the tile that is already on goes back to everything.
+  $(id).onclick = () => { activeTile = id === activeTile ? "fAll" : id; applyFilters(); };
 }
 $("search").oninput = applyFilters;
 $("pattern").onchange = repaintAll;
@@ -1225,7 +1228,7 @@ $("clearYes").onclick = () => {
   seenLive.clear();
   seenCount.clear();
   done = expected = 0;
-  filter = "all";
+  activeTile = "fAll";
   $("list").replaceChildren();
   $("out").classList.add("hide");
   $("work").classList.add("hide");
