@@ -23,9 +23,9 @@
     "app.tagline": "QR scanner",
     "nav.source": "Source",
 
-    "hero.title": "Read, filter and export every QR code in a folder of images",
-    "hero.sub": "Most scanners take one picture at a time. Drop a whole folder — or one photo, your camera, or whatever is on the clipboard — and get every code in every image at once.",
-    "hero.trust": "Nothing is uploaded — it all runs in this tab",
+    "hero.title": "Read every QR code in a folder of photos",
+    "hero.sub": "Other scanners take one picture at a time. Drop a whole folder here, or a single photo, or a zip. You get every code in every image, with the file it came from.",
+    "hero.trust": "Nothing is uploaded. It all runs here, in your browser.",
 
     "tab.images": "Images",
     "tab.camera": "Camera",
@@ -48,13 +48,14 @@
     "res.title": "Results",
     "res.private": "100% private · runs in your browser",
     "res.empty": "Codes you scan will show up here.",
-    "res.nothing": "Nothing there this page can read — pictures only.",
+    "res.nothing": "There is nothing readable in there. It takes pictures.",
     "res.search": "Search inside the codes…",
     "res.noMatch": "No result matches that search.",
     "res.noCode": "No code in this image",
     "engine.loading": "starting the reader",
     "engine.ready": "reader ready",
 
+    "work.files": "{n} files",
     "stat.images": "images",
     "stat.with": "with a code",
     "stat.codes": "codes",
@@ -76,7 +77,7 @@
 
     "rename.pattern": "New name",
     "rename.code": "The code content",
-    "rename.short": "The meaningful part of the code",
+    "rename.short": "The useful part of the code",
     "rename.nameCode": "Original name + code",
     "rename.keep": "Keep the original names",
     "rename.zip": "Download ZIP ({n})",
@@ -85,11 +86,10 @@
 
     "dupe.badge": "in {n} images",
 
-    "err.advice": "Retake the photo closer, with the code flat and evenly lit — or crop tight around it and try again.",
+    "err.advice": "Try again closer, with the code flat and evenly lit. Or crop tight around it.",
 
-    "adv.title": "Prefer the terminal? Use it there instead",
-    "adv.sub": "The same reader as a command you can put in a script — and, with it running, this page can also organize and rename the files where they sit. Nothing here is needed to read a code.",
-    "adv.localOn": "A local copy of the program is answering, so this page can also act on files on disk.",
+    "adv.localTitle": "The local app is running",
+    "adv.localOn": "A local copy of the program is answering, so this page can also work on the files where they sit.",
     "adv.scan": "Scan on disk",
     "adv.paths": "Folders or files, one per line",
     "adv.recreate": "Recreate QR images",
@@ -122,9 +122,9 @@
     "app.tagline": "lettore QR",
     "nav.source": "Codice",
 
-    "hero.title": "Leggi, filtra ed esporta ogni codice QR in una cartella di immagini",
-    "hero.sub": "Quasi tutti i lettori prendono una foto alla volta. Qui trascini una cartella intera — o una sola foto, la fotocamera, o quello che hai negli appunti — e ottieni ogni codice di ogni immagine in un colpo solo.",
-    "hero.trust": "Non viene caricato niente — funziona tutto in questa scheda",
+    "hero.title": "Leggi tutti i codici QR in una cartella di foto",
+    "hero.sub": "Gli altri lettori prendono una foto alla volta. Qui trascini una cartella intera, o una sola foto, o uno zip. Ottieni ogni codice di ogni immagine, con il file da cui viene.",
+    "hero.trust": "Non viene caricato niente. Funziona tutto qui, nel tuo browser.",
 
     "tab.images": "Immagini",
     "tab.camera": "Fotocamera",
@@ -147,13 +147,14 @@
     "res.title": "Risultati",
     "res.private": "100% privato · funziona nel tuo browser",
     "res.empty": "I codici che leggi compaiono qui.",
-    "res.nothing": "Lì dentro non c'è niente che questa pagina sappia leggere — solo immagini.",
+    "res.nothing": "Lì dentro non c'è niente da leggere. Servono immagini.",
     "res.search": "Cerca dentro i codici…",
     "res.noMatch": "Nessun risultato corrisponde alla ricerca.",
     "res.noCode": "Nessun codice in questa immagine",
     "engine.loading": "avvio del lettore",
     "engine.ready": "lettore pronto",
 
+    "work.files": "{n} file",
     "stat.images": "immagini",
     "stat.with": "con un codice",
     "stat.codes": "codici",
@@ -184,11 +185,10 @@
 
     "dupe.badge": "in {n} immagini",
 
-    "err.advice": "Rifai la foto più da vicino, con il codice dritto e illuminato in modo uniforme — oppure ritaglia stretto attorno al codice e riprova.",
+    "err.advice": "Riprova più da vicino, con il codice dritto e illuminato in modo uniforme. Oppure ritaglia stretto attorno al codice.",
 
-    "adv.title": "Preferisci il terminale? Usalo da lì",
-    "adv.sub": "Lo stesso lettore come comando da mettere in uno script — e, mentre gira, questa pagina può anche ordinare e rinominare i file dove si trovano. Niente di tutto questo serve per leggere un codice.",
-    "adv.localOn": "Una copia locale del programma sta rispondendo, quindi questa pagina può anche agire sui file su disco.",
+    "adv.localTitle": "L'app locale sta girando",
+    "adv.localOn": "Una copia locale del programma sta rispondendo, quindi questa pagina può lavorare sui file dove si trovano.",
     "adv.scan": "Analizza su disco",
     "adv.paths": "Cartelle o file, uno per riga",
     "adv.recreate": "Rigenera le immagini QR",
@@ -221,9 +221,9 @@
     "app.tagline": "lector QR",
     "nav.source": "Código fuente",
 
-    "hero.title": "Lee, filtra y exporta todos los códigos QR de una carpeta de imágenes",
-    "hero.sub": "Casi todos los lectores tratan una foto cada vez. Aquí arrastras una carpeta entera — o una sola foto, la cámara, o lo que tengas en el portapapeles — y obtienes todos los códigos de todas las imágenes de una vez.",
-    "hero.trust": "No se sube nada — todo funciona en esta pestaña",
+    "hero.title": "Lee todos los códigos QR de una carpeta de fotos",
+    "hero.sub": "Otros lectores tratan una foto cada vez. Aquí arrastras una carpeta entera, o una sola foto, o un zip. Obtienes todos los códigos de todas las imágenes, con el archivo del que vienen.",
+    "hero.trust": "No se sube nada. Funciona todo aquí, en tu navegador.",
 
     "tab.images": "Imágenes",
     "tab.camera": "Cámara",
@@ -246,13 +246,14 @@
     "res.title": "Resultados",
     "res.private": "100% privado · funciona en tu navegador",
     "res.empty": "Los códigos que leas aparecerán aquí.",
-    "res.nothing": "Ahí no hay nada que esta página pueda leer — solo imágenes.",
+    "res.nothing": "Ahí dentro no hay nada que leer. Hacen falta imágenes.",
     "res.search": "Buscar dentro de los códigos…",
     "res.noMatch": "Ningún resultado coincide con la búsqueda.",
     "res.noCode": "Ningún código en esta imagen",
     "engine.loading": "iniciando el lector",
     "engine.ready": "lector listo",
 
+    "work.files": "{n} archivos",
     "stat.images": "imágenes",
     "stat.with": "con código",
     "stat.codes": "códigos",
@@ -283,11 +284,10 @@
 
     "dupe.badge": "en {n} imágenes",
 
-    "err.advice": "Repite la foto más de cerca, con el código recto y bien iluminado — o recorta justo alrededor del código e inténtalo de nuevo.",
+    "err.advice": "Inténtalo de nuevo más cerca, con el código recto y bien iluminado. O recorta justo a su alrededor.",
 
-    "adv.title": "¿Prefieres el terminal? Úsalo desde ahí",
-    "adv.sub": "El mismo lector como un comando que puedes poner en un script — y, mientras se ejecuta, esta página también puede ordenar y renombrar los archivos donde están. Nada de esto hace falta para leer un código.",
-    "adv.localOn": "Una copia local del programa está respondiendo, así que esta página también puede actuar sobre los archivos del disco.",
+    "adv.localTitle": "La aplicación local está en marcha",
+    "adv.localOn": "Una copia local del programa está respondiendo, así que esta página puede trabajar sobre los archivos donde están.",
     "adv.scan": "Analizar en el disco",
     "adv.paths": "Carpetas o archivos, uno por línea",
     "adv.recreate": "Regenerar las imágenes QR",
@@ -320,9 +320,9 @@
     "app.tagline": "lecteur QR",
     "nav.source": "Code source",
 
-    "hero.title": "Lisez, filtrez et exportez chaque code QR d'un dossier d'images",
-    "hero.sub": "La plupart des lecteurs prennent une photo à la fois. Ici vous déposez un dossier entier — ou une seule photo, la caméra, ou ce qui est dans le presse-papiers — et vous obtenez chaque code de chaque image d'un coup.",
-    "hero.trust": "Rien n'est envoyé — tout fonctionne dans cet onglet",
+    "hero.title": "Lisez tous les codes QR d'un dossier de photos",
+    "hero.sub": "Les autres lecteurs prennent une photo à la fois. Ici vous déposez un dossier entier, ou une seule photo, ou un zip. Vous obtenez chaque code de chaque image, avec le fichier dont il vient.",
+    "hero.trust": "Rien n'est envoyé. Tout fonctionne ici, dans votre navigateur.",
 
     "tab.images": "Images",
     "tab.camera": "Caméra",
@@ -345,13 +345,14 @@
     "res.title": "Résultats",
     "res.private": "100% privé · fonctionne dans votre navigateur",
     "res.empty": "Les codes que vous lisez apparaîtront ici.",
-    "res.nothing": "Il n'y a rien là que cette page sache lire — des images seulement.",
+    "res.nothing": "Il n'y a rien de lisible là-dedans. Il faut des images.",
     "res.search": "Chercher dans les codes…",
     "res.noMatch": "Aucun résultat ne correspond à cette recherche.",
     "res.noCode": "Aucun code dans cette image",
     "engine.loading": "démarrage du lecteur",
     "engine.ready": "lecteur prêt",
 
+    "work.files": "{n} fichiers",
     "stat.images": "images",
     "stat.with": "avec un code",
     "stat.codes": "codes",
@@ -382,11 +383,10 @@
 
     "dupe.badge": "dans {n} images",
 
-    "err.advice": "Refaites la photo de plus près, le code bien droit et uniformément éclairé — ou recadrez au plus juste autour du code et réessayez.",
+    "err.advice": "Réessayez de plus près, le code bien droit et uniformément éclairé. Ou recadrez au plus juste autour.",
 
-    "adv.title": "Vous préférez le terminal ? Utilisez-le là-bas",
-    "adv.sub": "Le même lecteur sous forme de commande à mettre dans un script — et, pendant qu'il tourne, cette page peut aussi ranger et renommer les fichiers là où ils sont. Rien de tout cela n'est nécessaire pour lire un code.",
-    "adv.localOn": "Une copie locale du programme répond, donc cette page peut aussi agir sur les fichiers du disque.",
+    "adv.localTitle": "L'application locale tourne",
+    "adv.localOn": "Une copie locale du programme répond, donc cette page peut travailler sur les fichiers là où ils sont.",
     "adv.scan": "Analyser sur le disque",
     "adv.paths": "Dossiers ou fichiers, un par ligne",
     "adv.recreate": "Régénérer les images QR",
@@ -419,9 +419,9 @@
     "app.tagline": "QR-Leser",
     "nav.source": "Quelltext",
 
-    "hero.title": "Jeden QR-Code in einem Bilderordner lesen, filtern und exportieren",
-    "hero.sub": "Die meisten Leser nehmen ein Bild nach dem anderen. Hier ziehen Sie einen ganzen Ordner hinein — oder ein einzelnes Foto, die Kamera, oder was in der Zwischenablage liegt — und bekommen jeden Code aus jedem Bild auf einmal.",
-    "hero.trust": "Nichts wird hochgeladen — alles läuft in diesem Tab",
+    "hero.title": "Alle QR-Codes in einem Fotoordner lesen",
+    "hero.sub": "Andere Leser nehmen ein Bild nach dem anderen. Hier ziehen Sie einen ganzen Ordner hinein, oder ein einzelnes Foto, oder ein ZIP. Sie bekommen jeden Code aus jedem Bild, mit der Datei dazu.",
+    "hero.trust": "Nichts wird hochgeladen. Alles läuft hier, in Ihrem Browser.",
 
     "tab.images": "Bilder",
     "tab.camera": "Kamera",
@@ -444,13 +444,14 @@
     "res.title": "Ergebnisse",
     "res.private": "100% privat · läuft in Ihrem Browser",
     "res.empty": "Gelesene Codes erscheinen hier.",
-    "res.nothing": "Da ist nichts, was diese Seite lesen kann — nur Bilder.",
+    "res.nothing": "Da ist nichts Lesbares drin. Es braucht Bilder.",
     "res.search": "In den Codes suchen…",
     "res.noMatch": "Kein Ergebnis passt zu dieser Suche.",
     "res.noCode": "Kein Code in diesem Bild",
     "engine.loading": "Leser wird gestartet",
     "engine.ready": "Leser bereit",
 
+    "work.files": "{n} Dateien",
     "stat.images": "Bilder",
     "stat.with": "mit Code",
     "stat.codes": "Codes",
@@ -472,7 +473,7 @@
 
     "rename.pattern": "Neuer Name",
     "rename.code": "Der Inhalt des Codes",
-    "rename.short": "Der brauchbare Teil des Codes",
+    "rename.short": "Der nützliche Teil des Codes",
     "rename.nameCode": "Ursprünglicher Name + Code",
     "rename.keep": "Ursprüngliche Namen behalten",
     "rename.zip": "ZIP herunterladen ({n})",
@@ -481,11 +482,10 @@
 
     "dupe.badge": "in {n} Bildern",
 
-    "err.advice": "Machen Sie das Foto näher, mit dem Code gerade und gleichmäßig beleuchtet — oder schneiden Sie eng um den Code zu und versuchen Sie es erneut.",
+    "err.advice": "Versuchen Sie es näher, mit dem Code gerade und gleichmäßig beleuchtet. Oder schneiden Sie eng darum zu.",
 
-    "adv.title": "Lieber das Terminal? Dann von dort",
-    "adv.sub": "Derselbe Leser als Befehl für ein Skript — und während er läuft, kann diese Seite die Dateien auch dort sortieren und umbenennen, wo sie liegen. Nichts davon wird gebraucht, um einen Code zu lesen.",
-    "adv.localOn": "Eine lokale Kopie des Programms antwortet, diese Seite kann also auch auf Dateien auf der Festplatte wirken.",
+    "adv.localTitle": "Die lokale Anwendung läuft",
+    "adv.localOn": "Eine lokale Kopie des Programms antwortet, diese Seite kann also mit den Dateien dort arbeiten, wo sie liegen.",
     "adv.scan": "Auf der Festplatte suchen",
     "adv.paths": "Ordner oder Dateien, einer pro Zeile",
     "adv.recreate": "QR-Bilder neu erzeugen",
@@ -518,9 +518,9 @@
     "app.tagline": "leitor QR",
     "nav.source": "Código fonte",
 
-    "hero.title": "Leia, filtre e exporte todos os códigos QR de uma pasta de imagens",
-    "hero.sub": "Quase todos os leitores tratam uma foto de cada vez. Aqui arrasta uma pasta inteira — ou uma só foto, a câmara, ou o que estiver na área de transferência — e obtém todos os códigos de todas as imagens de uma vez.",
-    "hero.trust": "Nada é enviado — funciona tudo neste separador",
+    "hero.title": "Leia todos os códigos QR de uma pasta de fotos",
+    "hero.sub": "Outros leitores tratam uma foto de cada vez. Aqui arrasta uma pasta inteira, ou uma só foto, ou um zip. Obtém todos os códigos de todas as imagens, com o ficheiro de onde vêm.",
+    "hero.trust": "Nada é enviado. Funciona tudo aqui, no seu navegador.",
 
     "tab.images": "Imagens",
     "tab.camera": "Câmara",
@@ -543,13 +543,14 @@
     "res.title": "Resultados",
     "res.private": "100% privado · funciona no seu navegador",
     "res.empty": "Os códigos que ler aparecem aqui.",
-    "res.nothing": "Não há ali nada que esta página saiba ler — só imagens.",
+    "res.nothing": "Ali dentro não há nada para ler. São precisas imagens.",
     "res.search": "Procurar dentro dos códigos…",
     "res.noMatch": "Nenhum resultado corresponde a essa procura.",
     "res.noCode": "Nenhum código nesta imagem",
     "engine.loading": "a iniciar o leitor",
     "engine.ready": "leitor pronto",
 
+    "work.files": "{n} ficheiros",
     "stat.images": "imagens",
     "stat.with": "com código",
     "stat.codes": "códigos",
@@ -580,11 +581,10 @@
 
     "dupe.badge": "em {n} imagens",
 
-    "err.advice": "Repita a foto mais de perto, com o código direito e bem iluminado — ou corte justo à volta do código e tente de novo.",
+    "err.advice": "Tente de novo mais perto, com o código direito e bem iluminado. Ou corte justo à volta dele.",
 
-    "adv.title": "Prefere o terminal? Use-o a partir daí",
-    "adv.sub": "O mesmo leitor como um comando para pôr num script — e, enquanto corre, esta página pode também arrumar e renomear os ficheiros onde estão. Nada disto é preciso para ler um código.",
-    "adv.localOn": "Uma cópia local do programa está a responder, por isso esta página pode também agir sobre os ficheiros no disco.",
+    "adv.localTitle": "A aplicação local está a correr",
+    "adv.localOn": "Uma cópia local do programa está a responder, por isso esta página pode trabalhar sobre os ficheiros onde estão.",
     "adv.scan": "Analisar no disco",
     "adv.paths": "Pastas ou ficheiros, um por linha",
     "adv.recreate": "Recriar as imagens QR",
