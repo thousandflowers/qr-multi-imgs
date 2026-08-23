@@ -57,10 +57,8 @@ header { position:sticky; top:0; z-index:20; background:var(--panel);
 .bar nav { margin-left:auto; display:flex; align-items:center; gap:.8rem; font-size:.84rem; }
 .bar nav a { color:var(--dim); text-decoration:none; }
 .bar nav a:hover { color:var(--fg); }
-.lang { display:flex; border:1px solid var(--line); border-radius:7px; overflow:hidden; }
-.lang button { border:0; background:var(--panel); color:var(--dim); font-size:.76rem;
-  padding:.3rem .5rem; cursor:pointer; font-weight:600; }
-.lang button[aria-pressed="true"] { background:var(--brand); color:var(--brand-fg); }
+.lang { font-size:.8rem; padding:.28rem .4rem; border-radius:7px;
+  border:1px solid var(--line); background:var(--panel); color:var(--dim); }
 
 main { flex:1; max-width:78rem; width:100%; margin:0 auto; padding:2rem 1rem 3rem; }
 .hero { text-align:center; margin-bottom:1.6rem; }
@@ -213,6 +211,50 @@ footer { border-top:1px solid var(--line); background:var(--panel); }
 .fbar a { color:var(--dim); }
 
 .hide { display:none !important; }
+
+/* the working bar: progress, counter, and the one destructive control */
+#work { padding:.55rem .9rem; border-bottom:1px solid var(--line); background:var(--soft);
+  position:relative; }
+.workRow { display:flex; align-items:center; gap:.6rem; margin-bottom:.45rem; }
+#count { font-size:.78rem; color:var(--dim); font-family:var(--mono);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#work button.danger { padding:.3rem .6rem; font-size:.76rem; color:var(--bad);
+  border-color:var(--bad-soft); background:var(--bad-soft); }
+#work button.danger:hover { border-color:var(--bad); }
+#bar { height:4px; background:var(--line); border-radius:2px; overflow:hidden; }
+#bar i { display:block; height:100%; width:0; background:var(--brand); transition:width .18s ease; }
+#bar.done i { background:var(--ok); }
+
+.pop { position:absolute; right:.75rem; top:2.4rem; z-index:9; background:var(--panel);
+  border:1px solid var(--line); border-radius:10px; padding:.7rem .8rem;
+  box-shadow:0 8px 24px rgba(0,0,0,.14); width:15rem;
+  animation:popIn .12s ease-out; }
+.pop p { margin:0 0 .6rem; font-size:.82rem; }
+.pop .popBtns { display:flex; gap:.4rem; justify-content:flex-end; }
+.pop button { padding:.3rem .6rem; font-size:.78rem; }
+@keyframes popIn { from { opacity:0; transform:translateY(-4px); } }
+
+/* the statistics double as filters */
+.stats div { cursor:pointer; user-select:none; transition:background .12s; }
+.stats div:hover { background:var(--soft); }
+.stats div[aria-pressed="true"] { background:var(--brand-soft); box-shadow:inset 0 -2px 0 var(--brand); }
+
+/* a row appears the moment its file is queued, and fills in when it is read */
+li { animation:rowIn .18s ease-out; }
+@keyframes rowIn { from { opacity:0; transform:translateY(-5px); } }
+li.pending { opacity:.72; }
+.spin { width:16px; height:16px; border-radius:50%; border:2px solid var(--line);
+  border-top-color:var(--brand); animation:spin .7s linear infinite; flex:none; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.tick { width:16px; height:16px; color:var(--ok); flex:none; }
+.state { display:flex; align-items:center; padding-top:.15rem; }
+li .thumbwrap { position:relative; flex:none; }
+li .shim { width:48px; height:48px; border-radius:7px; background:var(--soft);
+  animation:shim 1.1s ease-in-out infinite; }
+@keyframes shim { 0%,100% { opacity:.55; } 50% { opacity:1; } }
+
+#drop.landed { animation:landed .45s ease-out; }
+@keyframes landed { 0% { transform:scale(1); } 35% { transform:scale(.985); border-color:var(--brand); } 100% { transform:scale(1); } }
 </style>
 </head>
 <body>
@@ -229,10 +271,7 @@ footer { border-top:1px solid var(--line); background:var(--panel); }
     <nav>
       <span id="ver"></span>
       <a href="https://github.com/thousandflowers/qr-multi-imgs" data-t="nav.source"></a>
-      <span class="lang">
-        <button id="langIt" aria-pressed="false">IT</button>
-        <button id="langEn" aria-pressed="false">EN</button>
-      </span>
+      <select id="lang" class="lang" aria-label="Language"></select>
     </nav>
   </div>
 </header>
@@ -270,7 +309,7 @@ footer { border-top:1px solid var(--line); background:var(--panel); }
           </svg>
           <strong data-t="drop.title"></strong>
           <small data-t="drop.sub"></small>
-          <div class="formats">PNG JPG WEBP GIF BMP AVIF HEIC</div>
+          <div class="formats">PNG JPG WEBP GIF BMP AVIF HEIC ZIP</div>
         </div>
         <div class="actions">
           <div class="span2" id="shootWrap">
@@ -280,7 +319,7 @@ footer { border-top:1px solid var(--line); background:var(--panel); }
           <button id="pickFolder" data-t="drop.folder"></button>
           <button id="pasteBtn" class="span2" data-t="drop.paste"></button>
         </div>
-        <input type="file" id="files" multiple accept="image/*">
+        <input type="file" id="files" multiple>
         <input type="file" id="folder" webkitdirectory directory multiple>
         <input type="file" id="camshot" accept="image/*" capture="environment">
       </div>
@@ -308,8 +347,19 @@ footer { border-top:1px solid var(--line); background:var(--panel); }
       </div>
 
       <div id="work" class="hide">
+        <div class="workRow">
+          <span id="count"></span>
+          <span class="grow"></span>
+          <button id="clear" class="danger" data-t="act.clear"></button>
+        </div>
         <div id="bar"><i></i></div>
-        <div id="count"></div>
+        <div id="clearPop" class="pop hide">
+          <p data-t="act.clearAsk"></p>
+          <div class="popBtns">
+            <button id="clearNo" data-t="act.cancel"></button>
+            <button id="clearYes" class="danger" data-t="act.clear"></button>
+          </div>
+        </div>
       </div>
 
       <div id="empty" class="empty">
@@ -322,28 +372,19 @@ footer { border-top:1px solid var(--line); background:var(--panel); }
 
       <div id="out" class="hide">
         <div class="stats">
-          <div><b id="sTotal">0</b><span data-t="stat.images"></span></div>
-          <div class="hit"><b id="sWith">0</b><span data-t="stat.with"></span></div>
-          <div><b id="sCodes">0</b><span data-t="stat.codes"></span></div>
-          <div><b id="sUniq">0</b><span data-t="stat.unique"></span></div>
-          <div><b id="sWithout">0</b><span data-t="stat.without"></span></div>
-          <div><b id="sErr">0</b><span data-t="stat.unreadable"></span></div>
+          <div id="fAll" role="button" aria-pressed="true"><b id="sTotal">0</b><span data-t="stat.images"></span></div>
+          <div id="fWith" class="hit" role="button" aria-pressed="false"><b id="sWith">0</b><span data-t="stat.with"></span></div>
+          <div id="fCodes" role="button" aria-pressed="false"><b id="sCodes">0</b><span data-t="stat.codes"></span></div>
+          <div id="fUniq" role="button" aria-pressed="false"><b id="sUniq">0</b><span data-t="stat.unique"></span></div>
+          <div id="fWithout" role="button" aria-pressed="false"><b id="sWithout">0</b><span data-t="stat.without"></span></div>
+          <div id="fErr" role="button" aria-pressed="false"><b id="sErr">0</b><span data-t="stat.unreadable"></span></div>
         </div>
 
         <div class="toolbar">
           <input type="search" id="search" data-t-ph="res.search">
-          <select id="filter">
-            <option value="all" data-t="filter.all"></option>
-            <option value="with" data-t="filter.with"></option>
-            <option value="without" data-t="filter.without"></option>
-            <option value="dupes" data-t="filter.dupes"></option>
-            <option value="error" data-t="filter.error"></option>
-          </select>
           <button id="copyAll" data-t="act.copyAll"></button>
           <select id="fmt"><option>csv</option><option>json</option><option>txt</option></select>
           <button id="save" data-t="act.download"></button>
-          <span class="grow"></span>
-          <button id="clear" class="danger" data-t="act.clear"></button>
         </div>
 
         <div class="toolbar">
@@ -366,12 +407,11 @@ footer { border-top:1px solid var(--line); background:var(--panel); }
     <summary data-t="adv.title"></summary>
     <div id="advBody">
       <p data-t="adv.sub"></p>
-      <p data-t="adv.cli"></p>
       <pre>brew install thousandflowers/tap/qr-multi-imgs
 
-qr-multi-imgs ./photos                 # scan a folder
-qr-multi-imgs a.heic invoice.pdf       # single files, any format
-qr-multi-imgs --serve                  # this page, driving the local copy</pre>
+qr-multi-imgs ./foto                   # una cartella
+qr-multi-imgs a.heic fattura.pdf       # singoli file, qualsiasi formato
+qr-multi-imgs --serve                  # questa pagina, con la copia locale</pre>
       <div id="localBox" class="hide">
         <p data-t="adv.localOn"></p>
         <textarea id="paths" data-t-ph="adv.paths" spellcheck="false"></textarea>
@@ -399,29 +439,28 @@ qr-multi-imgs --serve                  # this page, driving the local copy</pre>
     <a href="https://github.com/thousandflowers/qr-multi-imgs/blob/main/LICENSE">MIT</a>
   </div>
 </footer>
+<script src="strings.js"></script>
 <script src="i18n.js"></script>
 <script src="payload.js"></script>
 <script src="zip.js"></script>
+<script src="unzip.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 const t = (k, v) => I18N.t(k, v);
+const SVGNS = "http://www.w3.org/2000/svg";
 
 /* the in-tab engine */
 
-// One worker per core, within reason: each holds its own Go runtime and wasm
-// memory, so more of them buys throughput at a real cost in RAM.
-const POOL = Math.max(1, Math.min(3, (navigator.hardwareConcurrency || 2) - 1));
+// Each worker holds its own Go runtime and wasm memory, so the pool trades RAM
+// for throughput. Six is where that trade stops paying on a laptop.
+const POOL = Math.max(1, Math.min(6, (navigator.hardwareConcurrency || 2) - 2));
 let enginesReady = 0, engineFailed = false, engineReason = "", localAppFound = false;
 
-const queue = [], idle = [], results = [];
-// ids still belonging to the current run; Clear empties it so replies from
-// images already inside a worker are dropped instead of counted twice.
-const live = new Set();
-// id -> the File it came from. The archive needs the original bytes, and
-// keeping the handle here is free: a File is a reference to something already
-// on disk, so nothing is held in memory and nothing is posted back and forth.
-const pendingFiles = new Map();
-// payload -> how many images carry it, so a duplicate can be named as one.
+const queue = [], idle = [];
+// Every file gets a row the moment it is queued, so the list is the list of
+// what was loaded, not only of what has finished.
+const rows = [];
+const byId = new Map();
 const seenCount = new Map();
 let done = 0, expected = 0, nextId = 0;
 
@@ -436,9 +475,6 @@ function engineDied(why) {
   paintEngineState();
 }
 
-// Whether a dead engine is a problem depends on something that may arrive
-// later: the copy of this page embedded in the CLI ships without the wasm
-// engine, and with a local app answering it does not need one.
 function paintEngineState() {
   if (!engineFailed) return;
   if (localAppFound) {
@@ -461,50 +497,43 @@ function onWorkerMessage(w, msg) {
   }
   if (msg.type === "fatal") { engineDied("decoder failed: " + msg.error); return; }
   if (msg.id === CAMERA_JOB) { onCameraResult(msg); idle.push(w); pump(); return; }
-  record(msg);
+  finish(msg);
   idle.push(w);
   pump();
 }
 
 function pump() { while (idle.length && queue.length) idle.pop().postMessage(queue.shift()); }
 
-function record(msg) {
-  // A reply from a run the user cleared: drop it rather than let it land in
-  // the next run's counters.
-  if (!live.delete(msg.id)) { pendingFiles.delete(msg.id); return; }
-  const file = pendingFiles.get(msg.id) || null;
-  pendingFiles.delete(msg.id);
-  addRow({
-    name: msg.name, path: msg.path, file,
-    codes: msg.codes || [], error: msg.error || "",
-    thumbURL: msg.thumb ? URL.createObjectURL(msg.thumb) : "",
-  });
+function finish(msg) {
+  const r = byId.get(msg.id);
+  if (!r) return; // its run was cleared
+  r.pending = false;
+  r.codes = msg.codes || [];
+  r.error = msg.error || "";
+  r.thumbURL = msg.thumb ? URL.createObjectURL(msg.thumb) : "";
+  r.at = new Date();
+  for (const c of r.codes) seenCount.set(c, (seenCount.get(c) || 0) + 1);
   done++;
+  renderRow(r);
   paintProgress();
-  if (done === expected) { $("work").classList.add("hide"); $("count").textContent = ""; }
-}
-
-function addRow(row) {
-  row.seq = results.length + 1;
-  row.at = new Date();
-  for (const c of row.codes) seenCount.set(c, (seenCount.get(c) || 0) + 1);
-  results.push(row);
-  $("empty").classList.add("hide");
-  $("out").classList.remove("hide");
-  repaint();
+  paintStats();
+  // A repeated payload changes what its earlier siblings should say.
+  if (r.codes.some((c) => (seenCount.get(c) || 0) > 1)) {
+    for (const other of rows) {
+      if (other !== r && !other.pending && other.codes.some((c) => r.codes.includes(c))) renderRow(other);
+    }
+  }
+  applyFilters();
 }
 
 /* getting the files */
 
-// A file is worth trying when the browser calls it an image, or when it will
-// not say: an unknown type is usually HEIC or a camera raw, and the worker
-// reports honestly if the browser turns out not to read it.
-const worthTrying = (f) => !f.type || f.type.startsWith("image/");
+const worthTrying = (f) => !f.type || f.type.startsWith("image/") || Unzip.looksLikeZip(f);
 
 async function readDirectory(entry, prefix, out) {
   const reader = entry.createReader();
-  // readEntries returns one batch at a time and signals the end with an empty
-  // one; a single call silently truncates a folder past about a hundred files.
+  // readEntries returns one batch at a time and ends with an empty one; a
+  // single call silently truncates a folder past about a hundred files.
   for (;;) {
     const batch = await new Promise((res, rej) => reader.readEntries(res, rej));
     if (!batch.length) return;
@@ -530,25 +559,73 @@ async function fromDataTransfer(dt) {
   return out;
 }
 
+// An archive is a folder that happens to be one file, so it is unpacked here
+// rather than refused. Its inner paths are kept, since where a photo sat is
+// half of what a batch scan is for.
+async function expandArchives(items) {
+  const out = [];
+  for (const it of items) {
+    if (!Unzip.looksLikeZip(it.file)) { out.push(it); continue; }
+    try {
+      const { files } = await Unzip.entries(it.file);
+      for (const f of files) {
+        // Archives written from inside a folder carry a "./" prefix, and macOS
+        // adds a __MACOSX shadow tree of resource forks that is not pictures.
+        const inner = f.name.replace(/^\.\//, "");
+        if (inner.startsWith("__MACOSX/")) continue;
+        const name = inner.split("/").pop();
+        if (!name || name.startsWith(".")) continue;
+        out.push({
+          file: new File([f.blob], name),
+          path: it.path.replace(/\.zip$/i, "") + "/" + inner,
+        });
+      }
+    } catch {
+      // Not readable as an archive: let it through so the row reports why.
+      out.push(it);
+    }
+  }
+  return out;
+}
+
+async function accept(items) {
+  if (!items.length) { $("emptyText").textContent = t("res.nothing"); return; }
+  bounce();
+  enqueue(await expandArchives(items));
+}
+
 function enqueue(items) {
   if (!items.length) { $("emptyText").textContent = t("res.nothing"); return; }
-  $("emptyText").textContent = t("res.empty");
-  expected += items.length;
+  $("empty").classList.add("hide");
+  $("out").classList.remove("hide");
   $("work").classList.remove("hide");
+  $("bar").classList.remove("done");
+  expected += items.length;
+
   for (const it of items) {
     const id = nextId++;
-    live.add(id);
-    pendingFiles.set(id, it.file);
-    queue.push({ id, name: it.file.name, path: it.path, blob: it.file });
+    const r = { id, name: it.file.name, path: it.path, file: it.file,
+                codes: [], error: "", thumbURL: "", pending: true, seq: rows.length + 1 };
+    rows.push(r);
+    byId.set(id, r);
+    renderRow(r);                      // the row exists before its answer does
+    queue.push({ id, name: r.name, path: r.path, blob: it.file });
   }
   paintProgress();
+  paintStats();
+  applyFilters();
   pump();
+}
+
+function bounce() {
+  const d = $("drop");
+  d.classList.remove("landed");
+  void d.offsetWidth;                  // restart the animation on a second drop
+  d.classList.add("landed");
 }
 
 /* the camera */
 
-// Camera frames go through the same engine under a reserved id, so a frame is
-// never mistaken for a file and Clear cannot orphan one.
 const CAMERA_JOB = -1;
 let stream = null, camBusy = false, camTimer = 0;
 const seenLive = new Set();
@@ -607,17 +684,22 @@ function onCameraResult(msg) {
   const fresh = (msg.codes || []).filter((c) => !seenLive.has(c));
   if (!fresh.length) return;
   for (const c of fresh) seenLive.add(c);
-  addRow({
-    name: t("tab.camera"), path: "", file: null, codes: fresh, error: "",
-    thumbURL: msg.thumb ? URL.createObjectURL(msg.thumb) : "",
-  });
+  for (const c of fresh) seenCount.set(c, (seenCount.get(c) || 0) + 1);
+  const r = { id: nextId++, name: t("tab.camera"), path: "", file: null, codes: fresh,
+              error: "", thumbURL: msg.thumb ? URL.createObjectURL(msg.thumb) : "",
+              pending: false, seq: rows.length + 1, at: new Date() };
+  rows.push(r);
+  byId.set(r.id, r);
+  $("empty").classList.add("hide");
+  $("out").classList.remove("hide");
+  renderRow(r);
+  paintStats();
+  applyFilters();
   $("camMsg").textContent = t("cam.read", { n: seenLive.size });
 }
 
 /* naming */
 
-// What a file should be called once its code is known. Everything is run
-// through Zip.safeName, so a payload containing a slash cannot invent a folder.
 function newNameFor(r) {
   const pattern = $("pattern").value;
   if (pattern === "keep" || !r.codes.length) return r.name;
@@ -633,17 +715,15 @@ function newNameFor(r) {
 }
 
 async function downloadZip() {
-  const rows = visibleRows().filter((r) => r.file);
-  if (!rows.length) { $("emptyText").textContent = t("rename.none"); return; }
+  const list = visibleRows().filter((r) => r.file && !r.pending);
+  if (!list.length) { $("emptyText").textContent = t("rename.none"); return; }
   $("zip").disabled = true;
   try {
     const taken = new Set();
     const entries = [];
-    for (const r of rows) {
-      entries.push({
-        name: Zip.uniqueName(taken, newNameFor(r)),
-        data: new Uint8Array(await r.file.arrayBuffer()),
-      });
+    for (const r of list) {
+      entries.push({ name: Zip.uniqueName(taken, newNameFor(r)),
+                     data: new Uint8Array(await r.file.arrayBuffer()) });
     }
     // The mapping from image to code is the valuable part of a batch scan, so
     // it travels inside the archive rather than as a separate download nobody
@@ -661,35 +741,41 @@ function paintProgress() {
   const pct = expected ? (100 * done) / expected : 0;
   $("bar").firstElementChild.style.width = pct + "%";
   $("count").textContent = done + " / " + expected;
+  $("bar").classList.toggle("done", expected > 0 && done === expected);
 }
 
 function paintStats() {
-  let withQR = 0, codes = 0, errs = 0;
+  let withQR = 0, codes = 0, errs = 0, settled = 0;
   const uniq = new Set();
-  for (const r of results) {
+  for (const r of rows) {
+    if (r.pending) continue;
+    settled++;
     if (r.error) errs++;
     else if (r.codes.length) { withQR++; codes += r.codes.length; for (const c of r.codes) uniq.add(c); }
   }
-  $("sTotal").textContent = results.length;
+  $("sTotal").textContent = rows.length;
   $("sWith").textContent = withQR;
   $("sCodes").textContent = codes;
   $("sUniq").textContent = uniq.size;
-  $("sWithout").textContent = results.length - withQR - errs;
+  $("sWithout").textContent = settled - withQR - errs;
   $("sErr").textContent = errs;
 }
 
-function matchesFilter(r) {
-  switch ($("filter").value) {
+let filter = "all";
+const FILTERS = { fAll: "all", fWith: "with", fCodes: "with", fUniq: "unique", fWithout: "without", fErr: "error" };
+
+function matchesFilter(r, firstOfPayload) {
+  switch (filter) {
     case "with": return !r.error && r.codes.length > 0;
-    case "without": return !r.error && r.codes.length === 0;
+    case "without": return !r.pending && !r.error && r.codes.length === 0;
     case "error": return !!r.error;
-    case "dupes": return r.codes.some((c) => (seenCount.get(c) || 0) > 1);
+    case "unique": return !r.error && r.codes.length > 0 && firstOfPayload.has(r.id);
     default: return true;
   }
 }
 
 // Search runs over the decoded content and the file name together, because a
-// person looking for a ticket id and a person looking for a photo are the same
+// person looking for a ticket id and one looking for a photo are the same
 // person ten seconds apart.
 function matchesSearch(r) {
   const q = $("search").value.trim().toLowerCase();
@@ -698,7 +784,39 @@ function matchesSearch(r) {
   return r.codes.some((c) => c.toLowerCase().includes(q));
 }
 
-const visibleRows = () => results.filter((r) => matchesFilter(r) && matchesSearch(r));
+// For the "unique" view, the row that keeps a payload is the first one that
+// found it, so the answer does not move around as later copies arrive.
+function firstOwners() {
+  const seen = new Set(), keep = new Set();
+  for (const r of rows) {
+    if (r.pending || r.error || !r.codes.length) continue;
+    if (r.codes.some((c) => !seen.has(c))) { keep.add(r.id); for (const c of r.codes) seen.add(c); }
+  }
+  return keep;
+}
+
+function visibleRows() {
+  const firsts = firstOwners();
+  return rows.filter((r) => matchesFilter(r, firsts) && matchesSearch(r));
+}
+
+function applyFilters() {
+  const firsts = firstOwners();
+  let shown = 0;
+  for (const r of rows) {
+    const ok = matchesFilter(r, firsts) && matchesSearch(r);
+    if (r.el) r.el.classList.toggle("hide", !ok);
+    if (ok) shown++;
+  }
+  for (const id in FILTERS) $(id).setAttribute("aria-pressed", String(FILTERS[id] === filter));
+  $("zip").textContent = t("rename.zip", { n: visibleRows().filter((r) => r.file && !r.pending).length });
+  if (!shown && rows.length) {
+    $("emptyText").textContent = t("res.noMatch");
+    $("empty").classList.remove("hide");
+  } else if (rows.length) {
+    $("empty").classList.add("hide");
+  }
+}
 
 const ICONS = {
   url: "M10 13a5 5 0 007.5.5l3-3a5 5 0 00-7-7l-1.7 1.7M14 11a5 5 0 00-7.5-.5l-3 3a5 5 0 007 7l1.7-1.7",
@@ -714,17 +832,19 @@ const ICONS = {
   otp: "M6 11V8a6 6 0 1112 0v3M5 11h14v9H5zM12 15v2",
   reference: "M7 4h7l5 5v11H7zM14 4v5h5",
   text: "M5 6h14M5 12h14M5 18h9",
+  tick: "M20 6L9 17l-5-5",
 };
 
-function icon(kind) {
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+function svgPath(d, cls) {
+  const svg = document.createElementNS(SVGNS, "svg");
   svg.setAttribute("viewBox", "0 0 24 24");
   svg.setAttribute("fill", "none");
   svg.setAttribute("stroke", "currentColor");
   svg.setAttribute("stroke-width", "2");
   svg.setAttribute("stroke-linecap", "round");
-  const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
-  p.setAttribute("d", ICONS[kind] || ICONS.text);
+  if (cls) svg.setAttribute("class", cls);
+  const p = document.createElementNS(SVGNS, "path");
+  p.setAttribute("d", d);
   svg.appendChild(p);
   return svg;
 }
@@ -745,8 +865,6 @@ function copyButton(text) {
   });
 }
 
-// A vCard is only useful if it can leave the page as a file the phone or the
-// address book will open.
 function saveContactButton(raw) {
   return smallButton(t("act.saveContact"), () => {
     const body = /^BEGIN:VCARD/i.test(raw) ? raw : mecardToVcard(raw);
@@ -765,7 +883,6 @@ function mecardToVcard(raw) {
 function fieldRow(f) {
   const row = document.createElement("div");
   row.className = "field" + (f.secret ? " secret" : "");
-
   const k = document.createElement("span");
   k.className = "k";
   k.textContent = t("f." + f.k);
@@ -777,7 +894,7 @@ function fieldRow(f) {
     const v = document.createElement("span");
     v.className = "v";
     let shown = false;
-    const paint = () => { v.textContent = shown ? f.v : "•".repeat(Math.min(f.v.length, 24)); };
+    const paint = () => { v.textContent = shown ? f.v : "*".repeat(Math.min(f.v.length, 24)); };
     paint();
     row.appendChild(v);
     row.appendChild(smallButton(t("act.reveal"), (e) => {
@@ -814,10 +931,9 @@ function hitBox(raw) {
 
   const top = document.createElement("div");
   top.className = "hitTop";
-
   const kind = document.createElement("span");
   kind.className = "kind";
-  kind.appendChild(icon(d.kind));
+  kind.appendChild(svgPath(ICONS[d.kind] || ICONS.text));
   const label = document.createElement("span");
   label.textContent = t("kind." + d.kind);
   kind.appendChild(label);
@@ -835,9 +951,7 @@ function hitBox(raw) {
   grow.className = "grow";
   top.appendChild(grow);
 
-  if (d.href) {
-    top.appendChild(smallButton(t("act.open"), () => window.open(d.href, "_blank", "noopener")));
-  }
+  if (d.href) top.appendChild(smallButton(t("act.open"), () => window.open(d.href, "_blank", "noopener")));
   if (d.kind === "contact") top.appendChild(saveContactButton(raw));
   top.appendChild(copyButton(raw));
   box.appendChild(top);
@@ -849,23 +963,33 @@ function hitBox(raw) {
   return box;
 }
 
-function rowElement(r) {
-  const li = document.createElement("li");
+// A row is built once and rewritten in place, so the file appears in the list
+// the moment it is queued and gains its answer where it already sits.
+function renderRow(r) {
+  if (!r.el) {
+    r.el = document.createElement("li");
+    $("list").appendChild(r.el);
+  }
+  const li = r.el;
+  li.replaceChildren();
+  li.classList.toggle("pending", !!r.pending);
 
+  const wrap = document.createElement("div");
+  wrap.className = "thumbwrap";
   if (r.thumbURL) {
     const img = document.createElement("img");
     img.src = r.thumbURL;
     img.alt = "";
-    li.appendChild(img);
+    wrap.appendChild(img);
   } else {
     const box = document.createElement("div");
-    box.className = "noimg";
-    li.appendChild(box);
+    box.className = r.pending ? "shim" : "noimg";
+    wrap.appendChild(box);
   }
+  li.appendChild(wrap);
 
   const meta = document.createElement("div");
   meta.className = "meta";
-
   const line = document.createElement("div");
   line.className = "nameline";
   const name = document.createElement("span");
@@ -880,92 +1004,88 @@ function rowElement(r) {
   }
   meta.appendChild(line);
 
-  const renamed = newNameFor(r);
-  if (r.file && renamed !== r.name) {
-    const pv = document.createElement("div");
-    pv.className = "renamed";
-    pv.textContent = t("rename.preview") + " ";
-    const code = document.createElement("code");
-    code.textContent = renamed;
-    pv.appendChild(code);
-    meta.appendChild(pv);
+  if (!r.pending) {
+    const renamed = newNameFor(r);
+    if (r.file && renamed !== r.name) {
+      const pv = document.createElement("div");
+      pv.className = "renamed";
+      pv.textContent = t("rename.preview") + " ";
+      const code = document.createElement("code");
+      code.textContent = renamed;
+      pv.appendChild(code);
+      meta.appendChild(pv);
+    }
+    if (r.error) {
+      const bad = document.createElement("div");
+      bad.className = "tagline err";
+      bad.textContent = r.error;
+      meta.appendChild(bad);
+      const advice = document.createElement("div");
+      advice.className = "advice";
+      advice.textContent = t("err.advice");
+      meta.appendChild(advice);
+    } else if (!r.codes.length) {
+      const no = document.createElement("div");
+      no.className = "tagline no";
+      no.textContent = t("res.noCode");
+      meta.appendChild(no);
+      const advice = document.createElement("div");
+      advice.className = "advice";
+      advice.textContent = t("err.advice");
+      meta.appendChild(advice);
+    } else {
+      for (const c of r.codes) meta.appendChild(hitBox(c));
+    }
   }
-
-  if (r.error) {
-    const bad = document.createElement("div");
-    bad.className = "tagline err";
-    bad.textContent = r.error;
-    meta.appendChild(bad);
-    const advice = document.createElement("div");
-    advice.className = "advice";
-    advice.textContent = t("err.advice");
-    meta.appendChild(advice);
-  } else if (!r.codes.length) {
-    const no = document.createElement("div");
-    no.className = "tagline no";
-    no.textContent = t("res.noCode");
-    meta.appendChild(no);
-    const advice = document.createElement("div");
-    advice.className = "advice";
-    advice.textContent = t("err.advice");
-    meta.appendChild(advice);
-  } else {
-    for (const c of r.codes) meta.appendChild(hitBox(c));
-  }
-
   li.appendChild(meta);
-  return li;
+
+  const state = document.createElement("div");
+  state.className = "state";
+  if (r.pending) {
+    const spin = document.createElement("div");
+    spin.className = "spin";
+    state.appendChild(spin);
+  } else if (!r.error) {
+    state.appendChild(svgPath(ICONS.tick, "tick"));
+  }
+  li.appendChild(state);
 }
 
-function repaint() {
+function repaintAll() {
+  for (const r of rows) renderRow(r);
   paintStats();
-  const rows = visibleRows();
-  const list = $("list");
-  list.replaceChildren();
-  for (const r of rows) list.appendChild(rowElement(r));
-  $("zip").textContent = t("rename.zip", { n: rows.filter((r) => r.file).length });
-  if (!rows.length && results.length) {
-    $("emptyText").textContent = t("res.noMatch");
-    $("empty").classList.remove("hide");
-  } else if (results.length) {
-    $("empty").classList.add("hide");
-  }
+  applyFilters();
 }
 
 /* exporting */
 
 function serialise(format) {
-  const stamp = (r) => r.at ? r.at.toISOString() : "";
+  const stamp = (r) => (r.at ? r.at.toISOString() : "");
+  const settled = rows.filter((r) => !r.pending);
   if (format === "json") {
-    return JSON.stringify(results.map((r) => ({
-      file: r.name,
-      path: r.path || r.name,
-      first_seen: stamp(r),
-      order: r.seq,
-      codes: r.codes.map((c) => {
-        const d = Payload.describe(c);
-        return { payload: c, type: d.kind, seen_in_images: seenCount.get(c) || 1 };
-      }),
+    return JSON.stringify(settled.map((r) => ({
+      file: r.name, path: r.path || r.name, first_seen: stamp(r), order: r.seq,
+      codes: r.codes.map((c) => ({ payload: c, type: Payload.describe(c).kind,
+                                   seen_in_images: seenCount.get(c) || 1 })),
       error: r.error || undefined,
     })), null, 2);
   }
   if (format === "csv") {
     const cell = (s) => '"' + String(s == null ? "" : s).replace(/"/g, '""') + '"';
     const lines = ["file,path,type,payload,seen_in_images,first_seen,error"];
-    for (const r of results) {
+    for (const r of settled) {
       if (r.codes.length) {
         for (const c of r.codes) {
           lines.push([cell(r.name), cell(r.path || r.name), cell(Payload.describe(c).kind),
             cell(c), seenCount.get(c) || 1, cell(stamp(r)), '""'].join(","));
         }
       } else {
-        lines.push([cell(r.name), cell(r.path || r.name), '""', '""', 0,
-          cell(stamp(r)), cell(r.error)].join(","));
+        lines.push([cell(r.name), cell(r.path || r.name), '""', '""', 0, cell(stamp(r)), cell(r.error)].join(","));
       }
     }
     return lines.join("\n");
   }
-  return results.filter((r) => r.codes.length)
+  return settled.filter((r) => r.codes.length)
     .map((r) => (r.path || r.name) + "\n" + r.codes.join("\n")).join("\n\n");
 }
 
@@ -988,16 +1108,15 @@ document.addEventListener("drop", async (e) => {
   e.preventDefault();
   drop.classList.remove("over");
   showTab("files");
-  enqueue(await fromDataTransfer(e.dataTransfer));
+  accept(await fromDataTransfer(e.dataTransfer));
 });
 
-// Paste is what people reach for after screenshotting a code.
 document.addEventListener("paste", (e) => {
   const items = [...(e.clipboardData ? e.clipboardData.files : [])].filter(worthTrying);
   if (!items.length) return;
   e.preventDefault();
   showTab("files");
-  enqueue(items.map((f) => ({ file: f, path: f.name })));
+  accept(items.map((f) => ({ file: f, path: f.name })));
 });
 
 $("pasteBtn").onclick = async () => {
@@ -1012,7 +1131,7 @@ $("pasteBtn").onclick = async () => {
       const blob = await it.getType(type);
       out.push({ file: new File([blob], "incollata." + type.split("/")[1], { type }), path: "clipboard" });
     }
-    enqueue(out);
+    accept(out);
   } catch {
     $("emptyText").textContent = t("res.nothing");
   }
@@ -1037,15 +1156,17 @@ const fromInput = (input) => {
   const items = [...input.files].filter(worthTrying)
     .map((f) => ({ file: f, path: f.webkitRelativePath || f.name }));
   input.value = "";
-  enqueue(items);
+  accept(items);
 };
 $("files").onchange = () => fromInput($("files"));
 $("folder").onchange = () => fromInput($("folder"));
 $("camshot").onchange = () => fromInput($("camshot"));
 
-$("filter").onchange = repaint;
-$("search").oninput = repaint;
-$("pattern").onchange = repaint;
+for (const id in FILTERS) {
+  $(id).onclick = () => { filter = FILTERS[id] === filter && filter !== "all" ? "all" : FILTERS[id]; applyFilters(); };
+}
+$("search").oninput = applyFilters;
+$("pattern").onchange = repaintAll;
 $("zip").onclick = downloadZip;
 $("save").onclick = () => saveBlob(
   new Blob([serialise($("fmt").value)], { type: "text/plain;charset=utf-8" }),
@@ -1057,39 +1178,59 @@ $("copyAll").onclick = async (e) => {
   b.textContent = t("act.copied") + " " + all.length;
   setTimeout(() => (b.textContent = t("act.copyAll")), 1400);
 };
-$("clear").onclick = () => {
-  for (const r of results) if (r.thumbURL) URL.revokeObjectURL(r.thumbURL);
-  results.length = 0;
+
+// Clearing throws away work that cannot be got back without scanning again, so
+// it asks first, next to the button rather than in a system dialog that stops
+// the whole page.
+$("clear").onclick = () => $("clearPop").classList.toggle("hide");
+$("clearNo").onclick = () => $("clearPop").classList.add("hide");
+document.addEventListener("click", (e) => {
+  if (!$("clearPop").contains(e.target) && e.target !== $("clear")) $("clearPop").classList.add("hide");
+});
+$("clearYes").onclick = () => {
+  for (const r of rows) if (r.thumbURL) URL.revokeObjectURL(r.thumbURL);
+  rows.length = 0;
   queue.length = 0;
-  live.clear();
-  pendingFiles.clear();
+  byId.clear();
   seenLive.clear();
   seenCount.clear();
   done = expected = 0;
+  filter = "all";
   $("list").replaceChildren();
   $("out").classList.add("hide");
-  $("empty").classList.remove("hide");
   $("work").classList.add("hide");
+  $("clearPop").classList.add("hide");
+  $("empty").classList.remove("hide");
   $("emptyText").textContent = t("res.empty");
   paintStats();
+  applyFilters();
 };
 
 /* language */
 
-function paintLang() {
-  $("langIt").setAttribute("aria-pressed", String(I18N.lang === "it"));
-  $("langEn").setAttribute("aria-pressed", String(I18N.lang === "en"));
+// The list is built from whatever strings.js defines, so adding a language
+// there is the whole job.
+function buildLangMenu() {
+  const sel = $("lang");
+  sel.replaceChildren();
+  for (const l of I18N.languages()) {
+    const o = document.createElement("option");
+    o.value = l.code;
+    o.textContent = l.name;
+    sel.appendChild(o);
+  }
+  sel.value = I18N.lang;
 }
-$("langIt").onclick = () => I18N.setLang("it");
-$("langEn").onclick = () => I18N.setLang("en");
+function paintLang() { $("lang").value = I18N.lang; }
+$("lang").onchange = (e) => I18N.setLang(e.target.value);
 I18N.onChange(() => {
   paintLang();
   if (stream) $("camStart").textContent = t("cam.stop");
   if (enginesReady) $("engine").textContent = t("engine.ready");
-  if (results.length) repaint(); else $("emptyText").textContent = t("res.empty");
+  if (rows.length) repaintAll(); else $("emptyText").textContent = t("res.empty");
 });
 I18N.apply();
-paintLang();
+buildLangMenu();
 $("emptyText").textContent = t("res.empty");
 $("zip").textContent = t("rename.zip", { n: 0 });
 
