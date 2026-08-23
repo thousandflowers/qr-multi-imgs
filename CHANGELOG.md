@@ -8,6 +8,38 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Six languages** — English, Italian, Spanish, French, German, Portuguese —
+  chosen from the browser's own order of preference, with a menu in the header.
+  The words live in `web/strings.js` as data, so adding a language is one block and
+  nothing else; the self-test fails if any language is short a key or drops a `{n}`
+  placeholder, which is how a sentence ends up with a hole in it
+- **A dropped zip is unpacked and read.** No library: `DecompressionStream` handles
+  deflate and the rest is three fixed-layout records. The central directory is the
+  authority rather than the local headers, which a streaming writer may leave with
+  zero sizes. Inner paths are kept, the `./` a `zip -r` leaves is stripped, and
+  macOS's `__MACOSX` resource-fork tree is skipped
+- **Every file gets a row the moment it is queued**, with a spinner and a shimmering
+  placeholder, and gains a green tick where it already sits when its answer arrives.
+  The list is now the list of what was loaded, not only of what has finished, and the
+  drop zone acknowledges the drop
+- **The statistics are the filters.** Clicking `with a code`, `without`, `unreadable`
+  or `unique` filters to it and clicking again returns to everything. `unique` keeps
+  the first image that found each payload, so the view does not shuffle as later
+  copies arrive
+
+### Changed
+- **Three times faster on photos.** Measured on a 3024x4032 photo: a 3000 px cap took
+  3826 ms, a 1600 px cap took 1287 ms and found the same code. The first pass is now
+  1600 px, with one retry at full size only when nothing was found *and* the image was
+  actually shrunk — failure is the expensive case, since with no candidate count the
+  decoder runs every strategy. The worker pool went from 3 to 6. A five-image folder
+  went 4.5 s to 1.3 s
+- Clear moved into the progress bar, in red, and asks first through a small popover
+  beside it rather than a system dialog that stops the page
+- "Advanced" is gone. That section is not an advanced feature, it is a different way
+  in for people who prefer the terminal, and it now says exactly that
+
+### Added
 - **What a code means, not the string it contains.** Every payload is run past a
   table of recognisers and comes back as a kind with named fields: a link shows its
   site and the reference inside it, a Wi-Fi code shows network and security, a SEPA

@@ -41,6 +41,7 @@ jobs:
         run: |
           node web/payload.js --test
           node web/zip.js --test
+          node web/unzip.js --test
           node web/i18n.js --test
 
       - name: Test
