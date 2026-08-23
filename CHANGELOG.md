@@ -7,6 +7,16 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- Clicking a statistic to filter threw the panel around. Three separate faults, all
+  reproduced before being touched: the pressed state was derived from the filter
+  *value*, so `with a code` and `codes` lit up together since they mean the same
+  thing; clicking `codes` right after `with a code` compared values and so switched
+  the filter off instead of keeping it; and a filter matching nothing raised the
+  big empty state, which sits above the statistics and shoved the whole panel down.
+  The active *tile* is remembered now rather than the value, and an empty filter says
+  so from inside the list, where the missing rows would have been
+
 ### Changed
 - **The decoder is compiled once and shared with every worker.** Each worker used to
   fetch `qr.wasm` for itself, so six workers meant six downloads of the same 4.6 MB
