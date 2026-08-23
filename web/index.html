@@ -186,19 +186,6 @@ li .noimg { width:48px; height:48px; border-radius:7px; background:var(--soft); 
 .tagline.err { background:var(--bad-soft); color:var(--bad); }
 .advice { margin-top:.3rem; font-size:.75rem; color:var(--dim); }
 
-details#adv { margin-top:1rem; }
-details#adv > summary { cursor:pointer; padding:.7rem .9rem; background:var(--panel);
-  border:1px solid var(--line); border-radius:var(--radius); font-size:.87rem;
-  font-weight:600; color:var(--dim); list-style:none; }
-details#adv > summary::-webkit-details-marker { display:none; }
-details#adv > summary::before { content:"+ "; }
-details#adv[open] > summary::before { content:"- "; }
-details#adv > summary:hover { color:var(--fg); }
-#advBody { border:1px solid var(--line); border-top:0; border-radius:0 0 var(--radius) var(--radius);
-  background:var(--panel); padding:.9rem; margin-top:-.4rem; }
-#advBody p { margin:0 0 .7rem; color:var(--dim); font-size:.84rem; }
-#advBody pre { background:var(--soft); padding:.6rem .7rem; border-radius:8px;
-  font-family:var(--mono); font-size:.76rem; overflow-x:auto; margin:0 0 .8rem; }
 textarea { width:100%; min-height:3.5rem; font-family:var(--mono); font-size:.83rem;
   background:var(--bg); color:var(--fg); border:1px solid var(--line);
   border-radius:8px; padding:.5rem .6rem; resize:vertical; }
@@ -403,32 +390,28 @@ li .shim { width:48px; height:48px; border-radius:7px; background:var(--soft);
     </section>
   </div>
 
-  <details id="adv">
-    <summary data-t="adv.title"></summary>
-    <div id="advBody">
-      <p data-t="adv.sub"></p>
-      <pre>brew install thousandflowers/tap/qr-multi-imgs
-
-qr-multi-imgs ./foto                   # una cartella
-qr-multi-imgs a.heic fattura.pdf       # singoli file, qualsiasi formato
-qr-multi-imgs --serve                  # questa pagina, con la copia locale</pre>
-      <div id="localBox" class="hide">
-        <p data-t="adv.localOn"></p>
-        <textarea id="paths" data-t-ph="adv.paths" spellcheck="false"></textarea>
-        <div class="row">
-          <button id="localScan" class="primary" data-t="adv.scan"></button>
-          <span id="localStatus" style="font-family:var(--mono);font-size:.77rem;color:var(--dim)"></span>
-        </div>
-        <div class="row hide" id="localActions">
-          <select id="qrFmt"><option>png</option><option>jpg</option><option>svg</option></select>
-          <button id="recreate" data-t="adv.recreate"></button>
-          <button id="organize" data-t="adv.organize"></button>
-          <button id="del" class="danger" data-t="adv.delete"></button>
-        </div>
-        <div id="localMsg"></div>
+  <!-- Only ever seen by someone running the program locally: a browser cannot
+       touch files where they sit, so without a local copy answering there is
+       nothing here to show. Installation lives in the README, which the link
+       in the header points at. -->
+  <section class="panel hide" id="localBox">
+    <div class="phead"><h2 data-t="adv.localTitle"></h2></div>
+    <div class="pbody">
+      <p data-t="adv.localOn"></p>
+      <textarea id="paths" data-t-ph="adv.paths" spellcheck="false"></textarea>
+      <div class="row">
+        <button id="localScan" class="primary" data-t="adv.scan"></button>
+        <span id="localStatus" style="font-family:var(--mono);font-size:.77rem;color:var(--dim)"></span>
       </div>
+      <div class="row hide" id="localActions">
+        <select id="qrFmt"><option>png</option><option>jpg</option><option>svg</option></select>
+        <button id="recreate" data-t="adv.recreate"></button>
+        <button id="organize" data-t="adv.organize"></button>
+        <button id="del" class="danger" data-t="adv.delete"></button>
+      </div>
+      <div id="localMsg"></div>
     </div>
-  </details>
+  </section>
 </main>
 
 <footer>
@@ -461,14 +444,37 @@ const queue = [], idle = [];
 // what was loaded, not only of what has finished.
 const rows = [];
 const byId = new Map();
+// What was dropped, one entry per drop, so the bar can name the folder it is
+// working through instead of only counting.
+const batches = [];
 const seenCount = new Map();
 let done = 0, expected = 0, nextId = 0;
 
+// Compile the decoder once and hand the same module to every worker. Letting
+// each fetch its own meant six downloads of the same file, which is most of
+// what made the page feel slow to wake up.
+const workers = [];
 for (let i = 0; i < POOL; i++) {
   const w = new Worker("worker.js");
   w.onmessage = (e) => onWorkerMessage(w, e.data);
   w.onerror = () => engineDied("the decoder could not start");
+  workers.push(w);
 }
+
+(async () => {
+  try {
+    let module;
+    try {
+      module = await WebAssembly.compileStreaming(fetch("qr.wasm"));
+    } catch {
+      // A host serving .wasm with the wrong Content-Type rejects the stream.
+      module = await WebAssembly.compile(await (await fetch("qr.wasm")).arrayBuffer());
+    }
+    for (const w of workers) w.postMessage({ type: "module", module });
+  } catch (e) {
+    engineDied("decoder failed: " + String((e && e.message) || e));
+  }
+})();
 
 function engineDied(why) {
   if (!engineFailed) { engineFailed = true; engineReason = why; }
@@ -514,6 +520,7 @@ function finish(msg) {
   r.at = new Date();
   for (const c of r.codes) seenCount.set(c, (seenCount.get(c) || 0) + 1);
   done++;
+  if (r.batch) r.batch.done++;
   renderRow(r);
   paintProgress();
   paintStats();
@@ -588,14 +595,29 @@ async function expandArchives(items) {
   return out;
 }
 
+// The name of what was just dropped: the folder if they all came from one,
+// the file itself if there is only one, otherwise a count.
+function labelFor(items) {
+  const tops = new Set(items.map((i) => (i.path || i.file.name).split("/")[0]));
+  if (tops.size === 1) {
+    const only = [...tops][0];
+    return items.length === 1 ? items[0].file.name : only;
+  }
+  return t("work.files", { n: items.length });
+}
+
 async function accept(items) {
   if (!items.length) { $("emptyText").textContent = t("res.nothing"); return; }
   bounce();
-  enqueue(await expandArchives(items));
+  const expanded = await expandArchives(items);
+  if (!expanded.length) { $("emptyText").textContent = t("res.nothing"); return; }
+  enqueue(expanded, labelFor(expanded));
 }
 
-function enqueue(items) {
+function enqueue(items, label) {
   if (!items.length) { $("emptyText").textContent = t("res.nothing"); return; }
+  const batch = { label: label || "", total: items.length, done: 0 };
+  batches.push(batch);
   $("empty").classList.add("hide");
   $("out").classList.remove("hide");
   $("work").classList.remove("hide");
@@ -604,7 +626,7 @@ function enqueue(items) {
 
   for (const it of items) {
     const id = nextId++;
-    const r = { id, name: it.file.name, path: it.path, file: it.file,
+    const r = { id, name: it.file.name, path: it.path, file: it.file, batch,
                 codes: [], error: "", thumbURL: "", pending: true, seq: rows.length + 1 };
     rows.push(r);
     byId.set(id, r);
@@ -740,8 +762,15 @@ async function downloadZip() {
 function paintProgress() {
   const pct = expected ? (100 * done) / expected : 0;
   $("bar").firstElementChild.style.width = pct + "%";
-  $("count").textContent = done + " / " + expected;
   $("bar").classList.toggle("done", expected > 0 && done === expected);
+
+  // Name what is being worked through. With several drops queued the one still
+  // running is the one worth naming; when everything is finished the total is.
+  const running = batches.find((b) => b.done < b.total);
+  const b = running || batches[batches.length - 1];
+  $("count").textContent = b && b.label
+    ? b.label + "   " + (running ? b.done + " / " + b.total : done + " / " + expected)
+    : done + " / " + expected;
 }
 
 function paintStats() {
@@ -1191,6 +1220,7 @@ $("clearYes").onclick = () => {
   for (const r of rows) if (r.thumbURL) URL.revokeObjectURL(r.thumbURL);
   rows.length = 0;
   queue.length = 0;
+  batches.length = 0;
   byId.clear();
   seenLive.clear();
   seenCount.clear();
@@ -1258,7 +1288,6 @@ async function findLocalApp() {
     localAppFound = true;
     $("ver").textContent = "v" + info.version;
     $("localBox").classList.remove("hide");
-    $("adv").open = true;
     paintEngineState();
   } catch { /* the normal case, and the page is fully usable without one */ }
 }

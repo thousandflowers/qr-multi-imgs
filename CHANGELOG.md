@@ -7,6 +7,20 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- **The decoder is compiled once and shared with every worker.** Each worker used to
+  fetch `qr.wasm` for itself, so six workers meant six downloads of the same 4.6 MB
+  file. Measured: one fetch instead of six, and a local cold start of 190 ms against
+  322 ms. Over a network the difference is six round trips against one, which was most
+  of what made the page feel slow to wake up. Frame timing during a scan was already
+  clean and stayed so: 588 frames over eighteen 12-megapixel photos, worst 17 ms,
+  none above 50
+- **The progress bar names what it is working through**, not just a count: `rich 2 / 5`
+  while a folder runs, `archivio 0 / 5` when a zip follows it. Each drop is its own
+  batch, so a second folder does not silently join the first one's total
+- Plainer copy, in all six languages, and no em dashes anywhere on the page. The
+  sentences were built the same way every time: a clause bolted on after a dash
+
 ### Added
 - **Six languages** — English, Italian, Spanish, French, German, Portuguese —
   chosen from the browser's own order of preference, with a menu in the header.

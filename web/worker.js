@@ -34,18 +34,19 @@ self.qrWasmReady = () => {
   self.postMessage({ type: "ready" });
 };
 
-(async () => {
+// The module arrives already compiled, from the page. Fetching it here would
+// mean one download per worker: six workers pulling the same 4.6 MB is the
+// difference between a page that is ready at once and one that stalls on
+// first load.
+async function boot(module) {
   try {
     const go = new Go();
-    // Not instantiateStreaming: a host that serves .wasm with the wrong
-    // Content-Type would reject the stream, and this must not depend on that.
-    const bytes = await (await fetch("qr.wasm")).arrayBuffer();
-    const { instance } = await WebAssembly.instantiate(bytes, go.importObject);
+    const instance = await WebAssembly.instantiate(module, go.importObject);
     go.run(instance); // returns only when the module exits, which it never does
   } catch (e) {
     self.postMessage({ type: "fatal", error: String((e && e.message) || e) });
   }
-})();
+}
 
 async function pixelsOf(blob, cap) {
   // Ask for the decode at a bounded size in one step where possible: the
@@ -116,6 +117,7 @@ async function run(job) {
 
 self.onmessage = (e) => {
   const job = e.data;
+  if (job && job.type === "module") { boot(job.module); return; }
   if (ready) run(job);
   else pending.push(job);
 };
