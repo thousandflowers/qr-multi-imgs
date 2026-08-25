@@ -1,10 +1,10 @@
 # qr-multi-imgs
 
-**Scan a folder → decode QR → organize, export, recreate — from a clean TUI.**
+**Scan a folder → decode QR → organize, export, recreate - from a clean TUI.**
 
 **Or read your codes with nothing installed: [open the web app](https://thousandflowers.github.io/qr-multi-imgs/)**
 and drop a photo or a folder on it. The decoder is a WebAssembly build of this
-same Go code running inside your tab — your images are never uploaded.
+same Go code running inside your tab - your images are never uploaded.
 
 ![demo](demo.gif)
 
@@ -27,11 +27,11 @@ qr-multi-imgs ./folder-of-qr-images
 
 ## Why
 
-My father needed to catalog hundreds of photos of orders — each one a QR code on a receipt. No CLI could take a whole folder, keep the results, and then do something with them.
+My father needed to catalog hundreds of photos of orders - each one a QR code on a receipt. No CLI could take a whole folder, keep the results, and then do something with them.
 
-qr-multi-imgs is that missing step: point it at a folder, and the decoded codes come out the other side as files you can act on — sorted, exported, or regenerated.
+qr-multi-imgs is that missing step: point it at a folder, and the decoded codes come out the other side as files you can act on - sorted, exported, or regenerated.
 
-### Input — 5 ways
+### Input - 5 ways
 
 CLI argument · **drag & drop a folder onto the terminal** · type a path · paste (`Cmd+V`) · clipboard (`Ctrl+D`)
 
@@ -56,7 +56,7 @@ Plenty of CLI QR scanners exist. None ship a TUI built for batch work.
 
 ## Benchmark
 
-Dataset: [lovasoa/qrcode-dataset](https://github.com/lovasoa/qrcode-dataset) — **3332 damaged & distorted QR images** built to stress-test scanners. Each sample ships three files: the distorted `NNN.png`, the decoded `NNN.txt`, and `NNN.npy` — the generator's **source bit-matrix**.
+Dataset: [lovasoa/qrcode-dataset](https://github.com/lovasoa/qrcode-dataset) - **3332 damaged & distorted QR images** built to stress-test scanners. Each sample ships three files: the distorted `NNN.png`, the decoded `NNN.txt`, and `NNN.npy` - the generator's **source bit-matrix**.
 
 | | image pixels only | with the companion `.npy` |
 |---|---|---|
@@ -79,10 +79,10 @@ exactly what you want on this dataset and it never happens on your own photos.
 The ~70% of `without_qr` left unread is not low-hanging fruit. The classical
 ceiling, measured across the union of every colour channel, binarizer and scale
 we could throw at it, is ~28% with gozxing and ~30.3% with `zbarimg`. Passing it
-needs an ML detector (WeChat/CNN), which means an OpenCV C dependency — the
+needs an ML detector (WeChat/CNN), which means an OpenCV C dependency - the
 thing this tool exists to avoid.
 
-**Why the dense codes fail — measured, not assumed.** Not because the modules
+**Why the dense codes fail - measured, not assumed.** Not because the modules
 are sub-pixel: a clean 153x153-module QR rendered at 256 px (1.67 px per module,
 well under two) decodes fine straight from the pixels. What destroys it is the
 dataset's *distortion*; density only decides how little of it is enough. Under a
@@ -91,7 +91,7 @@ box blur, 61 modules survives radius 2 and fails at 3, 97 and 125 fail at 2, and
 
 **Since v1.5.0 a scan is slower on purpose.** Earlier versions stopped at the
 first code in an image; v1.5.0 returns every code in it. On 40 real photos that
-moved 3.9s to 18.4s. The unbounded strategy union would have cost 122.6s — the
+moved 3.9s to 18.4s. The unbounded strategy union would have cost 122.6s - the
 finder-pattern pre-pass is what keeps it at 18.
 
 ```bash
@@ -122,11 +122,11 @@ Measured on an Apple M2 Pro (10 cores, 16 GB).
 
 ---
 
-## Web app — nothing to install
+## Web app - nothing to install
 
 **<https://thousandflowers.github.io/qr-multi-imgs/>**
 
-Drop a single photo, a folder, or several folders — most scanners take one
+Drop a single photo, a folder, or several folders - most scanners take one
 picture at a time, which is the point of this one. You can also paste a
 screenshot, or read codes live through the camera.
 
@@ -140,16 +140,16 @@ origin and the loopback, so it *cannot* send a filename or a payload anywhere
 else even if the page were tampered with. It loads no font, script or image from
 any third party. Your files never leave the tab.
 
-How the work is split matters. The browser turns each file into pixels — it
+How the work is split matters. The browser turns each file into pixels - it
 already ships native decoders for everything it can display, JPEG through AVIF
-and HEIC on Safari — and a WebAssembly build of the same Go decoder does the
+and HEIC on Safari - and a WebAssembly build of the same Go decoder does the
 part a browser has no answer for: finding and reading the codes. That is why the
 engine is 4.6 MB (1.4 MB over the wire) instead of carrying image decoders it
 would only duplicate. Decoding runs in a pool of Web Workers, one per core up to
 three, so a folder of photos does not freeze the page.
 
 What the browser cannot do is touch your disk. It reads the files you hand it
-and nothing else — no moving, no deleting. For that, run the program.
+and nothing else - no moving, no deleting. For that, run the program.
 
 ## Driving the local program from a browser
 
@@ -157,8 +157,8 @@ and nothing else — no moving, no deleting. For that, run the program.
 qr-multi-imgs --serve
 ```
 
-It prints two links. Both open the same page — `web/` is embedded in the binary
-and published to Pages, so there is one file, not two — but with the program
+It prints two links. Both open the same page - `web/` is embedded in the binary
+and published to Pages, so there is one file, not two - but with the program
 running the page gains what a browser is not allowed to do on its own: organize
 into `with_qr/` and `without_qr/`, recreate the codes as images, delete the ones
 without a code, all where the files actually live.
@@ -169,7 +169,7 @@ without a code, all where the files actually live.
 | **Hosted UI** | `thousandflowers.github.io/qr-multi-imgs/#t=...&api=...` | one permission, below |
 
 A page served over `https://` reaching `http://127.0.0.1` clears the
-mixed-content rules — the loopback counts as a trustworthy origin — but Chrome
+mixed-content rules - the loopback counts as a trustworthy origin - but Chrome
 additionally gates it behind a **Local Network Access permission**. Measured on
 Chrome 151: `navigator.permissions.query({name: "local-network-access"})` reports
 `prompt`, so the browser asks and the choice is yours. Refuse it, or use a
@@ -188,14 +188,14 @@ It deletes files, so it rests on three properties, each enforced in code:
    even read.
 3. **Destructive calls name a session, never a path.** `organize`, `delete` and
    `recreate` take the id of a scan *this* server performed. The worst a stolen
-   token can do is repeat an action on files you already chose to scan — there
+   token can do is repeat an action on files you already chose to scan - there
    is no request shape that says "delete this arbitrary path".
 
 ---
 
 ## Install
 
-### macOS — Homebrew
+### macOS - Homebrew
 
 ```bash
 brew install thousandflowers/tap/qr-multi-imgs
@@ -204,10 +204,10 @@ brew install thousandflowers/tap/qr-multi-imgs
 The tap formula is bumped after a release with `scripts/bump_tap.py qr-multi-imgs`,
 which uses whatever auth `gh` already has. It deliberately does not run inside CI:
 publishing the formula from there needs a long-lived cross-repo token, and that
-token fails at the *end* of a release — after the GitHub release exists — which
+token fails at the *end* of a release - after the GitHub release exists - which
 leaves `brew` a version behind while the release looks fine.
 
-### Any platform — Go install
+### Any platform - Go install
 
 ```bash
 go install github.com/thousandflowers/qr-multi-imgs@latest
@@ -221,7 +221,7 @@ bash <(curl -sL https://raw.githubusercontent.com/thousandflowers/qr-multi-imgs/
 
 ### Prebuilt binaries
 
-Download from [GitHub Releases](https://github.com/thousandflowers/qr-multi-imgs/releases) — macOS (Intel + Apple Silicon), Linux (amd64 + arm64), Windows (amd64).
+Download from [GitHub Releases](https://github.com/thousandflowers/qr-multi-imgs/releases) - macOS (Intel + Apple Silicon), Linux (amd64 + arm64), Windows (amd64).
 
 ### From source
 
@@ -232,9 +232,9 @@ cd qr-multi-imgs && go build
 
 **Requirements:** Go 1.26+, an ANSI terminal.  
 **Build:** pure Go on Linux/Windows. The macOS build links Apple's Vision
-framework via cgo (ships with the OS — nothing to install) for photographed,
+framework via cgo (ships with the OS - nothing to install) for photographed,
 perspective-warped QR codes.  
-**Supported formats:** PNG / JPEG / GIF / BMP / WebP / TIFF everywhere. On macOS the list is whatever the system itself can decode — asked at startup via ImageIO rather than hardcoded — which adds HEIC / HEIF, PSD, JXL, AVIF and camera raw from any camera the OS supports (CR2, CR3, ARW, DNG, NEF, RAF, ORF, RW2 and the rest); 70 formats on a current macOS. PDFs are read too, by rendering each page — a multi-page document reports the codes from every page. Elsewhere HEIC needs a `-tags heic` build and raw is unavailable. A folder holding any mix of these scans in a single pass, and several folders or single files can be scanned together.  
+**Supported formats:** PNG / JPEG / GIF / BMP / WebP / TIFF everywhere. On macOS the list is whatever the system itself can decode - asked at startup via ImageIO rather than hardcoded - which adds HEIC / HEIF, PSD, JXL, AVIF and camera raw from any camera the OS supports (CR2, CR3, ARW, DNG, NEF, RAF, ORF, RW2 and the rest); 70 formats on a current macOS. PDFs are read too, by rendering each page - a multi-page document reports the codes from every page. Elsewhere HEIC needs a `-tags heic` build and raw is unavailable. A folder holding any mix of these scans in a single pass, and several folders or single files can be scanned together.  
 **Supported platforms:** macOS, Linux, **Windows** (clipboard via external tool).
 
 ---
@@ -250,4 +250,4 @@ for a first contribution. By taking part you agree to the
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT - see [LICENSE](LICENSE).

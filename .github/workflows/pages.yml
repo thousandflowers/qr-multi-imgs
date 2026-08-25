@@ -1,7 +1,7 @@
 name: Pages
 
 # Publishes web/ to GitHub Pages. The same directory is embedded in the binary,
-# so the hosted page and the one `--serve` hands you are the same file — there
+# so the hosted page and the one `--serve` hands you are the same file - there
 # is no second copy to keep in step.
 
 on:

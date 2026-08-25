@@ -75,11 +75,11 @@ https://github.com/thousandflowers/qr-multi-imgs
 - Be at the keyboard for the two hours after posting. On Show HN, replying
   to the first comments matters more than the post.
 - Likely first questions, worth having an answer ready for:
-  - *"So it isn't really 100%"* — agree immediately, the body already
+  - *"So it isn't really 100%"* - agree immediately, the body already
     concedes it; repeat the 56% number.
-  - *"Why not zbar/zxing-cpp?"* — no install step, and zbar segfaults on
+  - *"Why not zbar/zxing-cpp?"* - no install step, and zbar segfaults on
     valid PNGs on macOS arm64 (0.23.93). It is still used as a fallback
     if it is on PATH.
-  - *"Why a TUI and not flags?"* — the actions are destructive (delete,
+  - *"Why a TUI and not flags?"* - the actions are destructive (delete,
     move) and are better with a confirmation in front of them. A
     `--recursive` flag and headless mode are open issues.

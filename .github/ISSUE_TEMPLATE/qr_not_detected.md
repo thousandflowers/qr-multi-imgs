@@ -9,10 +9,10 @@ assignees: ''
 
 **The image**
 Attach the image (or one just like it). Without a sample this is very hard
-to act on — the decode path taken depends on the pixels.
+to act on - the decode path taken depends on the pixels.
 
 **What the QR contains**
-The payload, if you know it — decoded by a phone or another tool.
+The payload, if you know it - decoded by a phone or another tool.
 
 **How the image was produced**
 - [ ] Photographed (phone / camera)

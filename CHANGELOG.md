@@ -32,7 +32,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
   sentences were built the same way every time: a clause bolted on after a dash
 
 ### Added
-- **Six languages** — English, Italian, Spanish, French, German, Portuguese —
+- **Six languages** - English, Italian, Spanish, French, German, Portuguese -
   chosen from the browser's own order of preference, with a menu in the header.
   The words live in `web/strings.js` as data, so adding a language is one block and
   nothing else; the self-test fails if any language is short a key or drops a `{n}`
@@ -55,7 +55,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 - **Three times faster on photos.** Measured on a 3024x4032 photo: a 3000 px cap took
   3826 ms, a 1600 px cap took 1287 ms and found the same code. The first pass is now
   1600 px, with one retry at full size only when nothing was found *and* the image was
-  actually shrunk — failure is the expensive case, since with no candidate count the
+  actually shrunk - failure is the expensive case, since with no candidate count the
   decoder runs every strategy. The worker pool went from 3 to 6. A five-image folder
   went 4.5 s to 1.3 s
 - Clear moved into the progress bar, in red, and asks first through a small popover
@@ -73,10 +73,10 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 - **Secrets stay covered.** A two-factor setup code (`otpauth://`) carries the seed
   that generates every future code for that account, and a Wi-Fi payload carries the
   password. Both are marked secret, rendered as dots until deliberately revealed, and
-  a seed can never end up in a file name — a scan is often done with other people
+  a seed can never end up in a file name - a scan is often done with other people
   looking at the screen
 - **Rename and download as one archive.** New names are built from the meaningful
-  part of each code — for a link that is the reference, not the campaign path — with
+  part of each code - for a link that is the reference, not the campaign path - with
   collisions numbered rather than dropped. The ZIP is written by hand, store-only,
   because the images are already compressed and the page's CSP forbids fetching a
   library. The image-to-code manifest travels *inside* the archive, since that
@@ -93,8 +93,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
   rather than only a count
 
 ### Changed
-- Developer-facing machinery — the command line, the local API, acting on files on
-  disk — moved behind an "Advanced" disclosure. It is the right tool for scripted and
+- Developer-facing machinery - the command line, the local API, acting on files on
+  disk - moved behind an "Advanced" disclosure. It is the right tool for scripted and
   batch use and it is documented as such, but it is noise for someone who came to
   read one receipt
 - CSV export carries the full path, the payload type, how many images share the code,
@@ -120,8 +120,8 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
   to exhaustion rather than called once, which would have silently truncated any
   folder past about a hundred files
 - The decoder is a WebAssembly build of the same Go code (`wasm/`), 4.6 MB and
-  about 1.4 MB over the wire, running in a pool of Web Workers — one per core up
-  to three — so a folder of photos does not freeze the page. It is built by the
+  about 1.4 MB over the wire, running in a pool of Web Workers - one per core up
+  to three - so a folder of photos does not freeze the page. It is built by the
   Pages workflow rather than committed, and CI compiles the `js/wasm` target on
   every run so it cannot rot unnoticed
 - The split of labour is deliberate: the browser turns files into pixels, since
@@ -135,7 +135,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 ### Changed
 - Releasing no longer depends on a secret that does not exist. goreleaser's
   `brews:` block needed a long-lived token with push rights on the tap repo, stored
-  as `GH_PAT` — and that secret has never been set here, so the block had never once
+  as `GH_PAT` - and that secret has never been set here, so the block had never once
   run. Worse, the formula push happens at the *end* of goreleaser, so a release would
   publish and only then fail the bump, leaving `brew` on the old version behind a
   green-looking release. The block is gone; `scripts/bump_tap.py` does the same job
@@ -144,13 +144,13 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 - `scripts/bump_tap.py` reads the formula rather than knowing about any project: the
   source repo comes from `homepage`, the current version from `version` or from the
   tag inside a url, and each sha256 is recomputed from the file the url above it
-  actually points at — so a per-architecture formula cannot end up carrying one
+  actually points at - so a per-architecture formula cannot end up carrying one
   arch's checksum on another's download, which is exactly the bug that shipped in
   the skillreaper formula once. It refuses rather than guesses when the number of
   sha256 lines and urls disagree. `--self-test` covers both, `--dry-run` prints the
   formula it would write
 
-## [v1.6.0] — 2026-08-22
+## [v1.6.0] - 2026-08-22
 
 ### Added
 - `qr-multi-imgs --serve` runs a local HTTP API and serves a web UI with the same
@@ -184,7 +184,7 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
   `actionOutcome`, and the TUI commands are one-line wrappers over them, so the HTTP
   API runs the same code rather than a second copy of it
 
-## [v1.5.0] — never released
+## [v1.5.0] - never released
 
 Tagged nowhere: the release workflow at the commit this section describes still
 required a tap token that does not exist, and GitHub Actions runs the workflow
@@ -205,13 +205,13 @@ below shipped in v1.6.0 instead.
   which Core Image reads directly. Off macOS both report an unreadable format
 - Optional pure-Go HEIC behind `-tags heic` (`gen2brain/heic`, libheif via wazero),
   **off by default**: the wrapper is MIT but the embedded libheif is LGPL-3.0 with no
-  NOTICE, so no released artifact contains the codec. Verified — a goreleaser snapshot
+  NOTICE, so no released artifact contains the codec. Verified - a goreleaser snapshot
   holds no occurrence of wazero, gen2brain, libheif or de265. Tagged binary costs
   11.56 MB against 7.21 MB. Tracking gen2brain/heic#17
 - `cmd/corpusgen` bootstraps a `corpus.csv` manifest from unlabelled images
 - Homebrew formula is published to `thousandflowers/homebrew-tap` automatically on
   every release (goreleaser `brews:`), so `brew` users stop drifting behind
-- `scanner.ScanDecodedImage(image.Image) ([]string, error)` — decodes from pixels with
+- `scanner.ScanDecodedImage(image.Image) ([]string, error)` - decodes from pixels with
   no file path, for callers such as a wasm build. `ScanImage` now delegates its raster
   stage to it. Lower recall than `ScanImage`: the `.npy` mask, Apple Vision, and
   zbarimg all need a path and do not run
@@ -222,14 +222,14 @@ below shipped in v1.6.0 instead.
   its extension; a folder walk still filters; a path that does not exist is an error,
   not a silent skip
 - The readable-format list is asked of the system rather than hardcoded. On macOS
-  `CGImageSourceCopyTypeIdentifiers` supplies it — 70 formats on a current release,
+  `CGImageSourceCopyTypeIdentifiers` supplies it - 70 formats on a current release,
   including every camera raw the OS knows (cr2, cr3, arw, dng, raf, orf, rw2, nef and
   the rest) plus psd, jxl, avif, exr, hdr, dds, ico, icns, pict, jp2. The old list was
   already wrong for anyone shooting Canon, Sony or Fuji and went stale with each new
   camera. Elsewhere the built-in set applies
 - TIFF everywhere, via a package already in `go.mod`
-- PDFs are read, every page. Rendered through Core Graphics onto white — a QR is black
-  vector art over nothing, so an uninitialised bitmap gives black on black — honouring
+- PDFs are read, every page. Rendered through Core Graphics onto white - a QR is black
+  vector art over nothing, so an uninitialised bitmap gives black on black - honouring
   `/Rotate` and the crop box via `CGPDFPageGetDrawingTransform`
 - Ground-truth decode benchmark behind the `corpus` build tag:
   `go test -tags corpus ./scanner -run TestCorpus -v`. Reads a `corpus.csv` manifest,
@@ -240,7 +240,7 @@ below shipped in v1.6.0 instead.
 - The raster strategy loop stops on finder-pattern evidence. Decoding every code meant
   unioning all ten strategies, which cost 31.8x on real photos holding a code (40 of
   them: 3.9s → 122.6s, 10.4 img/s → 0.3). A pre-pass counts the QR candidates visible
-  across every colour projection and the loop stops once it has decoded that many —
+  across every colour projection and the loop stops once it has decoded that many -
   evidence rather than guesswork. Same 40 photos, best of six runs: 18.4s, 2.2 img/s,
   4.8x. Still slower than v1.4.1's single-code scan; that is the price of not
   under-reporting. A count of zero or a detector error disables early exit rather than
@@ -270,36 +270,36 @@ below shipped in v1.6.0 instead.
   HEIC with no QR came back as `decode: image: unknown format`; and
   `supportedExtensions` did not list `.heic`/`.heif`, so the walk skipped them. On a
   real library, a folder of 13 HEIC went from 0 images seen to 13 scanned. This
-  matters on a real camera roll — a sample library here holds 727 HEIC against 42 jpeg
+  matters on a real camera roll - a sample library here holds 727 HEIC against 42 jpeg
   and 14 png
 - Build failure on macOS with `CGO_ENABLED=0`: both Apple Vision files were excluded by
   their build tags, leaving `decodeWithVision` undefined. The stub is now selected by
   `!darwin || !cgo` and the cgo implementation by `darwin && cgo`
 
-## [v1.4.1] — 2026-06-26
+## [v1.4.1] - 2026-06-26
 
 ### Fixed
 - Release build: macOS artifacts are built on a macOS runner with `CGO_ENABLED=1` so the Vision backend links; Linux/Windows stay pure Go and cross-compile
 
-## [v1.4.0] — 2026-06-26
+## [v1.4.0] - 2026-06-26
 
 ### Added
-- macOS Vision QR backend — decodes real-world photos (perspective-warped, low-contrast, small-module receipt QRs) that the pure-Go path misses. Uses the framework shipped with macOS, so it adds no install step
+- macOS Vision QR backend - decodes real-world photos (perspective-warped, low-contrast, small-module receipt QRs) that the pure-Go path misses. Uses the framework shipped with macOS, so it adds no install step
 
-## [v1.3.0] — 2026-06-23
+## [v1.3.0] - 2026-06-23
 
 ### Added
 - Live progress bar pinned at the top during folder scans, with the file being scanned and a done/total counter
 - Color-channel decode strategies (R/G/B/min/max projections) that recover hard, low-contrast and colored QR codes
 - Homebrew formula (`brew install thousandflowers/tap/qr-multi-imgs`)
 - Prebuilt binaries for macOS, Linux, and Windows via GitHub Releases
-- `codecov.yml` — Codecov coverage tracking
+- `codecov.yml` - Codecov coverage tracking
 - Tests for pure functions in `main.go` (resolvePath, validateScanPath, etc.)
-- `CONTRIBUTING.md` — contributor guide
-- `CHANGELOG.md` — this file
+- `CONTRIBUTING.md` - contributor guide
+- `CHANGELOG.md` - this file
 
 ### Changed
-- Decoder returns the exact QR payload — no longer trims whitespace (fixes whitespace-only payloads)
+- Decoder returns the exact QR payload - no longer trims whitespace (fixes whitespace-only payloads)
 - Faster scanning: dropped the ineffective 3x/4x upscale strategies
 - CI now builds and tests on Windows too
 - README: Codecov badge, `go install` instructions, explicit Windows support
@@ -307,24 +307,24 @@ below shipped in v1.6.0 instead.
 ### Fixed
 - Crash (index out of range) when scanning a folder containing no supported images
 
-## [v1.2.0] — 2026-06-19
+## [v1.2.0] - 2026-06-19
 
 ### Added
-- 50+ new tests across all modules — coverage from 55% → 90.5%
+- 50+ new tests across all modules - coverage from 55% → 90.5%
 - Exporter test suite reaches 100% coverage
 - CI workflow for automatic cross-platform releases via GoReleaser
 - GoReleaser config for prebuilt binaries (macOS, Linux, Windows)
 
 ### Changed
-- `npy_test.go` — full test coverage for numpy mask parser
-- `main_test.go` — View, Update, action tests for all TUI pages
-- `scanner_test.go` — ScanImage, ScanFolder edge cases (unreadable dir, corrupt files)
+- `npy_test.go` - full test coverage for numpy mask parser
+- `main_test.go` - View, Update, action tests for all TUI pages
+- `scanner_test.go` - ScanImage, ScanFolder edge cases (unreadable dir, corrupt files)
 - README: massive simplification, single benchmark, no stale references
 
-## [v1.1.0] — 2026-06-19
+## [v1.1.0] - 2026-06-19
 
 ### Added
-- `scanner/npy.go` — minimal `.npy` v1.0 parser for boolean arrays
+- `scanner/npy.go` - minimal `.npy` v1.0 parser for boolean arrays
 - Mask-based QR detection fallback using `zbarimg` via stdin pipe
 - Parallel worker pool (6 workers, ~20× speedup)
 - JPG/SVG output for QR regeneration
@@ -333,10 +333,10 @@ below shipped in v1.6.0 instead.
 ### Performance
 - 3332/3332 detection at ~142 img/s (M2 Pro)
 
-## [v1.0.0] — 2026-06-09
+## [v1.0.0] - 2026-06-09
 
 ### Added
-- Go rewrite — pure Go QR scanner, no CGo, no Python
+- Go rewrite - pure Go QR scanner, no CGo, no Python
 - Bubbletea TUI with folder input, drag & drop, clipboard
 - Exporter test suite: JSON/CSV/TXT round trips, QR round trip through scanner
 - GitHub Actions CI (build + vet + test on ubuntu & macOS)
@@ -349,47 +349,47 @@ below shipped in v1.6.0 instead.
 ### Changed
 - Versioning reset from Python 0.x to Go 1.0.0
 
-## [v0.5.0] — 2026-04-16
+## [v0.5.0] - 2026-04-16
 
 ### Changed
 - Refactored TUI screens into `tui_screens.py` (main file reduced from 1669 to 1345 lines)
 
-## [v0.4.2] — 2026-04-16
+## [v0.4.2] - 2026-04-16
 
 ### Changed
 - Replaced Textual TUI with simple text-based interactive menu for terminal compatibility
 
-## [v0.4.1] — 2026-04-16
+## [v0.4.1] - 2026-04-16
 
 ### Fixed
 - TUI not launching, added fallback menu
 
-## [v0.4.0] — 2026-04-16
+## [v0.4.0] - 2026-04-16
 
 ### Added
 - New wizard TUI with step-by-step flow
 
-## [v0.3.4] — 2026-04-16
+## [v0.3.4] - 2026-04-16
 
 ### Changed
 - Simplified TUI: enter folder first, then select action
 
-## [v0.3.3] — 2026-04-16
+## [v0.3.3] - 2026-04-16
 
 ### Fixed
 - TUI now launches immediately without requiring Enter key
 
-## [v0.3.2] — 2026-04-16
+## [v0.3.2] - 2026-04-16
 
 ### Fixed
 - Homebrew formula `chmod` syntax
 
-## [v0.3.1] — 2026-04-16
+## [v0.3.1] - 2026-04-16
 
 ### Changed
 - Updated LICENSE with new project name
 
-## [v0.1.0] — 2026-06-09
+## [v0.1.0] - 2026-06-09
 
 ### Added
 - Initial Go release

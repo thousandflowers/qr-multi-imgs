@@ -1,4 +1,4 @@
-# Goreleaser config — builds and uploads cross-platform binaries on tag push.
+# Goreleaser config - builds and uploads cross-platform binaries on tag push.
 # https://goreleaser.com
 version: 2
 

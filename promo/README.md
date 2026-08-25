@@ -15,6 +15,6 @@ One rule across all of them: the 100% figure is on the
 [lovasoa/qrcode-dataset](https://github.com/lovasoa/qrcode-dataset)
 benchmark, and 44% of those decodes come from the dataset's companion
 `.npy` bit-matrix, not from the pixels. Every draft says so. Do not edit
-that out to make the number cleaner — it is the first thing a careful
+that out to make the number cleaner - it is the first thing a careful
 reader will check, and the honest version is the more interesting story
 anyway.
