@@ -4,9 +4,9 @@ Thanks for considering contributing to qr-multi-imgs.
 
 ## How to help
 
-- **Report bugs** — open a [GitHub Issue](https://github.com/thousandflowers/qr-multi-imgs/issues/new?template=bug_report.md) with reproduction steps.
-- **Suggest features** — open a [Feature Request](https://github.com/thousandflowers/qr-multi-imgs/issues/new?template=feature_request.md).
-- **Submit code** — follow the steps below.
+- **Report bugs** - open a [GitHub Issue](https://github.com/thousandflowers/qr-multi-imgs/issues/new?template=bug_report.md) with reproduction steps.
+- **Suggest features** - open a [Feature Request](https://github.com/thousandflowers/qr-multi-imgs/issues/new?template=feature_request.md).
+- **Submit code** - follow the steps below.
 
 ## Development setup
 

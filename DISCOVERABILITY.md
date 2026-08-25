@@ -1,10 +1,10 @@
 # Discoverability
 
 Settings that live in the GitHub web UI, not in the repo. Nothing here is
-applied automatically — copy the values in by hand at
+applied automatically - copy the values in by hand at
 **Settings → General**, or on the repo home page via the ⚙️ next to *About*.
 
-## Name alignment — checked
+## Name alignment - checked
 
 | Where | Value | Status |
 | --- | --- | --- |
@@ -14,7 +14,7 @@ applied automatically — copy the values in by hand at
 | `.goreleaser.yaml` `project_name` | `qr-multi-imgs` | ✅ |
 
 All install commands in the README resolve against that module path.
-Keep the four in sync — a rename means a new module path and a broken
+Keep the four in sync - a rename means a new module path and a broken
 `go install` for everyone.
 
 ## About (≤ 350 chars)
@@ -33,7 +33,7 @@ Batch QR code scanner with a TUI — scan a folder, decode, organize, export, re
 
 Also set:
 - **Website:** leave empty, or point at the latest release.
-- ✅ Releases, ✅ Packages — uncheck *Deployments*, *Environments*.
+- ✅ Releases, ✅ Packages - uncheck *Deployments*, *Environments*.
 
 ## Topics
 
@@ -65,21 +65,21 @@ macos
 homebrew
 ```
 
-Avoid topics that are not true of the repo (`qrcode-generator` — it only
-regenerates codes it decoded, `zbar` — it works without it). Wrong topics
+Avoid topics that are not true of the repo (`qrcode-generator` - it only
+regenerates codes it decoded, `zbar` - it works without it). Wrong topics
 cost more in bounce than they gain in impressions.
 
 ## Other UI-only switches
 
-- **Discussions** — enable it. Q&A that is not a bug does not belong in
+- **Discussions** - enable it. Q&A that is not a bug does not belong in
   Issues, and Discussions pages are indexed. `.github/ISSUE_TEMPLATE/config.yml`
   links to the Discussions tab, so that link 404s until you turn it on.
-- **Social preview image** — Settings → General → Social preview. Without
+- **Social preview image** - Settings → General → Social preview. Without
   one, every link shared on X / LinkedIn / Slack renders as a grey box.
   A single frame of `demo.gif` at 1280×640 is enough.
-- **Good first issue labels** — see [GOOD_FIRST_ISSUES.md](GOOD_FIRST_ISSUES.md).
+- **Good first issue labels** - see [GOOD_FIRST_ISSUES.md](GOOD_FIRST_ISSUES.md).
   GitHub surfaces repos in its *good first issue* feed only when issues
   carry that exact label.
-- **Repository description on pkg.go.dev** — comes from the README, no
+- **Repository description on pkg.go.dev** - comes from the README, no
   action needed, but the page only appears after someone fetches the
   module once: https://pkg.go.dev/github.com/thousandflowers/qr-multi-imgs

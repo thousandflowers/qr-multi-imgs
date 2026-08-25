@@ -1,10 +1,10 @@
 # X thread
 
-Five posts. Post 1 carries the GIF — it is what stops the scroll.
+Five posts. Post 1 carries the GIF - it is what stops the scroll.
 Attribution goes to @charmcli in post 4, not post 1: tagging in the first
 post of a thread suppresses reach and reads as begging.
 
-## 1 — hook + GIF
+## 1 - hook + GIF
 
 ```
 my dad photographs order receipts. every one has a QR code. his workflow was:
@@ -16,7 +16,7 @@ so I wrote the tool that should have existed.
 
 *Attach `demo.gif`.*
 
-## 2 — what it does
+## 2 - what it does
 
 ```
 qr-multi-imgs: point it at a folder, it decodes every QR in it, then acts on the
@@ -28,7 +28,7 @@ regenerate the codes as PNG/JPG/SVG
 drag the folder onto the terminal. that's the whole setup.
 ```
 
-## 3 — the benchmark
+## 3 - the benchmark
 
 ```
 benchmarked it on a public dataset: 3332 deliberately damaged QR images.
@@ -39,7 +39,7 @@ now: 3332/3332. ~7s.
 the 100% had nothing to do with the decoder.
 ```
 
-## 4 — the actual finding
+## 4 - the actual finding
 
 ```
 i assumed density killed them — 100+ modules in 256px is <2px per module. wrong.
@@ -53,7 +53,7 @@ for those, read the matrix, not the pixels. 132 lines of Go.
 TUI is @charmcli's bubbletea, which made the whole thing a pleasure to build.
 ```
 
-## 5 — honesty + link
+## 5 - honesty + link
 
 ```
 being precise: 100% is a benchmark number leaning on metadata the benchmark

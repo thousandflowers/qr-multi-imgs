@@ -3,7 +3,7 @@
 Four tasks that are real, small, and grounded in the current code. Open
 them by hand at
 [New issue](https://github.com/thousandflowers/qr-multi-imgs/issues/new)
-and label each **`good first issue`** + **`help wanted`** — GitHub's
+and label each **`good first issue`** + **`help wanted`** - GitHub's
 *good first issue* feed keys off those exact labels, which is most of
 the point of writing them.
 

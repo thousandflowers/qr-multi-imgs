@@ -32,8 +32,8 @@ jobs:
 
       # The Homebrew formula is bumped from a machine, not from here. Pushing to
       # the tap needs a long-lived token with write access to another repo, and
-      # that token only ever fails at the END of goreleaser — after the release
-      # is published — leaving brew on the old version behind a green release.
+      # that token only ever fails at the END of goreleaser - after the release
+      # is published - leaving brew on the old version behind a green release.
       # scripts/bump_tap.py does the same job with the operator's own gh auth.
       - name: Say what still has to happen
         run: |

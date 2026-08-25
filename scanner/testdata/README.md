@@ -12,14 +12,14 @@ go test -tags corpus ./scanner -run TestCorpus -v
 
 It scores each image as exact, partial, missed, false positive, or correct
 negative, and separately counts codes so per-code recall is visible next to the
-per-image rate — an image with three codes where two decode is neither a pass
+per-image rate - an image with three codes where two decode is neither a pass
 nor a plain failure. One line per failing file. It never fails on a low score:
 it measures, it does not gate. It only fails if the manifest is missing,
 empty, or malformed.
 
 It measures the CLI path (`ScanImage`, i.e. `ScanFast`) deliberately. Ground
 truth is built with `ScanExhaustive`, so the gap between the two numbers is
-exactly the set of codes the fast path misses and Apple Vision recovers — and
+exactly the set of codes the fast path misses and Apple Vision recovers - and
 what a browser build can never reach.
 
 Against a private photo set that is never committed:
@@ -30,9 +30,9 @@ QR_CORPUS_DIR=~/Pictures/qr-set go test -tags corpus ./scanner \
 ```
 
 - `QR_CORPUS_DIR` defaults to `testdata/corpus`.
-- `-timeout 0` — the harness is sequential and Apple Vision is slow; a few
+- `-timeout 0` - the harness is sequential and Apple Vision is slow; a few
   thousand photos will blow past the 10-minute default.
-- `-count=1` — `go test` caches by source and env, not by corpus content, so a
+- `-count=1` - `go test` caches by source and env, not by corpus content, so a
   rerun after editing images or the manifest otherwise replays a stale result.
 
 ## Populating a corpus
@@ -55,10 +55,10 @@ photos/duplicate-receipts.jpg,https://example.com/r/ccc
 - **An image holding several codes gets several rows sharing its path**, one
   row per payload, in reading order (top to bottom, then left to right).
 - **Two rows with the same path and the same payload mean two physically
-  distinct codes that happen to carry identical content** — two copies of one
+  distinct codes that happen to carry identical content** - two copies of one
   receipt in a frame. They are not a mistake and must not be collapsed: the
   decoder must find both to score both.
-- `expected` is the exact decoded payload — no trimming, so trailing whitespace
+- `expected` is the exact decoded payload - no trimming, so trailing whitespace
   in a payload must be quoted and preserved.
 - `EXPECTED_FAIL` means the image contains no QR. Decoding anything from it is
   scored as a false positive, not a success.

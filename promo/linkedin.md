@@ -1,6 +1,6 @@
 # LinkedIn
 
-One post, no thread. Attach `demo.gif` — LinkedIn plays GIFs inline and
+One post, no thread. Attach `demo.gif` - LinkedIn plays GIFs inline and
 the terminal recording is the whole pitch.
 
 ## Post
@@ -41,7 +41,7 @@ github.com/thousandflowers/qr-multi-imgs
 
 ## Notes
 
-- Tag **Charm** (the company page) on the Bubble Tea mention — the team
+- Tag **Charm** (the company page) on the Bubble Tea mention - the team
   reliably engages with things built on their stack, and that is where
   this post's reach actually comes from.
 - Do not put the GitHub link in the first two lines; LinkedIn suppresses

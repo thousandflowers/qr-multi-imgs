@@ -3,7 +3,7 @@
 Repo: <https://github.com/avelino/awesome-go>
 Rules: <https://github.com/avelino/awesome-go/blob/main/CONTRIBUTING.md>
 
-## ⚠️ Do not submit yet — one rule is not met
+## ⚠️ Do not submit yet - one rule is not met
 
 awesome-go requires **at least 5 months of history since the first
 commit**. First commit here is **2026-06-09**, so the repo becomes
@@ -26,7 +26,7 @@ Everything else passes: MIT license, `go.mod` at the root, SemVer release
 ## Section
 
 **Software Packages → Other Software**, not *Images*. The *Images*
-section is described as _"Libraries for manipulating images"_ — this is a
+section is described as _"Libraries for manipulating images"_ - this is a
 standalone application, not a library, so it belongs with the other
 end-user tools.
 
@@ -84,7 +84,7 @@ Linux and Windows.
 
 - [ ] Repo is ≥5 months old (2026-11-09).
 - [ ] `scanner` package coverage ≥80%.
-- [ ] Go Report Card grade is A- or better — check the live page, the
+- [ ] Go Report Card grade is A- or better - check the live page, the
       badge in the README links straight to it.
 - [ ] Rebase on their `main` right before opening; that file changes
       hourly and the insertion point moves.
@@ -104,11 +104,11 @@ Checked live, so nothing here gets submitted twice.
 
 The pattern is the same across all three curated lists: a maturity gate
 measured from the first commit. There is nothing to fix in the repo for
-it — it is a date. Put the two dates in a calendar and stop re-checking.
+it - it is a date. Put the two dates in a calendar and stop re-checking.
 
 ---
 
-# Appendix — awesome-tuis entry (for the December re-submission)
+# Appendix - awesome-tuis entry (for the December re-submission)
 
 The draft below is the one PR #738 used. Re-check the section names in
 their `CONTRIBUTING.md` before reopening; the list is reorganized often.
