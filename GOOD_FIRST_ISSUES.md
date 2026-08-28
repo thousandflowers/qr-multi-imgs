@@ -1,6 +1,6 @@
 # Good first issues
 
-Four tasks that are real, small, and grounded in the current code. Open
+Five tasks that are real, small, and grounded in the current code. Open
 them by hand at
 [New issue](https://github.com/thousandflowers/qr-multi-imgs/issues/new)
 and label each **`good first issue`** + **`help wanted`** — GitHub's
@@ -197,3 +197,45 @@ one with a working zbar.
 
 Good first issue — one fake binary, one seam, no new dependency.
 ~~~
+
+---
+
+## 5. Strip newlines before truncating a payload in the TUI list
+
+**Title**
+
+```
+Multi-line payloads (vCard, vEvent) break the results list layout
+```
+
+**Body**
+
+```markdown
+The results list gives each image one row, but a payload containing
+newlines is written into that row verbatim, so one image takes three
+lines and the alignment of everything under it goes with it.
+
+A vCard is the common case, and it is not exotic — every "add me to your
+contacts" QR code is one:
+
+    [QR] IMG_0412.png  BEGIN:VCARD
+    FN:R. Bianchi
+    END:VCARD
+    [QR] IMG_0418.png  https://example.com/menu
+
+`truncate` in `main.go` shortens by length only; it has no opinion about
+control characters. The fix is to collapse whitespace — newlines, tabs,
+carriage returns — into single spaces before the length cut, so the row
+shows `BEGIN:VCARD FN:R. Bianchi END:VCARD` and stays one row.
+
+Do it in `truncate` rather than at the call sites: every caller wants a
+single line, and one of them already forgot.
+
+### Done when
+
+A test builds a `ScanResult` whose content contains `\n` and asserts
+`viewList()` emits one line per image. The detail view, which has room
+for the whole payload, must keep its line breaks.
+```
+
+Good first issue — one function, one test, no new dependency.

@@ -128,13 +128,14 @@ input[type=file] { display:none; }
 #count { margin-top:.3rem; font-size:.73rem; color:var(--dim); font-family:var(--mono);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
-.stats { display:grid; grid-template-columns:repeat(6, 1fr); border-bottom:1px solid var(--line); }
-@media (max-width:640px) { .stats { grid-template-columns:repeat(3, 1fr); } }
+.stats { display:grid; grid-template-columns:repeat(7, 1fr); border-bottom:1px solid var(--line); }
+@media (max-width:640px) { .stats { grid-template-columns:repeat(4, 1fr); } }
 .stats div { padding:.7rem .4rem; text-align:center; border-right:1px solid var(--line); }
 .stats div:last-child { border-right:0; }
 .stats b { display:block; font-size:1.25rem; font-weight:650; line-height:1.2; }
 .stats span { font-size:.68rem; color:var(--dim); }
 .stats .hit b { color:var(--ok); }
+.stats .warn b { color:var(--warn); }
 
 .toolbar { display:flex; gap:.45rem; flex-wrap:wrap; align-items:center;
   padding:.65rem .9rem; border-bottom:1px solid var(--line); }
@@ -148,9 +149,9 @@ input[type=search] { flex:1; min-width:9rem; }
 .empty svg { width:42px; height:42px; margin-bottom:.7rem; opacity:.5; }
 .empty p { margin:0; font-size:.9rem; }
 
-ul { list-style:none; margin:0; padding:0; max-height:38rem; overflow-y:auto; }
+ul { list-style:none; margin:0; padding:0; max-height:38rem; overflow-y:auto;
+     display:flex; flex-direction:column; }
 li { display:flex; gap:.75rem; padding:.75rem .9rem; border-bottom:1px solid var(--line); }
-li:last-child { border-bottom:0; }
 li img { width:48px; height:48px; object-fit:cover; border-radius:7px;
   background:var(--soft); flex:none; }
 li .noimg { width:48px; height:48px; border-radius:7px; background:var(--soft); flex:none; }
@@ -184,6 +185,7 @@ li .noimg { width:48px; height:48px; border-radius:7px; background:var(--soft); 
 .tagline { display:inline-block; margin-top:.3rem; font-size:.73rem;
   padding:.1rem .45rem; border-radius:5px; }
 .tagline.no { background:var(--soft); color:var(--dim); }
+.tagline.found { background:var(--warn-soft); color:var(--warn); }
 .tagline.err { background:var(--bad-soft); color:var(--bad); }
 .advice { margin-top:.3rem; font-size:.75rem; color:var(--dim); }
 
@@ -364,8 +366,9 @@ li .shim { width:48px; height:48px; border-radius:7px; background:var(--soft);
           <div id="fWith" class="hit" role="button" aria-pressed="false"><b id="sWith">0</b><span data-t="stat.with"></span></div>
           <div id="fCodes" role="button" aria-pressed="false"><b id="sCodes">0</b><span data-t="stat.codes"></span></div>
           <div id="fUniq" role="button" aria-pressed="false"><b id="sUniq">0</b><span data-t="stat.unique"></span></div>
+          <div id="fUnread" class="warn" role="button" aria-pressed="false"><b id="sUnread">0</b><span data-t="stat.unread"></span></div>
           <div id="fWithout" role="button" aria-pressed="false"><b id="sWithout">0</b><span data-t="stat.without"></span></div>
-          <div id="fErr" role="button" aria-pressed="false"><b id="sErr">0</b><span data-t="stat.unreadable"></span></div>
+          <div id="fErr" role="button" aria-pressed="false"><b id="sErr">0</b><span data-t="stat.unopened"></span></div>
         </div>
 
         <div class="toolbar">
@@ -426,6 +429,7 @@ li .shim { width:48px; height:48px; border-radius:7px; background:var(--soft);
 </footer>
 <script src="strings.js"></script>
 <script src="i18n.js"></script>
+<script src="order.js"></script>
 <script src="payload.js"></script>
 <script src="zip.js"></script>
 <script src="unzip.js"></script>
@@ -518,6 +522,11 @@ function finish(msg) {
   r.pending = false;
   r.codes = msg.codes || [];
   r.error = msg.error || "";
+  // The worker cannot reach the string table, so it names the sentence instead
+  // of writing it. See err.unopenable.
+  r.errorKey = msg.errorKey || "";
+  // Why this image has no code, when it has none.
+  r.reason = msg.reason || "";
   r.thumbURL = msg.thumb ? URL.createObjectURL(msg.thumb) : "";
   r.at = new Date();
   for (const c of r.codes) seenCount.set(c, (seenCount.get(c) || 0) + 1);
@@ -629,7 +638,8 @@ function enqueue(items, label) {
   for (const it of items) {
     const id = nextId++;
     const r = { id, name: it.file.name, path: it.path, file: it.file, batch,
-                codes: [], error: "", thumbURL: "", pending: true, seq: rows.length + 1 };
+                codes: [], error: "", reason: "", thumbURL: "", pending: true,
+                seq: rows.length + 1 };
     rows.push(r);
     byId.set(id, r);
     renderRow(r);                      // the row exists before its answer does
@@ -710,7 +720,8 @@ function onCameraResult(msg) {
   for (const c of fresh) seenLive.add(c);
   for (const c of fresh) seenCount.set(c, (seenCount.get(c) || 0) + 1);
   const r = { id: nextId++, name: t("tab.camera"), path: "", file: null, codes: fresh,
-              error: "", thumbURL: msg.thumb ? URL.createObjectURL(msg.thumb) : "",
+              error: "", reason: msg.reason || "",
+              thumbURL: msg.thumb ? URL.createObjectURL(msg.thumb) : "",
               pending: false, seq: rows.length + 1, at: new Date() };
   rows.push(r);
   byId.set(r.id, r);
@@ -775,31 +786,40 @@ function paintProgress() {
     : done + " / " + expected;
 }
 
+// The web's row order and the two questions behind it live in order.js, next
+// to the test that pins them. The terminal orders the same data differently on
+// purpose — see resultRank in scanner/scanner.go.
+const { rowRank, isUnread, settledEmpty } = Order;
+
 function paintStats() {
-  let withQR = 0, codes = 0, errs = 0, settled = 0;
+  let withQR = 0, codes = 0, errs = 0, unread = 0, settled = 0;
   const uniq = new Set();
   for (const r of rows) {
     if (r.pending) continue;
     settled++;
     if (r.error) errs++;
     else if (r.codes.length) { withQR++; codes += r.codes.length; for (const c of r.codes) uniq.add(c); }
+    else if (isUnread(r)) unread++;
   }
   $("sTotal").textContent = rows.length;
   $("sWith").textContent = withQR;
   $("sCodes").textContent = codes;
   $("sUniq").textContent = uniq.size;
-  $("sWithout").textContent = settled - withQR - errs;
+  $("sUnread").textContent = unread;
+  $("sWithout").textContent = settled - withQR - errs - unread;
   $("sErr").textContent = errs;
 }
 
 let activeTile = "fAll";
-const FILTERS = { fAll: "all", fWith: "with", fCodes: "with", fUniq: "unique", fWithout: "without", fErr: "error" };
+const FILTERS = { fAll: "all", fWith: "with", fCodes: "with", fUniq: "unique",
+                  fUnread: "unread", fWithout: "without", fErr: "error" };
 const filterOf = () => FILTERS[activeTile] || "all";
 
 function matchesFilter(r, firstOfPayload) {
   switch (filterOf()) {
     case "with": return !r.error && r.codes.length > 0;
-    case "without": return !r.pending && !r.error && r.codes.length === 0;
+    case "unread": return settledEmpty(r) && isUnread(r);
+    case "without": return settledEmpty(r) && !isUnread(r);
     case "error": return !!r.error;
     case "unique": return !r.error && r.codes.length > 0 && firstOfPayload.has(r.id);
     default: return true;
@@ -1002,6 +1022,7 @@ function renderRow(r) {
     $("list").appendChild(r.el);
   }
   const li = r.el;
+  li.style.order = rowRank(r);
   li.replaceChildren();
   li.classList.toggle("pending", !!r.pending);
 
@@ -1049,21 +1070,37 @@ function renderRow(r) {
     if (r.error) {
       const bad = document.createElement("div");
       bad.className = "tagline err";
-      bad.textContent = r.error;
+      // A translated sentence when the worker named one; the raw text only for
+      // the decoder's own errors, which are diagnostics rather than copy.
+      bad.textContent = r.errorKey ? t(r.errorKey) : r.error;
       meta.appendChild(bad);
       const advice = document.createElement("div");
       advice.className = "advice";
-      advice.textContent = t("err.advice");
+      // Not the re-shoot line: this file never opened, so there is no photo to
+      // retake and nothing about the framing to fix. What is left is the
+      // format, which is a thing a person can actually change.
+      advice.textContent = t("err.fileAdvice");
       meta.appendChild(advice);
     } else if (!r.codes.length) {
+      // Two situations, and only one of them is the user's to fix. A code that
+      // was located and could not be read is worth re-shooting; an image that
+      // holds no code is not, and telling someone to retake a photo of a code
+      // that was never there is the whole bug this branch exists to end.
+      const found = isUnread(r);
       const no = document.createElement("div");
-      no.className = "tagline no";
-      no.textContent = t("res.noCode");
+      no.className = found ? "tagline found" : "tagline no";
+      no.textContent = t(found ? "res.detected" : "res.noCode");
       meta.appendChild(no);
-      const advice = document.createElement("div");
-      advice.className = "advice";
-      advice.textContent = t("err.advice");
-      meta.appendChild(advice);
+      // Only the actionable state gets a second line. "No code found" already
+      // declines to assert the absence — found is a claim about the search, not
+      // about the image — so an advice line under it restated the label in more
+      // words and offered nothing to do. A row with no action reads quietest.
+      if (found) {
+        const advice = document.createElement("div");
+        advice.className = "advice";
+        advice.textContent = t("err.advice");
+        meta.appendChild(advice);
+      }
     } else {
       for (const c of r.codes) meta.appendChild(hitBox(c));
     }

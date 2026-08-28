@@ -104,6 +104,10 @@ func writeTXT(results []scanner.ScanResult, path string) error {
 			status = "QR OK"
 		case r.Error != "":
 			status = "ERROR"
+		case r.Classification == scanner.QRDetectedDecodeFailed:
+			// Not the same thing as an empty image, and a text report a person
+			// reads is exactly where that distinction is worth the characters.
+			status = "QR UNREAD"
 		default:
 			status = "NO QR"
 		}
@@ -112,6 +116,9 @@ func writeTXT(results []scanner.ScanResult, path string) error {
 			for _, c := range r.Contents {
 				fmt.Fprintf(f, "  content: %s\n", c)
 			}
+		}
+		if r.Classification == scanner.QRDetectedDecodeFailed {
+			fmt.Fprintf(f, "  reason: %s\n", r.Classification.Reason())
 		}
 		if r.Error != "" {
 			fmt.Fprintf(f, "  error: %s\n", r.Error)

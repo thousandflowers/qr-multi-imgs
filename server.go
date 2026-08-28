@@ -192,9 +192,14 @@ func (s *apiServer) handleHealth(w http.ResponseWriter, r *http.Request) {
 
 // wireSummary is scanner.Summary with a duration a browser can read.
 type wireSummary struct {
-	Total      int                  `json:"total"`
-	WithQR     int                  `json:"with_qr"`
-	WithoutQR  int                  `json:"without_qr"`
+	Total     int `json:"total"`
+	WithQR    int `json:"with_qr"`
+	WithoutQR int `json:"without_qr"`
+	// Detected is the part of WithoutQR holding a code that was located and
+	// could not be read. It ships because a client that only sees without_qr
+	// has to merge the two states back together to render a number, which is
+	// the bug this whole change removes from the UI.
+	Detected   int                  `json:"detected"`
 	Errors     int                  `json:"errors"`
 	TotalSize  int64                `json:"total_size"`
 	DurationMs int64                `json:"duration_ms"`
@@ -203,7 +208,8 @@ type wireSummary struct {
 
 func toWire(s *scanner.Summary) wireSummary {
 	return wireSummary{
-		Total: s.Total, WithQR: s.WithQR, WithoutQR: s.WithoutQR, Errors: s.Errors,
+		Total: s.Total, WithQR: s.WithQR, WithoutQR: s.WithoutQR,
+		Detected: s.Detected, Errors: s.Errors,
 		TotalSize: s.TotalSize, DurationMs: s.Duration.Milliseconds(), Results: s.Results,
 	}
 }

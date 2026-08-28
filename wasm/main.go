@@ -20,44 +20,75 @@ import (
 
 // decode reads every QR code out of one frame of RGBA pixels.
 //
-// JS signature: qrDecode(width, height, Uint8ClampedArray) -> {codes, error}
+// JS signature:
+//
+//	qrDecode(width, height, Uint8ClampedArray)
+//	  -> {codes, classification, detections, error}
+//
 // It is synchronous and CPU-bound, which is why the page runs it inside a
 // worker rather than on the thread that has to keep the UI moving.
+//
+// classification is why the answer is what it is — see scanner.Classification.
+// detections carry a box each, and only when a code was located and could not
+// be read. The page does not draw them; they are here because the same shape
+// is what the CLI exports and what the local API returns, and a caller that
+// wants them should not have to decode the image a second time to get them.
+//
+// Boxes are in the pixel space of the frame handed in, which is not the
+// original file's when the caller shrank it first. Any consumer that wants
+// them in file coordinates has to scale them itself, and only the caller still
+// knows by how much.
 func decode(_ js.Value, args []js.Value) any {
 	if len(args) < 3 {
-		return result(nil, "decode(width, height, pixels) takes three arguments")
+		return errResult("decode(width, height, pixels) takes three arguments")
 	}
 	w, h := args[0].Int(), args[1].Int()
 	if w <= 0 || h <= 0 {
-		return result(nil, "image has no pixels")
+		return errResult("image has no pixels")
 	}
 
 	want := w * h * 4
 	if n := args[2].Length(); n != want {
-		return result(nil, "pixel buffer is the wrong size for the given dimensions")
+		return errResult("pixel buffer is the wrong size for the given dimensions")
 	}
 
 	pix := make([]byte, want)
 	js.CopyBytesToGo(pix, args[2])
 	img := &image.RGBA{Pix: pix, Stride: w * 4, Rect: image.Rect(0, 0, w, h)}
 
-	codes, err := scanner.ScanDecodedImage(img)
+	d, err := scanner.ScanDecodedImageDetail(img)
 	if err != nil {
-		return result(nil, err.Error())
+		return errResult(err.Error())
 	}
-	return result(codes, "")
+	return result(d)
 }
 
-func result(codes []string, errMsg string) any {
-	out := make([]any, len(codes))
-	for i, c := range codes {
-		out[i] = c
+func result(d scanner.Detail) any {
+	codes := make([]any, len(d.Codes))
+	for i, c := range d.Codes {
+		codes[i] = c
 	}
-	m := map[string]any{"codes": out}
-	if errMsg != "" {
-		m["error"] = errMsg
+	dets := make([]any, len(d.Detections))
+	for i, det := range d.Detections {
+		dets[i] = map[string]any{
+			"x": det.Box.X, "y": det.Box.Y, "w": det.Box.W, "h": det.Box.H,
+			"module_size": det.ModuleSize,
+			"version":     det.Version,
+		}
 	}
-	return m
+	return map[string]any{
+		"codes":          codes,
+		"classification": string(d.Classification),
+		"detections":     dets,
+	}
+}
+
+func errResult(msg string) any {
+	return map[string]any{
+		"codes":      []any{},
+		"detections": []any{},
+		"error":      msg,
+	}
 }
 
 func main() {

@@ -23,15 +23,25 @@ import (
 	multiqr "github.com/makiuchi-d/gozxing/multi/qrcode"
 	multidetector "github.com/makiuchi-d/gozxing/multi/qrcode/detector"
 	"github.com/makiuchi-d/gozxing/qrcode"
+	"github.com/makiuchi-d/gozxing/qrcode/detector"
 )
 
 // ScanResult holds the outcome of scanning a single image file.
+//
+// Classification and Detections are additive: every field that was here before
+// still means what it did, so an existing consumer of the JSON export reads the
+// same rows it always has. What is new is why a row without a code has no code.
 type ScanResult struct {
 	FilePath string   `json:"file_path"`
 	HasQR    bool     `json:"has_qr"`
 	Contents []string `json:"qr_contents,omitempty"`
 	Error    string   `json:"error,omitempty"`
 	FileSize int64    `json:"file_size"`
+	// Classification is empty for a file that could not be read at all — see
+	// ScanImageDetail. Every other row carries one.
+	Classification Classification `json:"classification,omitempty"`
+	// Detections is populated only for QRDetectedDecodeFailed.
+	Detections []Detection `json:"detections,omitempty"`
 }
 
 // Summary aggregates scan results across all files in a folder.
@@ -40,6 +50,11 @@ type Summary struct {
 	WithQR    int
 	WithoutQR int
 	Errors    int
+	// Detected counts the images inside WithoutQR that hold a QR code the
+	// decoder located and could not read. It is a subset of WithoutQR, not a
+	// fourth bucket beside it: the file still has no payload, which is what
+	// every existing count and action means by "without".
+	Detected  int
 	TotalSize int64
 	Results   []ScanResult
 	StartTime time.Time
@@ -127,20 +142,57 @@ func tallySummary(list []ScanResult, start time.Time) *Summary {
 			s.Errors++
 		default:
 			s.WithoutQR++
+			if r.Classification == QRDetectedDecodeFailed {
+				s.Detected++
+			}
 		}
 		s.TotalSize += r.FileSize
 	}
 	return s
 }
 
-// sortResults sorts results: QR items first, then by file path.
+// sortResults puts the images that decoded first, then everything else, and
+// orders by file path within each group.
+//
+// This is deliberately NOT the order the web UI uses — see rowRank in
+// web/order.js, which leads with the images holding a code nobody could read.
+// The two surfaces want different things and each pins its own order in its
+// own test:
+//
+//   - In the terminal nothing is per-row. Every action the list offers (e
+//     export, d delete, o organize, r recreate) works on the whole set, never
+//     on the row under the cursor, so leading with the failures buys a reader
+//     nothing they can use.
+//   - It also costs them the answer. viewList renders 25 rows from the cursor,
+//     and on a real camera roll — a couple of hundred photos, most with no code
+//     in them — ranking NO_QR_FOUND above the decoded rows pushes every single
+//     payload past the first screen. The summary box has already given the
+//     counts by then; the list is where the payloads are read.
+//
+// In the browser the row IS the unit of work — it carries the thumbnail, the
+// rename preview and the filter tab that selects it — which is why triage
+// order is right there and wrong here.
 func sortResults(s *Summary) {
 	sort.Slice(s.Results, func(i, j int) bool {
-		if s.Results[i].HasQR != s.Results[j].HasQR {
-			return s.Results[i].HasQR && !s.Results[j].HasQR
+		a, b := s.Results[i], s.Results[j]
+		if ra, rb := resultRank(a), resultRank(b); ra != rb {
+			return ra < rb
 		}
-		return s.Results[i].FilePath < s.Results[j].FilePath
+		return a.FilePath < b.FilePath
 	})
+}
+
+// resultRank orders the buckets for the terminal list. See sortResults for why
+// this is two buckets and not four, and why it is not what the web does.
+//
+// Classification still reaches the row — viewList marks a located-but-unread
+// image [QR?] and names the reason — it just does not move it. Saying what a
+// row is and deciding where it sits are separate jobs.
+func resultRank(r ScanResult) int {
+	if r.HasQR {
+		return 0
+	}
+	return 1
 }
 
 // ─── multi-strategy decoding ─────────────────────────────────────────────────
@@ -320,27 +372,37 @@ func projectionChannels() []string {
 	return out
 }
 
-// countCandidates estimates how many QR codes the image holds, by locating
-// finder patterns rather than decoding anything. Finder patterns are cheap to
-// find and a payload is expensive to recover, which is what makes an evidence
-// based stopping rule affordable.
+// detectFinders locates QR finder patterns without decoding anything. Finder
+// patterns are cheap to find and a payload is expensive to recover, which is
+// what makes an evidence based stopping rule affordable.
 //
 // It looks across every colour projection the strategies use, not just
-// luminance, and takes the largest count any of them shows. That breadth is the
-// whole point: a code whose contrast lives in one channel can be nearly absent
-// from the luminance image — red on green of the same brightness is the extreme
-// case — so a count taken from luminance alone would miss it, and a decode loop
-// trusting that count would stop before the channel strategy that could read
-// it ever ran. Taking the maximum means a projection that hides a code can
-// never lower a target another projection has already raised.
+// luminance, and keeps the triples from whichever projection shows the most.
+// That breadth is the whole point: a code whose contrast lives in one channel
+// can be nearly absent from the luminance image — red on green of the same
+// brightness is the extreme case — so a count taken from luminance alone would
+// miss it, and a decode loop trusting that count would stop before the channel
+// strategy that could read it ever ran. Taking the largest set means a
+// projection that hides a code can never lower a target another projection has
+// already raised.
 //
-// Returns 0 when nothing is detected anywhere, which disables early exit
+// The geometry, not only the count, is returned. An image that failed to decode
+// with finder patterns plainly located is a different answer from an image with
+// nothing in it, and these triples are what let a caller tell the two apart —
+// see classify.go. Until this returned a bare count, and every box was thrown
+// away the moment it was computed.
+//
+// Returns nil when nothing is detected anywhere, which disables early exit
 // entirely rather than ending the search.
-func countCandidates(img image.Image) int {
+//
+// Result points are in original-image coordinates: every projection here is
+// unscaled and uncropped, so nothing needs mapping back. A projection that
+// scaled would have to map at capture time — see the contract in hits.go.
+func detectFinders(img image.Image) []*detector.FinderPatternInfo {
 	hints := map[gozxing.DecodeHintType]interface{}{
 		gozxing.DecodeHintType_TRY_HARDER: true,
 	}
-	most := 0
+	var best []*detector.FinderPatternInfo
 	for _, channel := range projectionChannels() {
 		src := projectChannel(img, channel)
 		// Global histogram: cheapest binarizer, and the most forgiving on the
@@ -356,15 +418,23 @@ func countCandidates(img image.Image) int {
 		}
 		infos, ferr := multidetector.NewMultiFinderPatternFinder(matrix, nil).FindMulti(hints)
 		if ferr != nil {
-			// A detector error must cost time, never recall: leaving the count
+			// A detector error must cost time, never recall: leaving the set
 			// where it is only fails to stop the loop early.
+			//
+			// The partial centres behind this error are deliberately not used.
+			// FindMulti does populate them before failing — GetPossibleCenters
+			// returns what it had — so they are there for the taking. Measured,
+			// they also fire where there is nothing: a uniform-noise image with
+			// no code in it yields one. A bucket built on them would promise a
+			// code the image does not contain, which is the failure this whole
+			// change exists to stop, pointed the other way.
 			continue
 		}
-		if len(infos) > most {
-			most = len(infos)
+		if len(infos) > len(best) {
+			best = infos
 		}
 	}
-	return most
+	return best
 }
 
 // decodeRaster runs the pure-Go strategies over a decoded image and returns
@@ -377,7 +447,7 @@ func countCandidates(img image.Image) int {
 // really held one code. Running all ten instead costs roughly thirty times the
 // old best case on real photos, which is why the loop stops on evidence.
 //
-// countCandidates says how many codes are visible before any decoding starts;
+// detectFinders says how many codes are visible before any decoding starts;
 // once that many have been decoded there is nothing left to look for. The
 // guards are that at least one strategy always runs, and that a count of zero
 // disables early exit rather than triggering it, so uncertainty costs time
@@ -388,7 +458,17 @@ func countCandidates(img image.Image) int {
 // It is strictly better than stopping at the first success, and it is what
 // makes the union affordable.
 func decodeRaster(img image.Image) ([]hit, error) {
-	target := countCandidates(img)
+	hits, _, err := decodeRasterDetail(img)
+	return hits, err
+}
+
+// decodeRasterDetail is decodeRaster plus the finder-pattern triples the pass
+// already located. Two entry points rather than one because decodeRaster's
+// shape is load-bearing across the package and its tests, and a caller that
+// only wants payloads should not have to name a value it will discard.
+func decodeRasterDetail(img image.Image) ([]hit, []*detector.FinderPatternInfo, error) {
+	infos := detectFinders(img)
+	target := len(infos)
 	var hits []hit
 	for _, s := range strategies {
 		hits = mergeHits(hits, decodeAttempt(img, s))
@@ -397,7 +477,7 @@ func decodeRaster(img image.Image) ([]hit, error) {
 		}
 	}
 	sortHits(hits)
-	return hits, nil
+	return hits, infos, nil
 }
 
 // maskRenderScale upscales each QR module to this many pixels before decoding.
@@ -496,6 +576,24 @@ func ScanDecodedImage(img image.Image) ([]string, error) {
 	return hitTexts(hits), err
 }
 
+// ScanDecodedImageDetail is ScanDecodedImage plus the reason behind the answer:
+// which of the three buckets this image fell into, and where the codes are when
+// they were located but could not be read.
+//
+// It exists because "no QR found" is the wrong thing to tell someone looking at
+// a photo of a QR code, and the evidence to say something truer was already
+// being computed and discarded. This is the entry point a UI wants; the plain
+// one stays for callers that only need payloads.
+func ScanDecodedImageDetail(img image.Image) (Detail, error) {
+	hits, infos, err := decodeRasterDetail(img)
+	codes := hitTexts(hits)
+	d := Detail{Codes: codes, Classification: classify(codes, infos)}
+	if d.Classification == QRDetectedDecodeFailed {
+		d.Detections = detectionsFrom(infos, img.Bounds())
+	}
+	return d, err
+}
+
 // ScanMode selects how much work ScanImageMode does before giving up.
 //
 // There are exactly two modes and neither carries an expected number of codes.
@@ -528,6 +626,19 @@ func ScanImage(path string) ([]string, error) {
 // ScanImageMode decodes every QR code in the image at path under the given
 // mode. See ScanMode for what the modes cost.
 func ScanImageMode(path string, mode ScanMode) ([]string, error) {
+	d, err := ScanImageDetail(path, mode)
+	return d.Codes, err
+}
+
+// ScanImageDetail is ScanImageMode plus the reason behind the answer. See
+// Classification: the interesting case is an image whose finder patterns were
+// located and whose payload no strategy could recover, which until now was
+// reported as an image with no code in it.
+//
+// A file that could not be read at all returns an error and no Detail, exactly
+// as before. An unreadable file has no classification — "no QR found" would be
+// a claim about pixels nobody ever saw.
+func ScanImageDetail(path string, mode ScanMode) (Detail, error) {
 	exhaustive := mode == ScanExhaustive
 
 	// A companion .npy mask, when present, is the pixel-exact source QR, and it
@@ -539,14 +650,14 @@ func ScanImageMode(path string, mode ScanMode) ([]string, error) {
 	if text := decodeNPYMask(path); text != "" {
 		hits = append(hits, hit{text: text})
 		if !exhaustive {
-			return hitTexts(hits), nil
+			return Detail{Codes: hitTexts(hits), Classification: Decoded}, nil
 		}
 	}
 
 	// The file has to be readable at all; nothing downstream can work otherwise.
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, err
+		return Detail{}, err
 	}
 	img, _, decodeErr := image.Decode(f)
 	f.Close()
@@ -567,11 +678,12 @@ func ScanImageMode(path string, mode ScanMode) ([]string, error) {
 	// multiscale tiling) will land into: a strategy that runs out of room must
 	// cost recall, not the whole scan.
 	var rasterErr error
+	var infos []*detector.FinderPatternInfo
 	if decodeErr != nil {
 		rasterErr = fmt.Errorf("decode: %w", decodeErr)
 	} else {
 		var rasterHits []hit
-		rasterHits, rasterErr = decodeRaster(img)
+		rasterHits, infos, rasterErr = decodeRasterDetail(img)
 		hits = mergeHits(hits, rasterHits)
 	}
 
@@ -604,10 +716,19 @@ func ScanImageMode(path string, mode ScanMode) ([]string, error) {
 	// "no QR here" is the honest answer — calling that an error would turn a
 	// whole HEIC camera roll into a wall of failures.
 	if len(hits) == 0 && rasterErr != nil && !visionReadable {
-		return nil, rasterErr
+		return Detail{}, rasterErr
 	}
 	sortHits(hits)
-	return hitTexts(hits), nil
+
+	codes := hitTexts(hits)
+	d := Detail{Codes: codes, Classification: classify(codes, infos)}
+	// Vision and zbarimg report no finder patterns, so an image they read has
+	// no geometry to box even when it decoded. Boxes are only drawn for the
+	// bucket that has nothing else to show.
+	if d.Classification == QRDetectedDecodeFailed && img != nil {
+		d.Detections = detectionsFrom(infos, img.Bounds())
+	}
+	return d, nil
 }
 
 // FormatBytes returns a human-readable string for a byte count.
