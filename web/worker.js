@@ -113,8 +113,13 @@ async function run(job) {
     // a guess.
     // The sentence is named, not written: a worker has no string table, and
     // hardcoding English here left this one line untranslated in every locale
-    // while the advice under it translated. out.error stays as the English
-    // fallback the CSV and JSON exports carry.
+    // while the advice under it translated.
+    //
+    // The rule, and the reason these two fields both exist: the UI localises,
+    // the export does not. errorKey is what a person reads, so it follows their
+    // language; error is what the CSV and JSON exports carry, so it stays this
+    // one English string that a script can match on and that means the same
+    // thing to whoever opens the file next.
     out.errorKey = "err.unopenable";
     out.error = "could not be read — unsupported format, or a damaged file";
     out.detail = String((e && e.message) || e);
