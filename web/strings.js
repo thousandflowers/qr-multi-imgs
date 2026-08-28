@@ -51,7 +51,8 @@
     "res.nothing": "There is nothing readable in there. It takes pictures.",
     "res.search": "Search inside the codes…",
     "res.noMatch": "No result matches that search.",
-    "res.noCode": "No code in this image",
+    "res.noCode": "No code found",
+    "res.detected": "Code found, couldn't read it",
     "engine.loading": "starting the reader",
     "engine.ready": "reader ready",
 
@@ -60,8 +61,9 @@
     "stat.with": "with a code",
     "stat.codes": "codes",
     "stat.unique": "unique",
-    "stat.without": "without",
-    "stat.unreadable": "unreadable",
+    "stat.unread": "unread",
+    "stat.without": "no code",
+    "stat.unopened": "unopened",
 
     "act.copyAll": "Copy all",
     "act.copy": "copy",
@@ -87,6 +89,8 @@
     "dupe.badge": "in {n} images",
 
     "err.advice": "Try again closer, with the code flat and evenly lit. Or crop tight around it.",
+    "err.unopenable": "could not be read — unsupported format, or a damaged file",
+    "err.fileAdvice": "Converting it to PNG or JPEG usually works. The local app reads formats this browser cannot.",
 
     "adv.localTitle": "The local app is running",
     "adv.localOn": "A local copy of the program is answering, so this page can also work on the files where they sit.",
@@ -150,7 +154,8 @@
     "res.nothing": "Lì dentro non c'è niente da leggere. Servono immagini.",
     "res.search": "Cerca dentro i codici…",
     "res.noMatch": "Nessun risultato corrisponde alla ricerca.",
-    "res.noCode": "Nessun codice in questa immagine",
+    "res.noCode": "Nessun codice trovato",
+    "res.detected": "Codice trovato, non leggibile",
     "engine.loading": "avvio del lettore",
     "engine.ready": "lettore pronto",
 
@@ -159,8 +164,9 @@
     "stat.with": "con un codice",
     "stat.codes": "codici",
     "stat.unique": "univoci",
-    "stat.without": "senza",
-    "stat.unreadable": "illeggibili",
+    "stat.unread": "non letti",
+    "stat.without": "senza codice",
+    "stat.unopened": "non aperti",
 
     "act.copyAll": "Copia tutto",
     "act.copy": "copia",
@@ -186,6 +192,8 @@
     "dupe.badge": "in {n} immagini",
 
     "err.advice": "Riprova più da vicino, con il codice dritto e illuminato in modo uniforme. Oppure ritaglia stretto attorno al codice.",
+    "err.unopenable": "impossibile leggerlo — formato non supportato o file danneggiato",
+    "err.fileAdvice": "Di solito basta convertirlo in PNG o JPEG. L'app locale legge formati che questo browser non apre.",
 
     "adv.localTitle": "L'app locale sta girando",
     "adv.localOn": "Una copia locale del programma sta rispondendo, quindi questa pagina può lavorare sui file dove si trovano.",
@@ -249,7 +257,8 @@
     "res.nothing": "Ahí dentro no hay nada que leer. Hacen falta imágenes.",
     "res.search": "Buscar dentro de los códigos…",
     "res.noMatch": "Ningún resultado coincide con la búsqueda.",
-    "res.noCode": "Ningún código en esta imagen",
+    "res.noCode": "No se encontró ningún código",
+    "res.detected": "Código encontrado, no se pudo leer",
     "engine.loading": "iniciando el lector",
     "engine.ready": "lector listo",
 
@@ -258,8 +267,9 @@
     "stat.with": "con código",
     "stat.codes": "códigos",
     "stat.unique": "únicos",
+    "stat.unread": "sin leer",
     "stat.without": "sin código",
-    "stat.unreadable": "ilegibles",
+    "stat.unopened": "sin abrir",
 
     "act.copyAll": "Copiar todo",
     "act.copy": "copiar",
@@ -285,6 +295,8 @@
     "dupe.badge": "en {n} imágenes",
 
     "err.advice": "Inténtalo de nuevo más cerca, con el código recto y bien iluminado. O recorta justo a su alrededor.",
+    "err.unopenable": "no se ha podido leer — formato no compatible o archivo dañado",
+    "err.fileAdvice": "Suele bastar con convertirlo a PNG o JPEG. La app local lee formatos que este navegador no abre.",
 
     "adv.localTitle": "La aplicación local está en marcha",
     "adv.localOn": "Una copia local del programa está respondiendo, así que esta página puede trabajar sobre los archivos donde están.",
@@ -348,7 +360,8 @@
     "res.nothing": "Il n'y a rien de lisible là-dedans. Il faut des images.",
     "res.search": "Chercher dans les codes…",
     "res.noMatch": "Aucun résultat ne correspond à cette recherche.",
-    "res.noCode": "Aucun code dans cette image",
+    "res.noCode": "Aucun code trouvé",
+    "res.detected": "Code trouvé, lecture impossible",
     "engine.loading": "démarrage du lecteur",
     "engine.ready": "lecteur prêt",
 
@@ -357,8 +370,9 @@
     "stat.with": "avec un code",
     "stat.codes": "codes",
     "stat.unique": "uniques",
-    "stat.without": "sans",
-    "stat.unreadable": "illisibles",
+    "stat.unread": "non lus",
+    "stat.without": "sans code",
+    "stat.unopened": "non ouverts",
 
     "act.copyAll": "Tout copier",
     "act.copy": "copier",
@@ -384,6 +398,8 @@
     "dupe.badge": "dans {n} images",
 
     "err.advice": "Réessayez de plus près, le code bien droit et uniformément éclairé. Ou recadrez au plus juste autour.",
+    "err.unopenable": "lecture impossible — format non pris en charge ou fichier endommagé",
+    "err.fileAdvice": "Le convertir en PNG ou JPEG suffit généralement. L'app locale lit des formats que ce navigateur n'ouvre pas.",
 
     "adv.localTitle": "L'application locale tourne",
     "adv.localOn": "Une copie locale du programme répond, donc cette page peut travailler sur les fichiers là où ils sont.",
@@ -447,7 +463,8 @@
     "res.nothing": "Da ist nichts Lesbares drin. Es braucht Bilder.",
     "res.search": "In den Codes suchen…",
     "res.noMatch": "Kein Ergebnis passt zu dieser Suche.",
-    "res.noCode": "Kein Code in diesem Bild",
+    "res.noCode": "Kein Code gefunden",
+    "res.detected": "Code gefunden, nicht lesbar",
     "engine.loading": "Leser wird gestartet",
     "engine.ready": "Leser bereit",
 
@@ -456,8 +473,9 @@
     "stat.with": "mit Code",
     "stat.codes": "Codes",
     "stat.unique": "eindeutig",
-    "stat.without": "ohne",
-    "stat.unreadable": "unlesbar",
+    "stat.unread": "ungelesen",
+    "stat.without": "ohne Code",
+    "stat.unopened": "nicht geöffnet",
 
     "act.copyAll": "Alles kopieren",
     "act.copy": "kopieren",
@@ -483,6 +501,8 @@
     "dupe.badge": "in {n} Bildern",
 
     "err.advice": "Versuchen Sie es näher, mit dem Code gerade und gleichmäßig beleuchtet. Oder schneiden Sie eng darum zu.",
+    "err.unopenable": "nicht lesbar — nicht unterstütztes Format oder beschädigte Datei",
+    "err.fileAdvice": "Meist genügt es, sie in PNG oder JPEG umzuwandeln. Die lokale App liest Formate, die dieser Browser nicht öffnet.",
 
     "adv.localTitle": "Die lokale Anwendung läuft",
     "adv.localOn": "Eine lokale Kopie des Programms antwortet, diese Seite kann also mit den Dateien dort arbeiten, wo sie liegen.",
@@ -546,7 +566,8 @@
     "res.nothing": "Ali dentro não há nada para ler. São precisas imagens.",
     "res.search": "Procurar dentro dos códigos…",
     "res.noMatch": "Nenhum resultado corresponde a essa procura.",
-    "res.noCode": "Nenhum código nesta imagem",
+    "res.noCode": "Nenhum código encontrado",
+    "res.detected": "Código encontrado, não foi possível lê-lo",
     "engine.loading": "a iniciar o leitor",
     "engine.ready": "leitor pronto",
 
@@ -555,8 +576,9 @@
     "stat.with": "com código",
     "stat.codes": "códigos",
     "stat.unique": "únicos",
+    "stat.unread": "por ler",
     "stat.without": "sem código",
-    "stat.unreadable": "ilegíveis",
+    "stat.unopened": "não abertos",
 
     "act.copyAll": "Copiar tudo",
     "act.copy": "copiar",
@@ -582,6 +604,8 @@
     "dupe.badge": "em {n} imagens",
 
     "err.advice": "Tente de novo mais perto, com o código direito e bem iluminado. Ou corte justo à volta dele.",
+    "err.unopenable": "não foi possível ler — formato não suportado ou ficheiro danificado",
+    "err.fileAdvice": "Normalmente basta convertê-lo para PNG ou JPEG. A app local lê formatos que este navegador não abre.",
 
     "adv.localTitle": "A aplicação local está a correr",
     "adv.localOn": "Uma cópia local do programa está a responder, por isso esta página pode trabalhar sobre os ficheiros onde estão.",

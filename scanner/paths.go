@@ -87,12 +87,18 @@ func runJobs(jobs []scanJob, onResult func(ScanResult)) []ScanResult {
 			defer wg.Done()
 			for j := range in {
 				r := ScanResult{FilePath: j.path, FileSize: j.fi.Size()}
-				contents, err := ScanImage(j.path)
+				d, err := ScanImageDetail(j.path, ScanFast)
 				if err != nil {
+					// An unreadable file gets no classification: its pixels were
+					// never seen, so there is nothing to say about them.
 					r.Error = err.Error()
-				} else if len(contents) > 0 {
-					r.HasQR = true
-					r.Contents = contents
+				} else {
+					r.Classification = d.Classification
+					r.Detections = d.Detections
+					if len(d.Codes) > 0 {
+						r.HasQR = true
+						r.Contents = d.Codes
+					}
 				}
 				results <- r
 			}

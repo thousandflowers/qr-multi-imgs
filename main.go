@@ -643,12 +643,21 @@ func (m model) viewResults() string {
 	s := m.summary
 	folder := scanLabel(s)
 
+	// An image holding a code the decoder located and could not read is not an
+	// empty image, and counting it as one here would be the same false claim
+	// the results list used to make, in a different font. The two are separate
+	// figures, and the actionable one leads.
+	middle := fmt.Sprintf("%s %d no code", warnStyle.Render("●"), s.WithoutQR-s.Detected)
+	if s.Detected > 0 {
+		middle = fmt.Sprintf("%s %d unread  │  %s", warnStyle.Render("●"), s.Detected, middle)
+	}
+
 	summaryBody := fmt.Sprintf(
-		"\U0001f4c1  %s\n\nTotal: %d  │  %s %d with QR  │  %s %d empty  │  %s %d errors  │  \u23f1 %s",
+		"\U0001f4c1  %s\n\nTotal: %d  │  %s %d with QR  │  %s  │  %s %d errors  │  \u23f1 %s",
 		filepath.Base(folder),
 		s.Total,
 		okStyle.Render("●"), s.WithQR,
-		warnStyle.Render("●"), s.WithoutQR,
+		middle,
 		errStyle.Render("●"), s.Errors,
 		roundDur(s.Duration),
 	)
@@ -705,7 +714,14 @@ func (m model) viewList() string {
 		icon := okStyle.Render("QR")
 		content := ""
 		if !r.HasQR {
+			// An image whose finder patterns were located says so. Telling
+			// someone "no QR" about a code they can see is what made this list
+			// look wrong on exactly the photos they cared about.
 			icon = warnStyle.Render("--")
+			if r.Classification == scanner.QRDetectedDecodeFailed {
+				icon = warnStyle.Render("QR?")
+				content = "  " + mutedStyle.Render(r.Classification.Reason())
+			}
 		} else if len(r.Contents) > 0 {
 			// One row has space for one payload, so an image holding several
 			// codes says so rather than showing the first and looking like an
