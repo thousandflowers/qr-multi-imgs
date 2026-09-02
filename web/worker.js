@@ -7,7 +7,7 @@
 //
 // Nothing here uploads anything. The file never leaves the tab.
 
-importScripts("wasm_exec.js", "result.js");
+importScripts("wasm_exec.js", "result.js", "native.js");
 
 // A photo straight off a phone can be 12 megapixels, and the cost is almost
 // entirely in the pixels: measured on a 3024x4032 photo, decoding at a 3000 px
@@ -199,7 +199,12 @@ async function crop(job) {
       const data = ctx.getImageData(0, 0, cut.width, cut.height);
 
       const res = qrDecode(data.width, data.height, data.data);
-      last = Result.carry(res, { w: data.width, h: data.height, naturalW: data.width, naturalH: data.height });
+      const space = { w: data.width, h: data.height, naturalW: data.width, naturalH: data.height };
+      last = Result.carry(res, space);
+      // The browser's own decoder on the same crop. On a cropped code it is
+      // the one most likely to succeed, which is the whole point of cropping.
+      const nat = await Native.detect(cut);
+      if (nat) for (const c of nat.codes) last.codes.push(c);
       for (const c of last.codes) seen.add(c);
       if (res.error) out.error = res.error;
     }
@@ -244,20 +249,50 @@ function encodeBatch(job) {
 // is not decoding has to go: no blob, no createImageBitmap, no re-encode. The
 // page hands over the buffer it already has and gets back the codes and where
 // they are.
-function frame(job) {
+async function frame(job) {
   const out = { type: "frameResult", id: job.id, w: job.w, h: job.h };
+  const space = { w: job.w, h: job.h, naturalW: job.natW, naturalH: job.natH };
   try {
+    const pixels = new Uint8ClampedArray(job.buf);
     // The viewfinder's own decoder: a short cascade, because another frame is
     // fifty milliseconds away and a scanner that thinks for a third of a
     // second cannot be aimed. Measured in scanner/live.go.
-    const res = qrDecodeLive(job.w, job.h, new Uint8ClampedArray(job.buf));
-    Object.assign(out, Result.carry(res, { w: job.w, h: job.h, naturalW: job.natW, naturalH: job.natH }));
+    const res = qrDecodeLive(job.w, job.h, pixels);
+    Object.assign(out, Result.carry(res, space));
+    // And the one the browser already has, which on macOS is the system's own
+    // and reads the small, coloured and branded codes this one cannot. See
+    // native.js. Unioned, because each finds things the other misses.
+    await mergeNative(out, new ImageData(pixels, job.w, job.h), space);
   } catch (e) {
     out.error = String((e && e.message) || e);
-    out.codes = [];
-    out.detections = [];
+    out.codes = out.codes || [];
+    out.detections = out.detections || [];
   }
   self.postMessage(out);
+}
+
+// mergeNative folds the browser decoder's answer into one already produced by
+// the wasm engine. Payloads are deduped; a box is kept for a code that had
+// none, because a code with no geometry cannot be drawn or pointed at.
+async function mergeNative(out, source, space) {
+  const nat = await Native.detect(source);
+  if (!nat) return;
+  const have = new Set(out.codes || []);
+  const carried = Result.carry({ codes: nat.codes, detections: nat.detections, classification: "" }, space);
+  for (let i = 0; i < carried.codes.length; i++) {
+    if (have.has(carried.codes[i])) continue;
+    have.add(carried.codes[i]);
+    out.codes.push(carried.codes[i]);
+  }
+  const drawn = new Set((out.detections || []).filter((d) => d.text).map((d) => d.text));
+  for (const d of carried.detections) {
+    if (d.text && !drawn.has(d.text)) {
+      drawn.add(d.text);
+      out.detections.push(d);
+    }
+  }
+  // A code the browser read is a code that was read, whatever the enum said.
+  if (out.codes.length) out.reason = "DECODED";
 }
 
 const HANDLERS = { crop, encode: encodeBatch, frame };
