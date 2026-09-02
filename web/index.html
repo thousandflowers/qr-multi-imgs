@@ -226,7 +226,20 @@ input[type=file] { display:none; }
 .stats { display:grid; grid-template-columns:repeat(auto-fit, minmax(96px, 1fr));
   border-bottom:1px solid var(--line); }
 .stats .hide { display:none; }
+/* Visible to a screen reader, not on screen. */
+.sr { position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+  overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
+#renameEg { font-size:var(--fs-2); color:var(--dim); font-family:var(--mono);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:22rem; }
+#nowFile { padding:4px 12px 0; font-size:var(--fs-2); color:var(--dim);
+  font-family:var(--mono); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#nowFile.slow { color:var(--warn); font-family:var(--sans); }
 #summary { padding:8px 12px 0; color:var(--dim); font-size:var(--fs-2); }
+/* A payload that is a link looks like one but is a button: see the note where
+   it is built. */
+.linkish { background:none; border:0; padding:0; color:var(--brand);
+  text-decoration:underline; cursor:pointer; text-align:left; font:inherit;
+  font-family:var(--mono); font-size:var(--fs-2); word-break:break-all; }
 .chip { font-size:var(--fs-2); padding:4px 8px; border-radius:999px;
   border:1px solid var(--line); background:var(--panel); color:var(--dim); cursor:pointer; }
 .chip[aria-pressed="true"] { background:var(--brand-soft); border-color:var(--brand); color:var(--brand); }
@@ -353,6 +366,28 @@ li canvas.thumb { width:72px; height:72px; border-radius:9px; display:block;
 /* The "point at the code" panel. One canvas, opened on demand and torn down on
    close: a hundred rows each holding a full-resolution image is the thing that
    kills the page, and the row thumbnails stay 48px for exactly that reason. */
+#linkAsk[hidden] { display:none; }
+#linkAsk { position:fixed; inset:0; z-index:70; display:flex; align-items:center;
+  justify-content:center; background:rgba(0,0,0,.6); padding:16px; }
+#linkBox { background:var(--panel); border-radius:14px; padding:20px;
+  width:min(94vw,560px); box-shadow:0 20px 60px rgba(0,0,0,.35); }
+#linkBox h3 { margin:0 0 12px; font-size:var(--fs-5); }
+#linkBox .lbl { margin:12px 0 4px; font-size:var(--fs-2); color:var(--dim); }
+/* The host, as large as the title. It is the one fact that decides the answer,
+   so it is the one thing that cannot be skimmed past. */
+#linkHost { font-family:var(--mono); font-size:var(--fs-5); font-weight:700;
+  word-break:break-all; color:var(--fg); }
+#linkFull { font-family:var(--mono); font-size:var(--fs-2); color:var(--dim);
+  word-break:break-all; max-height:6em; overflow:auto;
+  background:var(--soft); border-radius:8px; padding:8px; }
+#linkWarn { display:flex; flex-direction:column; gap:8px; margin-top:12px; }
+#linkWarn div { font-size:var(--fs-2); color:var(--bad); background:var(--bad-soft);
+  border:1px solid var(--bad); border-radius:8px; padding:8px 10px; }
+#linkBtns { display:flex; gap:8px; margin-top:16px; }
+/* When something is wrong, the safe answer is the emphasised one. */
+#linkAsk.risky #linkGo { background:var(--panel); border-color:var(--line); color:var(--dim); }
+#linkAsk.risky #linkNo { background:var(--brand); border-color:var(--brand); color:var(--brand-fg); }
+
 #scan[hidden] { display:none; }
 #scan { position:fixed; inset:0; z-index:60; display:flex; align-items:center;
   justify-content:center; background:rgba(0,0,0,.72); padding:16px; }
@@ -461,12 +496,7 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
   <div class="hero">
     <h1 data-t="hero.title"></h1>
     <p data-t="hero.sub"></p>
-    <div class="trust">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
-        <path d="M12 3l7 3v6c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/>
-      </svg>
-      <span data-t="hero.trust"></span>
-    </div>
+    
   </div>
 
   <div class="tool">
@@ -486,7 +516,7 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
           </svg>
           <span data-t="trust.badge"></span>
         </div>
-        <div id="drop" class="roomy">
+        <div id="drop" class="roomy" aria-describedby="dropAlt">
           <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
             <path d="M12 16V4"/><path d="M7.5 8.5L12 4l4.5 4.5"/>
             <path d="M4 15v3a2 2 0 002 2h12a2 2 0 002-2v-3"/>
@@ -494,6 +524,10 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
           <strong data-t="drop.title"></strong>
           <small data-t="drop.sub"></small>
           <div class="formats">PNG JPG WEBP GIF BMP AVIF HEIC ZIP</div>
+          <!-- Dropping is a pointer gesture with no keyboard equivalent of its
+               own. The equivalent exists - it is the buttons below - and this
+               is what says so to anyone who cannot see them sitting there. -->
+          <p id="dropAlt" class="sr" data-t="drop.keyboard"></p>
         </div>
         <!-- The camera is a target, like the drop zone above it, not a button
              in a list. It is one of the two ways in that a person arrives
@@ -545,10 +579,15 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
 
       <div id="work" class="hide">
         <div class="workRow">
-          <span id="count"></span>
+          <!-- Announced, not just drawn. A count that only changes visually
+               tells a screen-reader user nothing, and this is the part of the
+               page that answers "is it stuck". -->
+          <span id="count" role="status" aria-live="polite"></span>
           <span class="grow"></span>
+          <button id="pause" class="hide" data-t="work.pause"></button>
           <button id="clear" class="danger" data-t="act.clear"></button>
         </div>
+        <div id="nowFile"></div>
         <div id="bar"><i></i></div>
         <div id="clearPop" class="pop hide">
           <p data-t="act.clearAsk"></p>
@@ -583,11 +622,17 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
                unique view to a toggle beside the search. -->
         </div>
 
-        <div id="summary"></div>
+        <!-- Announced when it changes: the counts are the result, and a
+             result that only appears visually has not been delivered to
+             everyone. -->
+        <div id="summary" role="status" aria-live="polite"></div>
 
         <div class="toolbar">
           <input type="search" id="search" data-t-ph="res.search">
-          <button id="fUniq" class="chip" role="button" aria-pressed="false" data-t="stat.unique"></button>
+          <button id="fUniq" class="chip" role="button" aria-pressed="false"
+                  data-t="stat.unique" data-t-title="stat.uniqueHelp"></button>
+          <label class="sr" for="kind" data-t="filter.kind"></label>
+          <select id="kind"><option value="" data-t="filter.kindAll"></option></select>
           <button id="copyAll" data-t="act.copyAll"></button>
           <select id="fmt"><option>csv</option><option>json</option><option>txt</option></select>
           <button id="save" data-t="act.download"></button>
@@ -602,6 +647,9 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
             <option value="keep" data-t="rename.keep"></option>
           </select>
           <button id="zip" class="primary"></button>
+          <!-- What the choice above actually produces, on a file in the list.
+               The option names describe a rule; this shows the result. -->
+          <span id="renameEg"></span>
         </div>
 
         <!-- Recreating the codes as files. It used to live in the local-app
@@ -636,6 +684,25 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
     <a href="https://github.com/thousandflowers/qr-multi-imgs/blob/main/LICENSE">MIT</a>
   </div>
 </footer>
+<!-- Where a scanned link goes, shown before anyone follows it. A QR code is a
+     URL nobody can read, so the one way this page could mislead a person is by
+     opening something the code did not visibly say. It never opens straight
+     from a scan. -->
+<div id="linkAsk" hidden role="dialog" aria-modal="true" aria-labelledby="linkTitle">
+  <div id="linkBox">
+    <h3 id="linkTitle" data-t="link.title"></h3>
+    <p class="lbl" data-t="link.goes"></p>
+    <div id="linkHost"></div>
+    <p class="lbl" data-t="link.full"></p>
+    <div id="linkFull"></div>
+    <div id="linkWarn"></div>
+    <div id="linkBtns">
+      <button id="linkGo" class="primary" data-t="link.open"></button>
+      <button id="linkNo" data-t="link.cancel"></button>
+    </div>
+  </div>
+</div>
+
 <!-- The live scanner. Nearly the whole page, because the job is looking at a
      moving picture and deciding whether the code is inside the frame - and a
      viewfinder the size of a thumbnail cannot answer that. It draws a box on
@@ -686,6 +753,7 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
 
 <script src="strings.js"></script>
 <script src="i18n.js"></script>
+<script src="linkcheck.js"></script>
 <script src="qrgen.js"></script>
 <script src="select.js"></script>
 <script src="result.js"></script>
@@ -790,9 +858,37 @@ function onWorkerMessage(w, msg) {
   pump();
 }
 
-function pump() { while (idle.length && queue.length) idle.pop().postMessage(queue.shift()); }
+// paused holds the queue without touching what is already in flight: a worker
+// mid-image finishes it, and nothing new goes out until the button is pressed
+// again. Cancelling a decode that has already started is not possible from
+// here, and pretending otherwise would leave a row spinning forever.
+let paused = false;
+const inFlight = new Map();   // job id -> { name, at }
+
+function pump() {
+  if (paused) return;
+  while (idle.length && queue.length) {
+    const job = queue.shift();
+    if (job.id !== undefined && job.name) inFlight.set(job.id, { name: job.name, at: Date.now() });
+    idle.pop().postMessage(job);
+  }
+  paintProgress();
+}
+
+function togglePause() {
+  paused = !paused;
+  $("pause").textContent = t(paused ? "work.resume" : "work.pause");
+  paintProgress();
+  if (!paused) pump();
+}
+
+// A scan long enough to worry about gets named. Two seconds is roughly where a
+// person stops assuming it is working and starts assuming it is stuck.
+const SLOW_MS = 2000;
+setInterval(() => { if (inFlight.size) paintProgress(); }, 700);
 
 function finish(msg) {
+  inFlight.delete(msg.id);
   const r = byId.get(msg.id);
   if (!r) return; // its run was cleared
   r.pending = false;
@@ -1212,6 +1308,39 @@ function recreatable() {
   return [...seen.entries()];
 }
 
+// askBeforeOpening never opens anything itself until the person says so, and
+// it says where they are going in the plainest terms available: the host,
+// large, and the whole address underneath.
+function askBeforeOpening(url) {
+  const info = LinkCheck.inspect(url);
+  if (!info.openable) return;   // not a link, or a scheme a page must not follow
+  $("linkHost").textContent = info.display;
+  $("linkFull").textContent = info.input;
+  const warn = $("linkWarn");
+  warn.replaceChildren();
+  for (const w of info.warnings) {
+    const d = document.createElement("div");
+    d.textContent = t("link.warn." + w);
+    warn.appendChild(d);
+  }
+  // With a warning on screen, "don't open" becomes the emphasised button. The
+  // default answer should be the safe one exactly when it matters.
+  $("linkAsk").classList.toggle("risky", info.warnings.length > 0);
+  $("linkAsk").hidden = false;
+  $("linkGo").onclick = () => {
+    $("linkAsk").hidden = true;
+    window.open(info.input, "_blank", "noopener,noreferrer");
+  };
+  ($("linkAsk").classList.contains("risky") ? $("linkNo") : $("linkGo")).focus();
+}
+
+// paintRenameExample answers "what will this actually be called" with a real
+// file from the list rather than a description of a rule.
+function paintRenameExample() {
+  const r = rows.find((x) => x.file && !x.pending && x.codes.length);
+  $("renameEg").textContent = r ? t("rename.example", { name: newNameFor(r) }) : "";
+}
+
 function paintQrCount() {
   const n = recreatable().length;
   $("qrSave").textContent = t("qrgen.download", { n });
@@ -1293,15 +1422,33 @@ async function downloadZip() {
 function paintProgress() {
   const pct = expected ? (100 * done) / expected : 0;
   $("bar").firstElementChild.style.width = pct + "%";
-  $("bar").classList.toggle("done", expected > 0 && done === expected);
+  const finished = expected > 0 && done === expected;
+  $("bar").classList.toggle("done", finished);
+  $("pause").classList.toggle("hide", finished || !expected);
 
-  // Name what is being worked through. With several drops queued the one still
-  // running is the one worth naming; when everything is finished the total is.
-  const running = batches.find((b) => b.done < b.total);
-  const b = running || batches[batches.length - 1];
-  $("count").textContent = b && b.label
-    ? b.label + "   " + (running ? b.done + " / " + b.total : done + " / " + expected)
-    : done + " / " + expected;
+  // In words, not just a bar. "34 of 210" is the answer to the question a bar
+  // only gestures at, and it is the text a screen reader announces.
+  $("count").textContent = paused
+    ? t("work.paused", { left: Math.max(0, expected - done) })
+    : finished
+      ? t("work.done", { n: done })
+      : t("work.progress", { done, total: expected });
+
+  // What is being read right now, and whether it has been on it too long.
+  const now = Date.now();
+  let slowest = null;
+  for (const v of inFlight.values()) if (!slowest || v.at < slowest.at) slowest = v;
+  const el = $("nowFile");
+  if (!slowest || finished) {
+    el.textContent = "";
+    el.classList.remove("slow");
+  } else if (now - slowest.at > SLOW_MS) {
+    el.textContent = t("work.slow", { name: slowest.name });
+    el.classList.add("slow");
+  } else {
+    el.textContent = t("work.now", { name: slowest.name });
+    el.classList.remove("slow");
+  }
 }
 
 // The web's row order and the two questions behind it live in order.js, next
@@ -1339,6 +1486,48 @@ let activeTile = "fAll";
 const FILTERS = { fAll: "all", fWith: "with", fUniq: "unique",
                   fUnread: "unread", fWithout: "without", fErr: "error" };
 const filterOf = () => FILTERS[activeTile] || "all";
+
+// The kind filter is a second axis, not another tile: a row can be "with a
+// code" and "a link" at once, and folding them into one control would make
+// them exclusive when they are not.
+let kindFilter = "";
+
+function kindsPresent() {
+  const seen = new Set();
+  for (const r of rows) for (const c of r.codes) seen.add(Payload.describe(c).kind);
+  return [...seen];
+}
+
+// Only the kinds actually on screen. A menu listing every kind the recogniser
+// knows would offer a dozen filters that match nothing.
+function paintKindFilter() {
+  const present = kindsPresent().sort();
+  const sel = $("kind");
+  const want = present.join(",");
+  if (sel.dataset.built === want) return;
+  sel.dataset.built = want;
+  sel.replaceChildren();
+  const all = document.createElement("option");
+  all.value = "";
+  all.textContent = t("filter.kindAll");
+  sel.appendChild(all);
+  for (const k of present) {
+    const o = document.createElement("option");
+    o.value = k;
+    // The recogniser already names every kind in six languages, for the
+    // labels it prints inside a row. Same names here.
+    o.textContent = t("kind." + k, {}) === "kind." + k ? k : t("kind." + k);
+    sel.appendChild(o);
+  }
+  sel.value = present.includes(kindFilter) ? kindFilter : "";
+  if (sel.value !== kindFilter) kindFilter = sel.value;
+  sel.classList.toggle("hide", present.length < 2);
+}
+
+function matchesKind(r) {
+  if (!kindFilter) return true;
+  return r.codes.some((c) => Payload.describe(c).kind === kindFilter);
+}
 
 function matchesFilter(r, firstOfPayload) {
   switch (filterOf()) {
@@ -1381,7 +1570,7 @@ function applyFilters() {
   const firsts = firstOwners();
   let shown = 0;
   for (const r of rows) {
-    const ok = matchesFilter(r, firsts) && matchesSearch(r);
+    const ok = matchesFilter(r, firsts) && matchesKind(r) && matchesSearch(r);
     if (r.el) r.el.classList.toggle("hide", !ok);
     if (ok) shown++;
   }
@@ -1400,6 +1589,8 @@ function applyFilters() {
   // button would wipe the icon sitting beside it.
   $("pickFolder").querySelector("span").textContent = t(rows.length ? "drop.folderMore" : "drop.folder");
   paintQrCount();
+  paintKindFilter();
+  paintRenameExample();
   $("noMatch").textContent = t("res.noMatch");
   $("noMatch").classList.toggle("hide", shown > 0 || !rows.length);
 }
@@ -1493,12 +1684,14 @@ function fieldRow(f) {
   }
 
   if (f.full && /^https?:\/\//i.test(f.v)) {
-    const a = document.createElement("a");
-    a.className = "v";
-    a.href = f.v;
+    // A button, not an anchor. An anchor navigates on click and there is no
+    // moment in between to show where it goes - which is the moment this
+    // whole flow exists for.
+    const a = document.createElement("button");
+    a.className = "v linkish";
+    a.type = "button";
     a.textContent = f.v;
-    a.target = "_blank";
-    a.rel = "noopener noreferrer";
+    a.onclick = () => askBeforeOpening(f.v);
     row.appendChild(a);
   } else {
     const v = document.createElement("span");
@@ -1537,7 +1730,7 @@ function hitBox(raw) {
   grow.className = "grow";
   top.appendChild(grow);
 
-  if (d.href) top.appendChild(smallButton(t("act.open"), () => window.open(d.href, "_blank", "noopener")));
+  if (d.href) top.appendChild(smallButton(t("act.open"), () => askBeforeOpening(d.href)));
   if (d.kind === "contact") top.appendChild(saveContactButton(raw));
   top.appendChild(copyButton(raw));
   box.appendChild(top);
@@ -2181,6 +2374,14 @@ for (const id in FILTERS) {
 }
 $("search").oninput = applyFilters;
 $("qrSave").onclick = downloadRecreated;
+$("pause").onclick = togglePause;
+$("kind").onchange = (e) => { kindFilter = e.target.value; applyFilters(); };
+$("pattern").addEventListener("change", paintRenameExample);
+$("linkNo").onclick = () => { $("linkAsk").hidden = true; };
+$("linkAsk").onclick = (e) => { if (e.target === $("linkAsk")) $("linkAsk").hidden = true; };
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !$("linkAsk").hidden) $("linkAsk").hidden = true;
+});
 
 /* the area picker's controls */
 

@@ -313,7 +313,11 @@
     };
   }
 
-  global.Payload = { describe, classify, shortValue, selfTest };
+  // The kinds this recogniser knows, for a page that wants to filter by them.
+  const kinds = () => KINDS.map((k) => k.id);
+
+  global.Payload = {
+    kinds, describe, classify, shortValue, selfTest };
 
   // One runnable check for the part that is all edge cases. Run it with
   //   node web/payload.js --test

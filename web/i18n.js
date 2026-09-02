@@ -24,7 +24,44 @@
       const base = String(tag).toLowerCase().split("-")[0];
       if (STRINGS[base]) return base;
     }
-    return "en";
+    // Nothing the browser is set to is a language this page speaks. Before
+    // falling back to English, ask where the machine thinks it is.
+    //
+    // WHY THE TIME ZONE AND NOT THE ACTUAL LOCATION. Real geolocation costs
+    // either a permission prompt or a request to somebody else's server to
+    // turn an IP into a place. The second is out of the question: this page's
+    // one promise is that nothing leaves the device, and it is enforced by a
+    // CSP that allows no third party at all. The first asks the user to grant
+    // a sensitive permission to pick a menu language.
+    //
+    // The time zone is already on the machine, needs no permission, sends
+    // nothing, and is set from where the computer was configured - which is
+    // the same question, answered offline.
+    return fromTimeZone() || "en";
+  }
+
+  // Zones for the languages this page speaks. A map rather than a chain of
+  // conditions, and deliberately not a world atlas: a zone that is not here
+  // simply falls through to English, which is what it did before.
+  const ZONE_LANG = {
+    "Europe/Rome": "it", "Europe/Vatican": "it", "Europe/San_Marino": "it",
+    "Europe/Madrid": "es", "Atlantic/Canary": "es", "Africa/Ceuta": "es",
+    "America/Mexico_City": "es", "America/Bogota": "es", "America/Lima": "es",
+    "America/Argentina/Buenos_Aires": "es", "America/Santiago": "es",
+    "Europe/Paris": "fr", "Europe/Brussels": "fr", "Europe/Monaco": "fr",
+    "Europe/Berlin": "de", "Europe/Vienna": "de", "Europe/Zurich": "de",
+    "Europe/Lisbon": "pt", "Atlantic/Azores": "pt", "Atlantic/Madeira": "pt",
+    "America/Sao_Paulo": "pt", "America/Bahia": "pt", "America/Fortaleza": "pt",
+  };
+
+  function fromTimeZone() {
+    try {
+      const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const lang = ZONE_LANG[zone];
+      return lang && STRINGS[lang] ? lang : null;
+    } catch {
+      return null;
+    }
   }
 
   let lang = pick();
@@ -102,9 +139,18 @@
   }
 
   global.I18N = {
-    t, setLang, apply, onChange, languages, selfTest, keysUsedIn,
+    t, setLang, apply, onChange, languages, selfTest, keysUsedIn, fromTimeZone, ZONE_LANG,
     get lang() { return lang; },
   };
+
+  // Every zone in the table must name a language the page actually speaks,
+  // or the fallback silently does nothing for the people it was written for.
+  function checkZones() {
+    const bad = Object.entries(ZONE_LANG).filter(([, l]) => !STRINGS[l]);
+    if (bad.length) throw new Error("zones point at languages that do not exist: " + JSON.stringify(bad));
+    return Object.keys(ZONE_LANG).length + " time zones mapped to " +
+      new Set(Object.values(ZONE_LANG)).size + " languages";
+  }
 
   function checkMarkup() {
     let html;
@@ -124,5 +170,6 @@
   if (typeof process !== "undefined" && process.argv && process.argv.includes("--test")) {
     console.log(selfTest());
     console.log(checkMarkup());
+    console.log(checkZones());
   }
 })(typeof globalThis !== "undefined" ? globalThis : this);
