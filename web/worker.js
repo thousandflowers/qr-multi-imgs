@@ -30,7 +30,7 @@ const pending = [];
 
 self.qrWasmReady = () => {
   ready = true;
-  for (const job of pending.splice(0)) (job && job.type === "crop" ? crop : run)(job);
+  for (const job of pending.splice(0)) ((job && HANDLERS[job.type]) || run)(job);
   self.postMessage({ type: "ready" });
 };
 
@@ -195,10 +195,31 @@ async function crop(job) {
   self.postMessage(out);
 }
 
+// encode is the other direction: payloads back into module matrices, so the
+// page can write them out as PNG, JPEG, SVG or PDF.
+//
+// It lives here for the same reason decoding does - the engine is in the
+// worker, and the page has no wasm instance of its own. Routing it through the
+// same queue also keeps a batch of a hundred codes off the thread that has to
+// keep the UI moving.
+function encodeBatch(job) {
+  const matrices = (job.texts || []).map((t) => {
+    try {
+      const m = qrEncode(t);
+      return m && !m.error ? m : null;
+    } catch {
+      return null;
+    }
+  });
+  self.postMessage({ type: "encodeResult", id: job.id, matrices });
+}
+
+const HANDLERS = { crop, encode: encodeBatch };
+
 self.onmessage = (e) => {
   const job = e.data;
   if (job && job.type === "module") { boot(job.module); return; }
-  const go = job && job.type === "crop" ? crop : run;
+  const go = (job && HANDLERS[job.type]) || run;
   if (ready) go(job);
   else pending.push(job);
 };

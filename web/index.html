@@ -199,10 +199,10 @@ input[type=file] { display:none; }
    It is the one thing on the page that says whether anything will work at all,
    and it earns a colour: neutral while it loads, green once it can decode, red
    if it never arrives. */
-#engine { margin-top:12px; padding:10px 12px; border-radius:10px;
+#engine { margin-left:12px; padding:4px 10px; border-radius:999px;
   border:1px solid var(--line); background:var(--soft); color:var(--dim);
-  font-size:var(--fs-2); text-align:center;
-  display:flex; align-items:center; justify-content:center; gap:8px; }
+  font-size:var(--fs-2); white-space:nowrap;
+  display:inline-flex; align-items:center; gap:8px; }
 #engine::before { content:""; width:8px; height:8px; border-radius:50%;
   background:currentColor; opacity:.5; flex:none; }
 #engine.ready { border-color:var(--ok); background:var(--ok-soft); color:var(--ok);
@@ -402,6 +402,11 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
       </svg>
       qr-multi-imgs
     </a>
+    <!-- The decoder's state belongs next to the name of the thing it is the
+         state of, and it is the first question a visitor has: does this work
+         yet. It was at the bottom of the left column, below everything you
+         would click before knowing the answer. -->
+    <div id="engine" data-t="engine.loading"></div>
     <nav>
       <span id="ver"></span>
       <a class="ghlink" href="https://github.com/thousandflowers/qr-multi-imgs"
@@ -483,15 +488,11 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
         </div>
       </div>
 
-      <div class="pbody" style="padding-top:0">
-        <div id="engine" data-t="engine.loading"></div>
-      </div>
     </aside>
 
     <section class="panel">
       <div class="phead">
         <h2 data-t="res.title"></h2>
-        <span class="pill"><b>*</b> <span data-t="res.private"></span></span>
       </div>
 
       <div id="work" class="hide">
@@ -555,35 +556,28 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
           <button id="zip" class="primary"></button>
         </div>
 
+        <!-- Recreating the codes as files. It used to live in the local-app
+             section and only worked with the binary running; it is a browser
+             job now, from the payloads already on screen. -->
+        <div class="toolbar">
+          <span data-t="qrgen.label"></span>
+          <select id="qrFmt">
+            <option value="png">PNG</option>
+            <option value="jpg">JPEG</option>
+            <option value="svg">SVG</option>
+            <option value="pdf">PDF</option>
+          </select>
+          <button id="qrSave" class="primary"></button>
+          <span id="qrMsg"></span>
+        </div>
+
         <p id="noMatch" class="nomatch hide"></p>
         <ul id="list"></ul>
       </div>
     </section>
   </div>
 
-  <!-- Only ever seen by someone running the program locally: a browser cannot
-       touch files where they sit, so without a local copy answering there is
-       nothing here to show. Installation lives in the README, which the link
-       in the header points at. -->
-  <section class="panel hide" id="localBox">
-    <div class="phead"><h2 data-t="adv.localTitle"></h2></div>
-    <div class="pbody">
-      <p data-t="adv.localOn"></p>
-      <textarea id="paths" data-t-ph="adv.paths" spellcheck="false"></textarea>
-      <div class="row">
-        <button id="localScan" class="primary" data-t="adv.scan"></button>
-        <span id="localStatus" style="font-family:var(--mono);font-size:var(--fs-2);color:var(--dim)"></span>
-      </div>
-      <div class="row hide" id="localActions">
-        <select id="qrFmt"><option>png</option><option>jpg</option><option>svg</option></select>
-        <button id="recreate" data-t="adv.recreate"></button>
-        <button id="organize" data-t="adv.organize"></button>
-        <button id="del" class="danger" data-t="adv.delete"></button>
-      </div>
-      <div id="localMsg"></div>
-    </div>
-  </section>
-</main>
+  </main>
 
 <footer>
   <div class="fbar">
@@ -621,6 +615,7 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
 
 <script src="strings.js"></script>
 <script src="i18n.js"></script>
+<script src="qrgen.js"></script>
 <script src="select.js"></script>
 <script src="result.js"></script>
 <script src="coords.js"></script>
@@ -708,6 +703,12 @@ function onWorkerMessage(w, msg) {
   // than into finish(), which would overwrite the row's own scan with the
   // crop's — the crop is an addition to what the row knows, not a replacement.
   if (msg.type === "cropResult") { adoptCropResult(byId.get(msg.id), msg); idle.push(w); pump(); return; }
+  if (msg.type === "encodeResult") {
+    const done = encodeWaiting.get(msg.id);
+    encodeWaiting.delete(msg.id);
+    if (done) done(msg.matrices || []);
+    idle.push(w); pump(); return;
+  }
   if (msg.id === CAMERA_JOB) { onCameraResult(msg); idle.push(w); pump(); return; }
   finish(msg);
   idle.push(w);
@@ -958,6 +959,94 @@ function newNameFor(r) {
   return base + ext;
 }
 
+// Recreating the decoded codes as files, in the browser.
+//
+// One file per DISTINCT payload, not one per row: two photographs of the same
+// poster are one code, and handing back two identical PNGs named after two
+// different photos would be a filing job for the user rather than a result.
+//
+// A single code downloads as a single file. Several become a zip, except for
+// PDF, which is already a container - one document, one page per code, which
+// is what a person printing a sheet of them wants.
+// The engine lives in the workers; the page has no wasm instance of its own,
+// so encoding is a round trip like every other decode. Found the hard way: the
+// first version called qrEncode() straight from the page and got
+// "qrEncode is not defined".
+const encodeWaiting = new Map();
+let encodeSeq = 0;
+function encodeAll(texts) {
+  return new Promise((resolve) => {
+    const id = "enc" + ++encodeSeq;
+    encodeWaiting.set(id, resolve);
+    queue.push({ type: "encode", id, texts });
+    pump();
+  });
+}
+
+function recreatable() {
+  const seen = new Map();
+  for (const r of rows) {
+    if (r.pending || r.error) continue;
+    for (const c of r.codes) if (!seen.has(c)) seen.set(c, r);
+  }
+  return [...seen.entries()];
+}
+
+function paintQrCount() {
+  const n = recreatable().length;
+  $("qrSave").textContent = t("qrgen.download", { n });
+  $("qrSave").disabled = n === 0;
+}
+
+async function downloadRecreated() {
+  const pairs = recreatable();
+  if (!pairs.length) { $("qrMsg").textContent = t("qrgen.none"); return; }
+  const fmt = $("qrFmt").value;
+  $("qrSave").disabled = true;
+  $("qrMsg").textContent = t("qrgen.working");
+  // Yield once so the message paints before the encoding blocks the thread.
+  await new Promise((r) => setTimeout(r, 0));
+
+  try {
+    const matrices = await encodeAll(pairs.map(([code]) => code));
+    const named = [];
+    pairs.forEach(([code, row], i) => {
+      if (!matrices[i]) return;
+      named.push({ stem: Zip.safeName(Payload.shortValue(code) || row.name, 60), matrix: matrices[i] });
+    });
+    if (!named.length) { $("qrMsg").textContent = t("qrgen.none"); return; }
+
+    if (fmt === "pdf") {
+      saveBlob(new Blob([QRGen.toPDF(named.map((n) => n.matrix))], { type: "application/pdf" }), "qr-codes.pdf");
+    } else if (named.length === 1) {
+      saveBlob(await oneFile(named[0], fmt), named[0].stem + "." + fmt);
+    } else {
+      const taken = new Set();
+      const entries = [];
+      for (const n of named) {
+        const blob = await oneFile(n, fmt);
+        entries.push({ name: Zip.uniqueName(taken, n.stem + "." + fmt), data: new Uint8Array(await blob.arrayBuffer()) });
+      }
+      saveBlob(Zip.build(entries), "qr-codes.zip");
+    }
+    $("qrMsg").textContent = "";
+  } catch (e) {
+    $("qrMsg").textContent = String((e && e.message) || e);
+  } finally {
+    paintQrCount();
+  }
+}
+
+function oneFile(n, fmt) {
+  if (fmt === "svg") {
+    return Promise.resolve(new Blob([QRGen.toSVG(n.matrix)], { type: "image/svg+xml" }));
+  }
+  // A DOM canvas rather than an OffscreenCanvas: this one has toBlob with a
+  // callback, which is what the rest of the page already uses.
+  const canvas = QRGen.toCanvas(n.matrix, 1024, function () { return document.createElement("canvas"); });
+  return new Promise((res) => canvas.toBlob(res, fmt === "jpg" ? "image/jpeg" : "image/png", 0.92));
+}
+
 async function downloadZip() {
   const list = visibleRows().filter((r) => r.file && !r.pending);
   if (!list.length) { $("emptyText").textContent = t("rename.none"); return; }
@@ -1090,6 +1179,7 @@ function applyFilters() {
   // The label lives in the span, not on the button: setting textContent on the
   // button would wipe the icon sitting beside it.
   $("pickFolder").querySelector("span").textContent = t(rows.length ? "drop.folderMore" : "drop.folder");
+  paintQrCount();
   $("noMatch").textContent = t("res.noMatch");
   $("noMatch").classList.toggle("hide", shown > 0 || !rows.length);
 }
@@ -1822,6 +1912,7 @@ for (const id in FILTERS) {
   $(id).onclick = () => { activeTile = id === activeTile ? "fAll" : id; applyFilters(); };
 }
 $("search").oninput = applyFilters;
+$("qrSave").onclick = downloadRecreated;
 
 /* the area picker's controls */
 
@@ -2104,61 +2195,10 @@ async function findLocalApp() {
     const info = await (await call("/api/health")).json();
     localAppFound = true;
     $("ver").textContent = "v" + info.version;
-    $("localBox").classList.remove("hide");
     paintEngineState();
   } catch { /* the normal case, and the page is fully usable without one */ }
 }
 
-async function localAction(path, extra, confirmText) {
-  if (!session) { $("localMsg").textContent = t("adv.scanFirst"); return; }
-  if (confirmText && !confirm(confirmText)) return;
-  try {
-    const out = await (await call(path, Object.assign({ session }, extra))).json();
-    $("localMsg").textContent = out.message + (out.errors ? "\n\n" + out.errors.join("\n") : "");
-  } catch (e) {
-    $("localMsg").textContent = String(e.message || e);
-  }
-}
-
-$("localScan").onclick = async () => {
-  const paths = $("paths").value.split("\n").map((s) => s.trim()).filter(Boolean);
-  if (!paths.length) return;
-  $("localScan").disabled = true;
-  $("localActions").classList.add("hide");
-  session = null;
-  try {
-    const res = await call("/api/scan", { paths });
-    const reader = res.body.getReader();
-    const dec = new TextDecoder();
-    let buf = "";
-    for (;;) {
-      const { done: fin, value } = await reader.read();
-      if (fin) break;
-      buf += dec.decode(value, { stream: true });
-      let nl;
-      while ((nl = buf.indexOf("\n")) >= 0) {
-        const lineText = buf.slice(0, nl).trim();
-        buf = buf.slice(nl + 1);
-        if (!lineText) continue;
-        const ev = JSON.parse(lineText);
-        if (ev.total) $("localStatus").textContent = ev.done + " / " + ev.total;
-        if (ev.summary) {
-          session = ev.session;
-          $("localStatus").textContent = ev.summary.total + " / " + ev.summary.with_qr;
-          $("localActions").classList.remove("hide");
-        }
-      }
-    }
-  } catch (e) {
-    $("localStatus").textContent = String(e.message || e);
-  } finally {
-    $("localScan").disabled = false;
-  }
-};
-
-$("recreate").onclick = () => localAction("/api/recreate", { format: $("qrFmt").value });
-$("organize").onclick = () => localAction("/api/organize", {}, t("adv.confirmOrganize"));
-$("del").onclick = () => localAction("/api/delete", {}, t("adv.confirmDelete"));
 
 findLocalApp();
 </script>

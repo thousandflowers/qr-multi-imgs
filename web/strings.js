@@ -20,6 +20,10 @@
   };
 
   S.en = {
+    "qrgen.label": "Recreate the codes",
+    "qrgen.download": "Download ({n})",
+    "qrgen.none": "There is no code to recreate yet.",
+    "qrgen.working": "Drawing the codes…",
     "drop.folderMore": "Add another folder",
     "insp.keys": "Drag a box, or drag it by its handles. Scroll to pan, pinch or ctrl-scroll to zoom, space and drag to pan. Arrows nudge, shift and arrows resize, Enter reads, Escape closes.",
     "res.summary": "{codes} codes read, {uniq} of them different.",
@@ -41,7 +45,7 @@
 
     "hero.title": "Read every QR code in a folder of photos",
     "hero.sub": "Other scanners take one picture at a time. Drop a whole folder here, or a single photo, or a zip. You get every code in every image, with the file it came from.",
-    "hero.trust": "Nothing is uploaded. It all runs here, in your browser.",
+    "hero.trust": "Nothing is uploaded. It all runs here, in your computer.",
 
     "tab.images": "Images",
     "tab.camera": "Camera",
@@ -139,6 +143,10 @@
   };
 
   S.it = {
+    "qrgen.label": "Ricrea i codici",
+    "qrgen.download": "Scarica ({n})",
+    "qrgen.none": "Non c'è ancora nessun codice da ricreare.",
+    "qrgen.working": "Sto disegnando i codici…",
     "drop.folderMore": "Aggiungi un'altra cartella",
     "insp.keys": "Trascina un riquadro, o spostalo dalle maniglie. Scorri per muoverti, pizzica o ctrl+rotella per zoomare, spazio e trascina per spostare. Le frecce spostano, shift e frecce ridimensionano, Invio legge, Esc chiude.",
     "res.summary": "{codes} codici letti, di cui {uniq} diversi.",
@@ -160,7 +168,7 @@
 
     "hero.title": "Leggi tutti i codici QR in una cartella di foto",
     "hero.sub": "Gli altri lettori prendono una foto alla volta. Qui trascini una cartella intera, o una sola foto, o uno zip. Ottieni ogni codice di ogni immagine, con il file da cui viene.",
-    "hero.trust": "Non viene caricato niente. Funziona tutto qui, nel tuo browser.",
+    "hero.trust": "Non viene caricato niente. Funziona tutto qui, nel tuo computer.",
 
     "tab.images": "Immagini",
     "tab.camera": "Fotocamera",
@@ -258,6 +266,10 @@
   };
 
   S.es = {
+    "qrgen.label": "Recrear los códigos",
+    "qrgen.download": "Descargar ({n})",
+    "qrgen.none": "Todavía no hay ningún código que recrear.",
+    "qrgen.working": "Dibujando los códigos…",
     "drop.folderMore": "Añadir otra carpeta",
     "insp.keys": "Arrastra un recuadro o muévelo por los tiradores. Desplaza para moverte, pellizca o ctrl+rueda para acercar, espacio y arrastrar para desplazar. Las flechas mueven, shift y flechas redimensionan, Intro lee, Esc cierra.",
     "res.summary": "{codes} códigos leídos, {uniq} de ellos distintos.",
@@ -279,7 +291,7 @@
 
     "hero.title": "Lee todos los códigos QR de una carpeta de fotos",
     "hero.sub": "Otros lectores tratan una foto cada vez. Aquí arrastras una carpeta entera, o una sola foto, o un zip. Obtienes todos los códigos de todas las imágenes, con el archivo del que vienen.",
-    "hero.trust": "No se sube nada. Funciona todo aquí, en tu navegador.",
+    "hero.trust": "No se sube nada. Funciona todo aquí, en tu ordenador.",
 
     "tab.images": "Imágenes",
     "tab.camera": "Cámara",
@@ -377,6 +389,10 @@
   };
 
   S.fr = {
+    "qrgen.label": "Recréer les codes",
+    "qrgen.download": "Télécharger ({n})",
+    "qrgen.none": "Il n'y a encore aucun code à recréer.",
+    "qrgen.working": "Dessin des codes…",
     "drop.folderMore": "Ajouter un autre dossier",
     "insp.keys": "Tracez un cadre, ou déplacez-le par ses poignées. Défilez pour vous déplacer, pincez ou ctrl+molette pour zoomer, espace et glisser pour déplacer. Les flèches déplacent, maj et flèches redimensionnent, Entrée lit, Échap ferme.",
     "res.summary": "{codes} codes lus, dont {uniq} différents.",
@@ -398,7 +414,7 @@
 
     "hero.title": "Lisez tous les codes QR d'un dossier de photos",
     "hero.sub": "Les autres lecteurs prennent une photo à la fois. Ici vous déposez un dossier entier, ou une seule photo, ou un zip. Vous obtenez chaque code de chaque image, avec le fichier dont il vient.",
-    "hero.trust": "Rien n'est envoyé. Tout fonctionne ici, dans votre navigateur.",
+    "hero.trust": "Rien n'est envoyé. Tout fonctionne ici, sur votre ordinateur.",
 
     "tab.images": "Images",
     "tab.camera": "Caméra",
@@ -496,6 +512,10 @@
   };
 
   S.de = {
+    "qrgen.label": "Codes neu erzeugen",
+    "qrgen.download": "Herunterladen ({n})",
+    "qrgen.none": "Es gibt noch keinen Code zum Neuerzeugen.",
+    "qrgen.working": "Die Codes werden gezeichnet…",
     "drop.folderMore": "Weiteren Ordner hinzufügen",
     "insp.keys": "Zieh einen Rahmen oder verschieb ihn an den Griffen. Scrollen bewegt, Pinch oder Strg+Rad zoomt, Leertaste und Ziehen verschiebt. Pfeile bewegen, Umschalt und Pfeile ändern die Größe, Enter liest, Esc schließt.",
     "res.summary": "{codes} Codes gelesen, davon {uniq} verschiedene.",
@@ -517,7 +537,7 @@
 
     "hero.title": "Alle QR-Codes in einem Fotoordner lesen",
     "hero.sub": "Andere Leser nehmen ein Bild nach dem anderen. Hier ziehen Sie einen ganzen Ordner hinein, oder ein einzelnes Foto, oder ein ZIP. Sie bekommen jeden Code aus jedem Bild, mit der Datei dazu.",
-    "hero.trust": "Nichts wird hochgeladen. Alles läuft hier, in Ihrem Browser.",
+    "hero.trust": "Nichts wird hochgeladen. Alles läuft hier, auf Ihrem Computer.",
 
     "tab.images": "Bilder",
     "tab.camera": "Kamera",
@@ -615,6 +635,10 @@
   };
 
   S.pt = {
+    "qrgen.label": "Recriar os códigos",
+    "qrgen.download": "Descarregar ({n})",
+    "qrgen.none": "Ainda não há nenhum código para recriar.",
+    "qrgen.working": "A desenhar os códigos…",
     "drop.folderMore": "Adicionar outra pasta",
     "insp.keys": "Arraste uma caixa, ou mova-a pelas pegas. Role para se deslocar, faça pinça ou ctrl+roda para ampliar, espaço e arrastar para deslocar. As setas movem, shift e setas redimensionam, Enter lê, Esc fecha.",
     "res.summary": "{codes} códigos lidos, {uniq} deles diferentes.",
@@ -636,7 +660,7 @@
 
     "hero.title": "Leia todos os códigos QR de uma pasta de fotos",
     "hero.sub": "Outros leitores tratam uma foto de cada vez. Aqui arrasta uma pasta inteira, ou uma só foto, ou um zip. Obtém todos os códigos de todas as imagens, com o ficheiro de onde vêm.",
-    "hero.trust": "Nada é enviado. Funciona tudo aqui, no seu navegador.",
+    "hero.trust": "Nada é enviado. Funciona tudo aqui, no seu computador.",
 
     "tab.images": "Imagens",
     "tab.camera": "Câmara",
