@@ -20,6 +20,14 @@
   };
 
   S.en = {
+    "cam.flip": "Flip",
+    "cam.flipHelp": "Some cameras hand the picture over already mirrored. This page never mirrors it; use this if yours does.",
+    "cam.auto": "Auto",
+    "cam.autoHelp": "Holds the picture by itself as soon as it sees a code, then reads it properly",
+    "cam.closer": "A code is in shot but too small to read — move closer",
+    "cam.checking": "Holding still and looking properly…",
+    "cam.autoGot": "Read {n} of {found} — resume to look for more",
+    "cam.autoNone": "Nothing readable there. Move closer, straighten it, or draw a box yourself.",
     "cam.device": "Camera",
     "cam.deviceHelp": "An iPhone connected through Continuity Camera appears here like any other camera",
     "cam.switch": "Switch camera",
@@ -189,6 +197,14 @@
   };
 
   S.it = {
+    "cam.flip": "Specchia",
+    "cam.flipHelp": "Alcune fotocamere consegnano l'immagine già specchiata. Questa pagina non la specchia mai: usa questo se la tua lo fa.",
+    "cam.auto": "Auto",
+    "cam.autoHelp": "Ferma l'immagine da sola appena vede un codice, poi lo legge per bene",
+    "cam.closer": "C'è un codice nell'inquadratura ma è troppo piccolo — avvicinati",
+    "cam.checking": "Immagine ferma, sto guardando per bene…",
+    "cam.autoGot": "Letti {n} su {found} — riprendi per cercarne altri",
+    "cam.autoNone": "Lì niente di leggibile. Avvicinati, raddrizzalo, oppure disegna tu un riquadro.",
     "cam.device": "Fotocamera",
     "cam.deviceHelp": "Un iPhone collegato con Fotocamera Continuity compare qui come una fotocamera qualsiasi",
     "cam.switch": "Cambia fotocamera",
@@ -358,6 +374,14 @@
   };
 
   S.es = {
+    "cam.flip": "Voltear",
+    "cam.flipHelp": "Algunas cámaras entregan la imagen ya invertida. Esta página nunca la invierte; usa esto si la tuya lo hace.",
+    "cam.auto": "Auto",
+    "cam.autoHelp": "Congela la imagen sola en cuanto ve un código, y luego lo lee bien",
+    "cam.closer": "Hay un código en el encuadre pero es demasiado pequeño — acércate",
+    "cam.checking": "Imagen fija, mirando bien…",
+    "cam.autoGot": "Leídos {n} de {found} — reanuda para buscar más",
+    "cam.autoNone": "Ahí no hay nada legible. Acércate, enderézalo o dibuja tú un recuadro.",
     "cam.device": "Cámara",
     "cam.deviceHelp": "Un iPhone conectado por Cámara de Continuidad aparece aquí como cualquier otra cámara",
     "cam.switch": "Cambiar cámara",
@@ -527,6 +551,14 @@
   };
 
   S.fr = {
+    "cam.flip": "Miroir",
+    "cam.flipHelp": "Certaines caméras livrent l'image déjà en miroir. Cette page ne la reflète jamais ; utilisez ceci si la vôtre le fait.",
+    "cam.auto": "Auto",
+    "cam.autoHelp": "Fige l'image dès qu'il voit un code, puis le lit correctement",
+    "cam.closer": "Un code est dans le cadre mais trop petit — approchez-vous",
+    "cam.checking": "Image figée, lecture attentive…",
+    "cam.autoGot": "{n} lus sur {found} — reprenez pour en chercher d'autres",
+    "cam.autoNone": "Rien de lisible là. Approchez-vous, redressez-le, ou tracez un cadre.",
     "cam.device": "Caméra",
     "cam.deviceHelp": "Un iPhone connecté via Caméra Continuité apparaît ici comme n'importe quelle caméra",
     "cam.switch": "Changer de caméra",
@@ -696,6 +728,14 @@
   };
 
   S.de = {
+    "cam.flip": "Spiegeln",
+    "cam.flipHelp": "Manche Kameras liefern das Bild bereits gespiegelt. Diese Seite spiegelt nie; nutze das, falls deine es tut.",
+    "cam.auto": "Auto",
+    "cam.autoHelp": "Friert das Bild selbst ein, sobald ein Code auftaucht, und liest ihn dann gründlich",
+    "cam.closer": "Ein Code ist im Bild, aber zu klein — geh näher ran",
+    "cam.checking": "Bild steht, wird gründlich gelesen…",
+    "cam.autoGot": "{n} von {found} gelesen — fortsetzen, um weitere zu suchen",
+    "cam.autoNone": "Dort nichts Lesbares. Näher rangehen, gerade halten, oder selbst einen Rahmen ziehen.",
     "cam.device": "Kamera",
     "cam.deviceHelp": "Ein über Integrationskamera verbundenes iPhone erscheint hier wie jede andere Kamera",
     "cam.switch": "Kamera wechseln",
@@ -865,6 +905,14 @@
   };
 
   S.pt = {
+    "cam.flip": "Espelhar",
+    "cam.flipHelp": "Algumas câmaras entregam a imagem já espelhada. Esta página nunca a espelha; usa isto se a tua o fizer.",
+    "cam.auto": "Auto",
+    "cam.autoHelp": "Congela a imagem sozinho assim que vê um código, e depois lê-o como deve ser",
+    "cam.closer": "Há um código no enquadramento mas é pequeno demais — aproxima-te",
+    "cam.checking": "Imagem parada, a ler com atenção…",
+    "cam.autoGot": "Lidos {n} de {found} — retoma para procurar mais",
+    "cam.autoNone": "Aí não há nada legível. Aproxima-te, endireita-o, ou desenha tu uma caixa.",
     "cam.device": "Câmara",
     "cam.deviceHelp": "Um iPhone ligado por Câmara de Continuidade aparece aqui como qualquer outra câmara",
     "cam.switch": "Mudar de câmara",

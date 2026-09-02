@@ -36,6 +36,11 @@ import (
 var liveStrategies = []decodeStrategy{
 	{channel: "lum", scale: 1},
 	{channel: "lum", scale: 1, global: true},
+	// Light code on a dark ground. Cheap - one subtraction per pixel before a
+	// decode that was going to happen anyway - and it is a whole class of code
+	// rather than a marginal gain: a white QR on a blue card is invisible to
+	// the other two, not merely hard for them.
+	{channel: "lum", scale: 1, prep: "invert"},
 }
 
 // ScanLive decodes one viewfinder frame and locates what it could not read.
@@ -76,18 +81,25 @@ func liveFinders(img image.Image) []*detector.FinderPatternInfo {
 	hints := map[gozxing.DecodeHintType]interface{}{
 		gozxing.DecodeHintType_TRY_HARDER: true,
 	}
-	bmp, err := gozxing.NewBinaryBitmap(gozxing.NewGlobalHistgramBinarizer(
-		gozxing.NewLuminanceSourceFromImage(img)))
-	if err != nil || bmp == nil {
-		return nil
+	// Both polarities, for the reason in detectFinders: a light code on a dark
+	// ground is invisible to the finder scan rather than hard for it, and the
+	// viewfinder is where a person is holding the card up expecting something
+	// to happen.
+	var best []*detector.FinderPatternInfo
+	for _, view := range []image.Image{img, invert(img)} {
+		bmp, err := gozxing.NewBinaryBitmap(gozxing.NewGlobalHistgramBinarizer(
+			gozxing.NewLuminanceSourceFromImage(view)))
+		if err != nil || bmp == nil {
+			continue
+		}
+		matrix, merr := bmp.GetBlackMatrix()
+		if merr != nil || matrix == nil {
+			continue
+		}
+		infos, ferr := multidetector.NewMultiFinderPatternFinder(matrix, nil).FindMulti(hints)
+		if ferr == nil && len(infos) > len(best) {
+			best = infos
+		}
 	}
-	matrix, merr := bmp.GetBlackMatrix()
-	if merr != nil || matrix == nil {
-		return nil
-	}
-	infos, ferr := multidetector.NewMultiFinderPatternFinder(matrix, nil).FindMulti(hints)
-	if ferr != nil {
-		return nil
-	}
-	return infos
+	return best
 }

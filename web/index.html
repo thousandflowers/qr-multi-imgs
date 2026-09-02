@@ -215,11 +215,6 @@ input[type=file] { display:none; }
 #engine.failed { border-color:var(--bad); background:var(--bad-soft); color:var(--bad); }
 #engine.failed::before { opacity:1; }
 
-#camWrap { border-radius:10px; overflow:hidden; background:#000; aspect-ratio:4/3;
-  display:flex; align-items:center; justify-content:center; }
-#cam { width:100%; height:100%; object-fit:cover; }
-#camOff { color:#8b93a1; font-size:var(--fs-3); text-align:center; padding:16px; }
-#camMsg { margin-top:8px; font-size:var(--fs-2); color:var(--dim); text-align:center; min-height:1.2em; }
 
 #work { padding:8px 16px; border-bottom:1px solid var(--line); background:var(--soft); }
 #bar { height:4px; background:var(--line); border-radius:2px; overflow:hidden; }
@@ -421,6 +416,8 @@ li canvas.thumb { width:72px; height:72px; border-radius:9px; display:block;
   box-shadow:0 20px 60px rgba(0,0,0,.35); }
 #scanHead { display:flex; align-items:center; gap:8px; }
 #scanHead h3 { margin:0; font-size:var(--fs-5); }
+#autoWrap, #scanHead label { display:flex; align-items:center; gap:6px; font-size:var(--fs-2);
+  color:var(--dim); cursor:pointer; }
 #scanStage { position:relative; flex:1; min-height:0; background:#000;
   border-radius:12px; overflow:hidden; display:flex; justify-content:center; }
 /* The video is a source, never a displayed element. It used to sit under the
@@ -748,6 +745,10 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
            to "use my phone as the camera": no pairing, no network, no second
            app - the operating system already did it, and a page only has to
            stop assuming there is exactly one camera. -->
+      <label id="autoWrap"><input type="checkbox" id="camAuto" checked>
+        <span data-t="cam.auto"></span></label>
+      <label id="autoWrap" data-t-title="cam.flipHelp"><input type="checkbox" id="camFlip">
+        <span data-t="cam.flip"></span></label>
       <label class="sr" for="camPick" data-t="cam.device"></label>
       <select id="camPick" class="hide" data-t-title="cam.deviceHelp"></select>
       <button id="scanFreeze" data-t="cam.freeze"></button>
@@ -1131,6 +1132,9 @@ const live = {
   drag: null,
   raf: 0,
   found: new Map(),
+  auto: true,     // hold the picture by itself when a code turns up
+  mirror: false,  // this page never mirrors; the switch is for cameras that do
+  busy: false,    // a careful pass is running; do not start another
 };
 
 // The long side the live decode runs at. Smaller than the capture on purpose:
@@ -1284,6 +1288,23 @@ function liveCanvas(w, h) {
   return _liveCanvas;
 }
 
+// Below this many pixels per module, at the source's own resolution, nothing
+// reads. Measured on photographs of business cards: the detector reports
+// 1.6-2.1 px/module in a 1080px frame and none of them decode; at native
+// resolution the same codes come in at 2.3-3.1 and either decode outright or
+// decode from a crop. So under two, the only useful thing to say is "closer",
+// and over two it is worth stopping to look properly.
+const MIN_MODULE_PX = 2.0;
+
+// naturalModule converts the module size the decoder reported - in the shrunk
+// frame it was given - into the size it would have in the source. That is the
+// number that decides whether a careful pass can work, because the careful
+// pass runs on the source.
+function naturalModule(det, frame) {
+  if (!frame || !frame.w || !frame.naturalW) return det.moduleSize;
+  return det.moduleSize * (frame.naturalW / frame.w);
+}
+
 function adoptFrameResult(msg) {
   live.inFlight = false;
   live.dets = msg.detections || [];
@@ -1298,6 +1319,92 @@ function adoptFrameResult(msg) {
     enqueueDecodedFromCamera(c);
   }
   if (msg.codes && msg.codes.length) $("camMsg").textContent = t("cam.read", { n: live.found.size });
+  if (live.auto) considerAuto();
+}
+
+// considerAuto is the whole of automatic mode.
+//
+// The live pass is cheap and shallow: it finds codes reliably and reads only
+// the easy ones. Finding without reading is not a failure, it is the signal -
+// it means a code is right there and the fast path is not enough for it. The
+// answer is to stop moving and spend real time on it, which is exactly what a
+// person does by hand with freeze and a box.
+//
+// So: nothing found, keep scanning. Found but too small, say so - freezing a
+// code that is two pixels a module wide would waste a second to conclude
+// nothing. Found and big enough, hold the picture and look properly at every
+// one of them.
+function considerAuto() {
+  if (live.frozen || live.busy) return;
+  const unread = live.dets.filter((d) => !d.text);
+  if (!unread.length) return;
+
+  const biggest = Math.max(...unread.map((d) => naturalModule(d, live.frame)));
+  if (biggest < MIN_MODULE_PX) {
+    $("camMsg").textContent = t("cam.closer");
+    return;
+  }
+  autoPass(unread);
+}
+
+// autoPass holds the frame and reads every code in it properly.
+//
+// Every one, not the first: a business card with an Instagram code and a
+// Facebook code beside it is the normal case, and a scanner that stops at the
+// first has read half the card.
+async function autoPass(unread) {
+  live.busy = true;
+  const v = $("cam");
+  try {
+    if (!v.videoWidth) return;
+    live.frozen = await createImageBitmap(v);
+    setFreezeLabel(true);
+    $("camMsg").textContent = t("cam.checking");
+    paintScanner();
+
+    // The boxes are in the live frame's pixels; the careful pass runs on the
+    // held frame, which is the camera's own resolution.
+    const held = { w: live.frame.w, h: live.frame.h, naturalW: live.frozen.width, naturalH: live.frozen.height };
+    const canvas = document.createElement("canvas");
+    canvas.width = live.frozen.width;
+    canvas.height = live.frozen.height;
+    canvas.getContext("2d").drawImage(live.frozen, 0, 0);
+    const blob = await new Promise((res) => canvas.toBlob(res, "image/png"));
+
+    let fresh = 0;
+    for (const det of unread) {
+      const nat = Coords.frameToNatural(det.box, held);
+      if (!nat) continue;
+      const got = await new Promise((res) => {
+        const id = "auto" + ++live.seq;
+        cropWaiting.set(id, res);
+        queue.push({ type: "crop", id, blob, rect: nat });
+        pump();
+      });
+      for (const c of got.codes || []) {
+        if (live.found.has(c)) continue;
+        live.found.set(c, true);
+        fresh++;
+        const row = document.createElement("div");
+        row.textContent = c;
+        $("scanFound").prepend(row);
+        enqueueDecodedFromCamera(c);
+      }
+    }
+    $("camMsg").textContent = fresh
+      ? t("cam.autoGot", { n: fresh, found: unread.length })
+      : t("cam.autoNone");
+    // Nothing came of it: give the picture back rather than leaving the person
+    // staring at a frozen frame they did not ask for.
+    if (!fresh) {
+      live.frozen.close();
+      live.frozen = null;
+      setFreezeLabel(false);
+    }
+  } finally {
+    live.busy = false;
+    paintScanner();
+  }
 }
 
 function paintScanner(v) {
@@ -1309,6 +1416,18 @@ function paintScanner(v) {
 
   const rect = stageRect();
   if (!rect) return;
+
+  // This page never mirrors the picture. Some cameras hand it over already
+  // mirrored, and the switch flips it back - applied to the whole canvas, so
+  // the boxes travel with the image instead of landing on the wrong side of
+  // it. Decoding is untouched either way: a mirrored QR is perfectly readable,
+  // which was worth measuring rather than assuming.
+  ctx.save();
+  if (live.mirror) {
+    ctx.translate(c.width, 0);
+    ctx.scale(-1, 1);
+  }
+
   // The picture itself, drawn here rather than shown underneath.
   const src = live.frozen || v || $("cam");
   try { ctx.drawImage(src, rect.x, rect.y, rect.w, rect.h); } catch { /* first frames */ }
@@ -1345,6 +1464,7 @@ function paintScanner(v) {
       for (const h of Select.handlePoints(s)) ctx.fillRect(h.x - hs, h.y - hs, hs * 2, hs * 2);
     }
   }
+  ctx.restore();
 }
 
 async function toggleFreeze() {
@@ -1352,6 +1472,7 @@ async function toggleFreeze() {
     live.frozen.close();
     live.frozen = null;
     live.selNat = null;
+    live.dets = [];   // otherwise auto mode re-freezes on the boxes it just failed
     setFreezeLabel(false);
     $("camMsg").textContent = t("cam.looking");
     return;
@@ -2468,6 +2589,8 @@ $("camZone").onclick = openScanner;
 $("scanClose").onclick = closeScanner;
 $("scanFreeze").onclick = toggleFreeze;
 $("camPick").onchange = (e) => switchCamera(e.target.value);
+$("camAuto").onchange = (e) => { live.auto = e.target.checked; };
+$("camFlip").onchange = (e) => { live.mirror = e.target.checked; paintScanner(); };
 
 // On a frozen frame the overlay behaves like the area picker: drag a box, and
 // reading it goes through the same crop path.

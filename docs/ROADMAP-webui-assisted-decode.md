@@ -628,6 +628,49 @@ cost almost nothing.
 **With that in place all five photographs yield a code through the page**:
 three from the ordinary scan, two from the box the scanner itself proposes.
 
+### The detector was only looking for dark codes
+
+A finder pattern is found by its run of dark-light-dark-light-dark, so a light
+code on a dark ground has every run the wrong colour and the scan reports
+**nothing at all** - not "found and unreadable", which is at least actionable,
+but nothing. On the photographs: a white code on a blue card was invisible
+upright and located immediately inverted, and a second card decoded only from
+the inverted image.
+
+`detectFinders` now looks in both polarities and keeps the larger set, and the
+live cascade carries the inversion rung. Measured on the same five, through the
+viewfinder path at its 1080 cap:
+
+| | before | after |
+|---|---|---|
+| read live | 0 of 5 | 2 of 5 |
+| located for the careful pass | 1 of 5 | 3 of 5 |
+
+The two that now read live are exactly the two the ordinary scan needed the
+full cascade for: a white-on-blue card, and a branded code with a logo in it.
+
+This broke a test, correctly. `TestInvertedQRIsUndecodableUntilInverted`
+asserted that an inverted code is invisible to the detector, with a comment
+saying that if it ever stopped being true the rung might be unnecessary and the
+test would say so. It said so, and the assertion now runs the other way.
+
+### Automatic mode
+
+Finding without reading is the signal, not the failure: a code is right there
+and the fast path is not enough for it. Three outcomes, on a threshold that was
+measured rather than picked - the detector reports 1.6 to 2.1 px per module in
+a 1080 frame on cards that never read, and 2.3 to 3.1 at native on the same
+cards, which do:
+
+- nothing found → keep scanning
+- found, under 2 px per module at source resolution → "move closer", rather
+  than spend a second proving nothing
+- found and big enough → hold the picture and read **every** code in it
+  properly, through the same multi-margin crop a person gets by hand
+
+Every code, not the first: a card with an Instagram code beside a Facebook one
+is the normal case, and stopping at the first reads half the card.
+
 **A second corpus, for real photographs.** `QR_CORPUS_DIR` takes any directory
 with a manifest, HEIC included: paths are opened by name and nothing filters by
 extension. What Step A added is a guard — a build that cannot read HEIC (no

@@ -50,14 +50,18 @@ func TestInvertedQRIsUndecodableUntilInverted(t *testing.T) {
 		t.Fatalf("the upright fixture does not decode: %q", got)
 	}
 
-	// Nothing in the stock cascade sees it: no payload and no finder patterns.
-	// If this stops being true the rung is unnecessary and this test says so.
-	if infos := detectFinders(flipped); len(infos) != 0 {
-		t.Errorf("the detector located %d finder triples in an inverted code; "+
-			"inversion may no longer be needed", len(infos))
+	// The detector DOES locate it now, and that is a later improvement rather
+	// than a contradiction. This test used to assert the opposite - that an
+	// inverted code was invisible - and it failed the day detectFinders
+	// started looking in both polarities, which is what it was written to
+	// catch. Measured on real photographs: a white code on a dark card was
+	// invisible upright and located immediately inverted, so the detector
+	// gained the second polarity and this assertion gained a sign.
+	if infos := detectFinders(flipped); len(infos) == 0 {
+		t.Error("the detector no longer locates an inverted code; the second polarity has been lost")
 	}
 
-	// And the transform recovers it.
+	// Locating is not reading. The transform is what recovers the payload.
 	if got, _ := ScanDecodedImage(invert(flipped)); len(got) != 1 || got[0] != content {
 		t.Fatalf("inverting an inverted code did not decode it: %q", got)
 	}

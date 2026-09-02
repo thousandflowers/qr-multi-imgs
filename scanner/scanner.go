@@ -441,16 +441,39 @@ func detectFinders(img image.Image) []*detector.FinderPatternInfo {
 	var best []*detector.FinderPatternInfo
 	for _, channel := range projectionChannels() {
 		src := projectChannel(img, channel)
+		// Both polarities.
+		//
+		// A finder pattern is found by its run of dark-light-dark-light-dark,
+		// so a light code on a dark ground has every run the wrong colour and
+		// the scan reports nothing at all - not "found and unreadable", which
+		// is at least actionable, but nothing. Measured on real photographs: a
+		// white code on a blue card was invisible upright and located
+		// immediately inverted, and a second card decoded only from the
+		// inverted image. Inverting a projection is one subtraction per pixel;
+		// the detection that follows is the cost, and it buys a class of code
+		// the tool could not see at all.
+		for _, view := range []image.Image{src, invert(src)} {
+			if infos := findIn(view, hints); len(infos) > len(best) {
+				best = infos
+			}
+		}
+	}
+	return best
+}
+
+// findIn runs the finder scan over one prepared projection.
+func findIn(src image.Image, hints map[gozxing.DecodeHintType]interface{}) []*detector.FinderPatternInfo {
+	{
 		// Global histogram: cheapest binarizer, and the most forgiving on the
 		// flat single-channel projections this pass is built around.
 		bmp, err := gozxing.NewBinaryBitmap(gozxing.NewGlobalHistgramBinarizer(
 			gozxing.NewLuminanceSourceFromImage(src)))
 		if err != nil || bmp == nil {
-			continue
+			return nil
 		}
 		matrix, merr := bmp.GetBlackMatrix()
 		if merr != nil || matrix == nil {
-			continue
+			return nil
 		}
 		infos, ferr := multidetector.NewMultiFinderPatternFinder(matrix, nil).FindMulti(hints)
 		if ferr != nil {
@@ -464,13 +487,10 @@ func detectFinders(img image.Image) []*detector.FinderPatternInfo {
 			// no code in it yields one. A bucket built on them would promise a
 			// code the image does not contain, which is the failure this whole
 			// change exists to stop, pointed the other way.
-			continue
+			return nil
 		}
-		if len(infos) > len(best) {
-			best = infos
-		}
+		return infos
 	}
-	return best
 }
 
 // decodeRaster runs the pure-Go strategies over a decoded image and returns
