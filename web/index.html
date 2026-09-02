@@ -269,6 +269,25 @@ button.quiet:hover:not(:disabled) { background:var(--panel); border-color:var(--
 #renameWrap[open] .bar2 { border-bottom:0; padding-top:0; }
 /* Air between the controls and what they act on. */
 ul { margin-top:8px; }
+/* Past a certain number a list stops being a set of cards and becomes a table
+   the eye scans down. Twenty rows of thumbnail-plus-payload-card is eight
+   screens; the same twenty compact is one and a half, and every payload is
+   still there on its own line. */
+ul.compact li { padding:8px 12px; gap:12px; }
+ul.compact li img, ul.compact li canvas.thumb, ul.compact li .noimg, ul.compact li .shim {
+  width:36px; height:36px; border-radius:6px; }
+ul.compact .hitbox { border:0; background:none; }
+ul.compact .hitTop { display:none; }
+ul.compact .hitShort { padding:0; }
+ul.compact .hitMore { display:none; }
+ul.compact .advice, ul.compact .renamed { display:none; }
+/* Name and payload on one line: they are two facts about the same row, and
+   stacking them doubled a list that is long by definition. */
+ul.compact li .meta { display:flex; align-items:center; gap:16px; min-width:0; }
+ul.compact li .nameline { flex:0 0 auto; max-width:38%; overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap; }
+ul.compact .hitbox { flex:1 1 auto; min-width:0; }
+ul.compact .hitShort { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 #summary { padding:8px 12px 0; color:var(--dim); font-size:var(--fs-2); }
 /* A payload that is a link looks like one but is a button: see the note where
    it is built. */
@@ -447,7 +466,21 @@ li canvas.thumb { width:72px; height:72px; border-radius:9px; display:block;
 #scanStage video { display:none; }
 #scanCanvas { width:100%; height:min(70vh,70vw); touch-action:none; display:block; }
 #camMsg { margin:0; font-size:var(--fs-3); color:var(--dim); min-height:1.2em; }
-#scanFound { display:flex; flex-direction:column; gap:4px; max-height:20vh; overflow:auto; }
+#scanBar { display:flex; align-items:center; gap:8px; position:relative; }
+#camSet { position:relative; }
+#camSet > summary { list-style:none; cursor:pointer; font-size:var(--fs-2);
+  color:var(--dim); padding:6px 10px; border:1px solid var(--line); border-radius:8px; }
+#camSet > summary::-webkit-details-marker { display:none; }
+#camSet[open] > summary { border-color:var(--brand); color:var(--brand); }
+#camSet[open] .drawer { position:absolute; right:0; bottom:calc(100% + 6px); z-index:5;
+  display:flex; align-items:center; gap:12px; white-space:nowrap; width:max-content;
+  background:var(--panel); border:1px solid var(--line); border-radius:10px;
+  padding:12px; box-shadow:0 12px 32px rgba(0,0,0,.18); }
+#camSet label { display:flex; align-items:center; gap:6px; font-size:var(--fs-2); color:var(--dim); }
+#scanCount { font-size:var(--fs-2); color:var(--ok); font-weight:600; }
+/* At most three, so the viewfinder never becomes a wall of payloads. */
+#scanFound { display:flex; flex-direction:column; gap:4px; }
+#scanFound div:nth-child(n+4) { display:none; }
 #scanFound div { font-family:var(--mono); font-size:var(--fs-2); color:var(--ok);
   background:var(--ok-soft); border-radius:8px; padding:4px 8px;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -677,6 +710,7 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
           <button id="fUniq" class="chip" role="button" aria-pressed="false"
                   data-t="stat.unique" data-t-title="stat.uniqueHelp"></button>
           <button id="fFlag" class="chip" role="button" aria-pressed="false" data-t="filter.flagged"></button>
+          <button id="fCompact" class="chip" role="button" aria-pressed="true" data-t="res.compact"></button>
           <label class="sr" for="kind" data-t="filter.kind"></label>
           <select id="kind"><option value="" data-t="filter.kindAll"></option></select>
         </div>
@@ -774,28 +808,44 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
      by hand over a code the machine could not manage. -->
 <div id="scan" hidden role="dialog" aria-modal="true" aria-labelledby="scanTitle">
   <div id="scanBox">
+    <!-- The header says where you are and how to leave. Six controls used to
+         share this line and none of them explained itself. -->
     <div id="scanHead">
       <h3 id="scanTitle" data-t="cam.title"></h3>
+      <span id="scanCount"></span>
       <span class="grow"></span>
-      <!-- Every camera the machine has. On macOS an iPhone joined through
-           Continuity Camera is simply one of them, which is the whole answer
-           to "use my phone as the camera": no pairing, no network, no second
-           app - the operating system already did it, and a page only has to
-           stop assuming there is exactly one camera. -->
-      <label id="autoWrap"><input type="checkbox" id="camAuto" checked>
-        <span data-t="cam.auto"></span></label>
-      <label id="autoWrap" data-t-title="cam.flipHelp"><input type="checkbox" id="camFlip">
-        <span data-t="cam.flip"></span></label>
-      <label class="sr" for="camPick" data-t="cam.device"></label>
-      <select id="camPick" class="hide" data-t-title="cam.deviceHelp"></select>
-      <button id="scanFreeze" data-t="cam.freeze"></button>
-      <button id="scanClose" data-t="insp.close"></button>
+      <button id="scanClose" class="quiet" data-t="insp.close"></button>
     </div>
     <div id="scanStage">
       <video id="cam" playsinline muted></video>
       <canvas id="scanCanvas"></canvas>
     </div>
+    <!-- One act under the picture, and the settings out of the way. Freezing
+         is the only thing a person does here that is not pointing the camera. -->
+    <div id="scanBar">
+      <button id="scanFreeze" class="primary" data-t="cam.freeze"></button>
+      <span class="grow"></span>
+      <details id="camSet">
+        <summary data-t="cam.settings"></summary>
+        <div class="drawer">
+          <label data-t-title="cam.autoHelp"><input type="checkbox" id="camAuto" checked>
+            <span data-t="cam.auto"></span></label>
+          <label data-t-title="cam.flipHelp"><input type="checkbox" id="camFlip">
+            <span data-t="cam.flip"></span></label>
+          <!-- Every camera the machine has. On macOS an iPhone joined through
+               Continuity Camera is simply one of them: no pairing, no network,
+               no second app - a page only has to stop assuming there is
+               exactly one camera. -->
+          <label class="sr" for="camPick" data-t="cam.device"></label>
+          <select id="camPick" class="hide" data-t-title="cam.deviceHelp"></select>
+        </div>
+      </details>
+    </div>
     <p id="camMsg" role="status" aria-live="polite"></p>
+    <!-- Only the most recent few: every code found is already becoming a row
+         in the list behind this dialog, and a growing pile of payloads inside
+         a viewfinder is a wall to read rather than a confirmation to glance
+         at. -->
     <div id="scanFound"></div>
   </div>
 </div>
@@ -1242,6 +1292,7 @@ async function openScanner() {
   $("camMsg").textContent = "";
   $("scanFound").replaceChildren();
   live.found.clear();
+  $("scanCount").textContent = "";
   live.dets = [];
   live.frozen = null;
   live.selNat = null;
@@ -1270,6 +1321,12 @@ function closeScanner() {
   if (stream) for (const tr of stream.getTracks()) tr.stop();
   stream = null;
   $("cam").srcObject = null;
+}
+
+// The list shows the last few; the count answers for the rest.
+function paintFound() {
+  $("scanCount").textContent = live.found.size ? t("cam.found", { n: live.found.size }) : "";
+  $("camMsg").textContent = t("cam.read", { n: live.found.size });
 }
 
 function setFreezeLabel(frozen) {
@@ -1347,7 +1404,7 @@ function sendNative(v) {
       $("scanFound").prepend(row);
       enqueueDecodedFromCamera(c);
     }
-    if (res.codes.length) $("camMsg").textContent = t("cam.read", { n: live.found.size });
+    if (res.codes.length) paintFound();
   }).catch(() => { live.natBusy = false; });
 }
 
@@ -1389,7 +1446,7 @@ function adoptFrameResult(msg) {
     // A code seen live is a result like any other, so it joins the list.
     enqueueDecodedFromCamera(c);
   }
-  if (msg.codes && msg.codes.length) $("camMsg").textContent = t("cam.read", { n: live.found.size });
+  if (msg.codes && msg.codes.length) paintFound();
   if (live.auto) considerAuto();
 }
 
@@ -1823,6 +1880,9 @@ let kindFilter = "";
 // A row the person wants to come back to. The scanner's own buckets say what
 // the machine thinks; this is the one mark it does not get to set or clear.
 let flagOnly = false;
+// Compact is what a long list wants; the switch is for the person who would
+// rather have the cards back.
+let compactOff = false;
 function toggleFlag(r) {
   r.flagged = !r.flagged;
   renderRow(r);
@@ -1927,6 +1987,9 @@ function applyFilters() {
   $("pickFolder").querySelector("span").textContent = t(rows.length ? "drop.folderMore" : "drop.folder");
   // Eight is where a list stops being something the eye can scan whole.
   $("filterBar").classList.toggle("hide", rows.length < 8);
+  // Same threshold as the filters, and for the same reason: eight rows is
+  // where scanning replaces reading.
+  $("list").classList.toggle("compact", rows.length >= 8 && !compactOff);
   paintQrCount();
   paintKindFilter();
   paintRenameExample();
@@ -2756,6 +2819,11 @@ $("pause").onclick = togglePause;
 $("kind").onchange = (e) => { kindFilter = e.target.value; applyFilters(); };
 $("csvClear").onclick = clearCodeList;
 $("fFlag").onclick = () => { flagOnly = !flagOnly; applyFilters(); };
+$("fCompact").onclick = () => {
+  compactOff = !compactOff;
+  $("fCompact").setAttribute("aria-pressed", String(!compactOff));
+  applyFilters();
+};
 $("pattern").addEventListener("change", () => { paintRenameExample(); repaintAll(); });
 $("renameWrap").addEventListener("toggle", repaintAll);
 $("linkNo").onclick = () => { $("linkAsk").hidden = true; };

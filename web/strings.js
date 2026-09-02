@@ -20,6 +20,11 @@
   };
 
   S.en = {
+    "cam.settings": "Settings",
+    "cam.found": "{n} found",
+    "res.compact": "Compact",
+    "act.exportAs": "Export as this format",
+    "qrgen.as": "Recreate the codes in this format",
     "res.more": "More",
     "res.moreHelp": "Other formats, and turning the codes back into images",
     "cam.flip": "Flip",
@@ -199,6 +204,11 @@
   };
 
   S.it = {
+    "cam.settings": "Impostazioni",
+    "cam.found": "{n} trovati",
+    "res.compact": "Compatta",
+    "act.exportAs": "Esporta in questo formato",
+    "qrgen.as": "Ricrea i codici in questo formato",
     "res.more": "Altro",
     "res.moreHelp": "Altri formati, e ricreare i codici come immagini",
     "cam.flip": "Specchia",
@@ -378,6 +388,11 @@
   };
 
   S.es = {
+    "cam.settings": "Ajustes",
+    "cam.found": "{n} encontrados",
+    "res.compact": "Compacta",
+    "act.exportAs": "Exportar en este formato",
+    "qrgen.as": "Recrear los códigos en este formato",
     "res.more": "Más",
     "res.moreHelp": "Otros formatos, y recrear los códigos como imágenes",
     "cam.flip": "Voltear",
@@ -557,6 +572,11 @@
   };
 
   S.fr = {
+    "cam.settings": "Réglages",
+    "cam.found": "{n} trouvés",
+    "res.compact": "Compacte",
+    "act.exportAs": "Exporter dans ce format",
+    "qrgen.as": "Recréer les codes dans ce format",
     "res.more": "Plus",
     "res.moreHelp": "Autres formats, et recréer les codes en images",
     "cam.flip": "Miroir",
@@ -736,6 +756,11 @@
   };
 
   S.de = {
+    "cam.settings": "Einstellungen",
+    "cam.found": "{n} gefunden",
+    "res.compact": "Kompakt",
+    "act.exportAs": "In diesem Format exportieren",
+    "qrgen.as": "Codes in diesem Format erzeugen",
     "res.more": "Mehr",
     "res.moreHelp": "Andere Formate, und die Codes wieder als Bilder",
     "cam.flip": "Spiegeln",
@@ -915,6 +940,11 @@
   };
 
   S.pt = {
+    "cam.settings": "Definições",
+    "cam.found": "{n} encontrados",
+    "res.compact": "Compacta",
+    "act.exportAs": "Exportar neste formato",
+    "qrgen.as": "Recriar os códigos neste formato",
     "res.more": "Mais",
     "res.moreHelp": "Outros formatos, e recriar os códigos como imagens",
     "cam.flip": "Espelhar",
