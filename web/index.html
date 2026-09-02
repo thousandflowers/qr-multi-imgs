@@ -564,7 +564,7 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
             <span data-t="drop.paste"></span>
           </button>
         </div>
-        <input type="file" id="files" multiple>
+        <input type="file" id="files" multiple accept="image/*,.zip,.csv,.tsv,.txt">
         <input type="file" id="folder" webkitdirectory directory multiple>
         <input type="file" id="camshot" accept="image/*" capture="environment">
 
@@ -666,6 +666,13 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
           <button id="qrSave" class="primary"></button>
           <span id="qrMsg"></span>
         </div>
+        <!-- Codes that came from a list rather than from a picture. They join
+             the same download, because "make these into files" is one job
+             whatever the payloads came from. -->
+        <div id="csvBar" class="toolbar hide">
+          <span id="csvMsg"></span>
+          <button id="csvClear" data-t="csv.clear"></button>
+        </div>
 
         <p id="noMatch" class="nomatch hide"></p>
         <ul id="list"></ul>
@@ -753,6 +760,7 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
 
 <script src="strings.js"></script>
 <script src="i18n.js"></script>
+<script src="csvin.js"></script>
 <script src="linkcheck.js"></script>
 <script src="qrgen.js"></script>
 <script src="select.js"></script>
@@ -923,7 +931,10 @@ function finish(msg) {
 
 /* getting the files */
 
-const worthTrying = (f) => !f.type || f.type.startsWith("image/") || Unzip.looksLikeZip(f);
+// A CSV is not an image and is still worth taking: it is a list of payloads to
+// turn INTO codes. It is separated out at intake rather than pushed at the
+// decoder, which would only report that a spreadsheet contains no QR code.
+const worthTrying = (f) => !f.type || f.type.startsWith("image/") || Unzip.looksLikeZip(f) || CSVIn.looksLikeCSV(f);
 
 async function readDirectory(entry, prefix, out) {
   const reader = entry.createReader();
@@ -997,9 +1008,43 @@ function labelFor(items) {
 async function accept(items) {
   if (!items.length) { $("emptyText").textContent = t("res.nothing"); return; }
   bounce();
-  const expanded = await expandArchives(items);
+  // A list of payloads goes one way and pictures go the other. Sending a CSV
+  // to the decoder would only report that a spreadsheet holds no QR code.
+  const lists = items.filter((it) => CSVIn.looksLikeCSV(it.file));
+  const pictures = items.filter((it) => !CSVIn.looksLikeCSV(it.file));
+  for (const it of lists) await loadCodeList(it.file);
+  if (!pictures.length) return;
+  const expanded = await expandArchives(pictures);
   if (!expanded.length) { $("emptyText").textContent = t("res.nothing"); return; }
   enqueue(expanded, labelFor(expanded));
+}
+
+// Payloads loaded from a list, kept beside the ones found in pictures. They
+// share the download because writing codes to files is one job whichever end
+// they came from.
+let csvItems = [];
+
+async function loadCodeList(file) {
+  const parsed = CSVIn.read(await file.text());
+  if (!parsed.items.length) { $("emptyText").textContent = t("res.nothing"); return; }
+  csvItems = csvItems.concat(parsed.items);
+  const notes = [];
+  if (!parsed.usedHeader) notes.push(t("csv.noHeader"));
+  if (parsed.skipped) notes.push(t("csv.skipped", { n: parsed.skipped }));
+  $("csvMsg").textContent =
+    t("csv.loaded", { n: csvItems.length, file: file.name, col: parsed.valueColumn }) +
+    (notes.length ? " · " + notes.join(" · ") : "");
+  $("csvBar").classList.remove("hide");
+  $("out").classList.remove("hide");
+  $("empty").classList.add("hide");
+  applyFilters();
+}
+
+function clearCodeList() {
+  csvItems = [];
+  $("csvBar").classList.add("hide");
+  $("csvMsg").textContent = "";
+  applyFilters();
 }
 
 function enqueue(items, label) {
@@ -1305,6 +1350,10 @@ function recreatable() {
     if (r.pending || r.error) continue;
     for (const c of r.codes) if (!seen.has(c)) seen.set(c, r);
   }
+  // Payloads from a list, after the ones found in pictures: a code that is
+  // both scanned and listed keeps the row it was scanned from, so its file is
+  // named after the photograph it came out of.
+  for (const it of csvItems) if (!seen.has(it.value)) seen.set(it.value, { name: it.name || it.value });
   return [...seen.entries()];
 }
 
@@ -2376,6 +2425,7 @@ $("search").oninput = applyFilters;
 $("qrSave").onclick = downloadRecreated;
 $("pause").onclick = togglePause;
 $("kind").onchange = (e) => { kindFilter = e.target.value; applyFilters(); };
+$("csvClear").onclick = clearCodeList;
 $("pattern").addEventListener("change", paintRenameExample);
 $("linkNo").onclick = () => { $("linkAsk").hidden = true; };
 $("linkAsk").onclick = (e) => { if (e.target === $("linkAsk")) $("linkAsk").hidden = true; };

@@ -55,6 +55,7 @@ jobs:
           node web/select.js --test
           node web/qrgen.js --test
           node web/linkcheck.js --test
+          node web/csvin.js --test
 
       - name: Test
         run: go test -v -count=1 -coverprofile=${{ runner.temp }}/coverage.txt . ./exporter ./scanner ./cmd/...

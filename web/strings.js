@@ -20,6 +20,10 @@
   };
 
   S.en = {
+    "csv.loaded": "{n} codes from {file} — column “{col}”",
+    "csv.clear": "Remove them",
+    "csv.noHeader": "no header found, first column used",
+    "csv.skipped": "{n} empty rows skipped",
     "filter.kind": "Kind",
     "filter.kindAll": "Any kind",
     "stat.uniqueHelp": "One row per distinct payload — two photos of the same code count once",
@@ -174,6 +178,10 @@
   };
 
   S.it = {
+    "csv.loaded": "{n} codici da {file} — colonna “{col}”",
+    "csv.clear": "Toglili",
+    "csv.noHeader": "nessuna intestazione trovata, usata la prima colonna",
+    "csv.skipped": "{n} righe vuote saltate",
     "filter.kind": "Tipo",
     "filter.kindAll": "Qualsiasi tipo",
     "stat.uniqueHelp": "Una riga per contenuto distinto — due foto dello stesso codice contano una volta",
@@ -328,6 +336,10 @@
   };
 
   S.es = {
+    "csv.loaded": "{n} códigos de {file} — columna «{col}»",
+    "csv.clear": "Quitarlos",
+    "csv.noHeader": "sin encabezado, se usó la primera columna",
+    "csv.skipped": "{n} filas vacías omitidas",
     "filter.kind": "Tipo",
     "filter.kindAll": "Cualquier tipo",
     "stat.uniqueHelp": "Una fila por contenido distinto — dos fotos del mismo código cuentan una vez",
@@ -482,6 +494,10 @@
   };
 
   S.fr = {
+    "csv.loaded": "{n} codes de {file} — colonne « {col} »",
+    "csv.clear": "Les retirer",
+    "csv.noHeader": "aucun en-tête trouvé, première colonne utilisée",
+    "csv.skipped": "{n} lignes vides ignorées",
     "filter.kind": "Type",
     "filter.kindAll": "Tous les types",
     "stat.uniqueHelp": "Une ligne par contenu distinct — deux photos du même code comptent une fois",
@@ -636,6 +652,10 @@
   };
 
   S.de = {
+    "csv.loaded": "{n} Codes aus {file} — Spalte „{col}“",
+    "csv.clear": "Entfernen",
+    "csv.noHeader": "keine Kopfzeile gefunden, erste Spalte benutzt",
+    "csv.skipped": "{n} leere Zeilen übersprungen",
     "filter.kind": "Art",
     "filter.kindAll": "Jede Art",
     "stat.uniqueHelp": "Eine Zeile pro verschiedenem Inhalt — zwei Fotos desselben Codes zählen einmal",
@@ -790,6 +810,10 @@
   };
 
   S.pt = {
+    "csv.loaded": "{n} códigos de {file} — coluna «{col}»",
+    "csv.clear": "Remover",
+    "csv.noHeader": "sem cabeçalho, usada a primeira coluna",
+    "csv.skipped": "{n} linhas vazias ignoradas",
     "filter.kind": "Tipo",
     "filter.kindAll": "Qualquer tipo",
     "stat.uniqueHelp": "Uma linha por conteúdo distinto — duas fotos do mesmo código contam uma vez",
