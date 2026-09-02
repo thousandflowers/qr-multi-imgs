@@ -20,6 +20,7 @@
   };
 
   S.en = {
+    "drop.folderMore": "Add another folder",
     "insp.keys": "Drag a box, or drag it by its handles. Scroll to pan, pinch or ctrl-scroll to zoom, space and drag to pan. Arrows nudge, shift and arrows resize, Enter reads, Escape closes.",
     "res.summary": "{codes} codes read, {uniq} of them different.",
     "insp.zoomIn": "Zoom in",
@@ -138,6 +139,7 @@
   };
 
   S.it = {
+    "drop.folderMore": "Aggiungi un'altra cartella",
     "insp.keys": "Trascina un riquadro, o spostalo dalle maniglie. Scorri per muoverti, pizzica o ctrl+rotella per zoomare, spazio e trascina per spostare. Le frecce spostano, shift e frecce ridimensionano, Invio legge, Esc chiude.",
     "res.summary": "{codes} codici letti, di cui {uniq} diversi.",
     "insp.zoomIn": "Ingrandisci",
@@ -256,6 +258,7 @@
   };
 
   S.es = {
+    "drop.folderMore": "Añadir otra carpeta",
     "insp.keys": "Arrastra un recuadro o muévelo por los tiradores. Desplaza para moverte, pellizca o ctrl+rueda para acercar, espacio y arrastrar para desplazar. Las flechas mueven, shift y flechas redimensionan, Intro lee, Esc cierra.",
     "res.summary": "{codes} códigos leídos, {uniq} de ellos distintos.",
     "insp.zoomIn": "Acercar",
@@ -374,6 +377,7 @@
   };
 
   S.fr = {
+    "drop.folderMore": "Ajouter un autre dossier",
     "insp.keys": "Tracez un cadre, ou déplacez-le par ses poignées. Défilez pour vous déplacer, pincez ou ctrl+molette pour zoomer, espace et glisser pour déplacer. Les flèches déplacent, maj et flèches redimensionnent, Entrée lit, Échap ferme.",
     "res.summary": "{codes} codes lus, dont {uniq} différents.",
     "insp.zoomIn": "Agrandir",
@@ -492,6 +496,7 @@
   };
 
   S.de = {
+    "drop.folderMore": "Weiteren Ordner hinzufügen",
     "insp.keys": "Zieh einen Rahmen oder verschieb ihn an den Griffen. Scrollen bewegt, Pinch oder Strg+Rad zoomt, Leertaste und Ziehen verschiebt. Pfeile bewegen, Umschalt und Pfeile ändern die Größe, Enter liest, Esc schließt.",
     "res.summary": "{codes} Codes gelesen, davon {uniq} verschiedene.",
     "insp.zoomIn": "Vergrößern",
@@ -610,6 +615,7 @@
   };
 
   S.pt = {
+    "drop.folderMore": "Adicionar outra pasta",
     "insp.keys": "Arraste uma caixa, ou mova-a pelas pegas. Role para se deslocar, faça pinça ou ctrl+roda para ampliar, espaço e arrastar para deslocar. As setas movem, shift e setas redimensionam, Enter lê, Esc fecha.",
     "res.summary": "{codes} códigos lidos, {uniq} deles diferentes.",
     "insp.zoomIn": "Aumentar",
