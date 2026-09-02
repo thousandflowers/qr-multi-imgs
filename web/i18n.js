@@ -58,6 +58,19 @@
   const languages = () => Object.keys(STRINGS).map((code) => ({ code, name: NAMES[code] || code }));
   const onChange = (cb) => listeners.push(cb);
 
+  // keysUsedIn pulls every translation key a page actually asks for out of its
+  // markup. Parity between languages is not the only way a string goes missing:
+  // a key can be absent from ALL of them at once, and then every language
+  // agrees perfectly while the page renders "insp.keys" at the user. That
+  // happened. This is the check that catches it.
+  function keysUsedIn(html) {
+    const out = new Set();
+    const re = /data-t(?:-html|-ph|-title)?\s*=\s*"([^"]+)"/g;
+    let m;
+    while ((m = re.exec(html))) out.add(m[1]);
+    return [...out];
+  }
+
   function selfTest() {
     const codes = Object.keys(STRINGS);
     if (codes.length < 2) throw new Error("only one language is defined");
@@ -89,11 +102,27 @@
   }
 
   global.I18N = {
-    t, setLang, apply, onChange, languages, selfTest,
+    t, setLang, apply, onChange, languages, selfTest, keysUsedIn,
     get lang() { return lang; },
   };
 
+  function checkMarkup() {
+    let html;
+    try {
+      html = require("fs").readFileSync(require("path").join(__dirname, "index.html"), "utf8");
+    } catch {
+      return "index.html not readable from here, markup keys unchecked";
+    }
+    const used = keysUsedIn(html);
+    const missing = used.filter((k) => !STRINGS.en[k]);
+    if (missing.length) {
+      throw new Error("index.html asks for keys no language defines: " + missing.join(", "));
+    }
+    return used.length + " markup keys, all defined";
+  }
+
   if (typeof process !== "undefined" && process.argv && process.argv.includes("--test")) {
     console.log(selfTest());
+    console.log(checkMarkup());
   }
 })(typeof globalThis !== "undefined" ? globalThis : this);

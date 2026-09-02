@@ -46,6 +46,7 @@ body { margin:0; background:var(--bg); color:var(--fg);
   display:flex; flex-direction:column; min-height:100%; }
 a { color:var(--brand); }
 
+html { scroll-padding-top:64px; }  /* the sticky header must not cover what is scrolled to */
 header { position:sticky; top:0; z-index:20; background:var(--panel);
   border-bottom:1px solid var(--line); }
 .bar { max-width:78rem; margin:0 auto; padding:.7rem 1rem;
@@ -91,7 +92,14 @@ main { flex:1; max-width:78rem; width:100%; margin:0 auto; padding:2rem 1rem 3re
 .tab[aria-selected="true"] { color:var(--brand); border-bottom-color:var(--brand); font-weight:600; }
 
 #drop { border:2px dashed var(--line); border-radius:10px; background:var(--soft);
-  padding:1.5rem 1rem; text-align:center; transition:border-color .12s, background .12s; }
+  padding:1.5rem 1rem; text-align:center;
+  transition:border-color .12s, background .12s, padding .18s ease; }
+/* Once there are results, the invitation to drop files has done its job and
+   stops taking a third of the column to keep saying it. It still accepts a
+   drop, and still grows back when the list is cleared. */
+#drop.tight { padding:.7rem .8rem; }
+#drop.tight .ico { width:22px; height:22px; margin-bottom:.3rem; }
+#drop.tight small, #drop.tight .formats { display:none; }
 #drop.over { border-color:var(--brand); background:var(--brand-soft); }
 #drop .ico { width:36px; height:36px; margin:0 auto .55rem; color:var(--faint); display:block; }
 #drop.over .ico { color:var(--brand); }
@@ -128,8 +136,13 @@ input[type=file] { display:none; }
 #count { margin-top:.3rem; font-size:.73rem; color:var(--dim); font-family:var(--mono);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
-.stats { display:grid; grid-template-columns:repeat(7, 1fr); border-bottom:1px solid var(--line); }
-@media (max-width:640px) { .stats { grid-template-columns:repeat(4, 1fr); } }
+.stats { display:grid; grid-template-columns:repeat(auto-fit, minmax(96px, 1fr));
+  border-bottom:1px solid var(--line); }
+.stats .hide { display:none; }
+#summary { padding:.5rem .8rem 0; color:var(--dim); font-size:.8rem; }
+.chip { font-size:.8rem; padding:.35rem .6rem; border-radius:999px;
+  border:1px solid var(--line); background:var(--panel); color:var(--dim); cursor:pointer; }
+.chip[aria-pressed="true"] { background:var(--brand-soft); border-color:var(--brand); color:var(--brand); }
 .stats div { padding:.7rem .4rem; text-align:center; border-right:1px solid var(--line); }
 .stats div:last-child { border-right:0; }
 .stats b { display:block; font-size:1.25rem; font-weight:650; line-height:1.2; }
@@ -152,9 +165,9 @@ input[type=search] { flex:1; min-width:9rem; }
 ul { list-style:none; margin:0; padding:0; max-height:38rem; overflow-y:auto;
      display:flex; flex-direction:column; }
 li { display:flex; gap:.75rem; padding:.75rem .9rem; border-bottom:1px solid var(--line); }
-li img { width:48px; height:48px; object-fit:cover; border-radius:7px;
+li img { width:72px; height:72px; object-fit:cover; border-radius:9px;
   background:var(--soft); flex:none; }
-li .noimg { width:48px; height:48px; border-radius:7px; background:var(--soft); flex:none; }
+li .noimg { width:72px; height:72px; border-radius:9px; background:var(--soft); flex:none; }
 .meta { min-width:0; flex:1; }
 .nameline { display:flex; align-items:baseline; gap:.4rem; flex-wrap:wrap; }
 .name { font-size:.84rem; font-weight:600; word-break:break-all; }
@@ -244,7 +257,7 @@ li .thumbwrap { position:relative; flex:none; }
    often at an edge, and a cover crop would throw away the thing the box points
    at. No border of its own — the drawn box is the signal, and a second
    rectangle around the tile competes with it. */
-li canvas.thumb { width:48px; height:48px; border-radius:7px; display:block;
+li canvas.thumb { width:72px; height:72px; border-radius:9px; display:block;
   background:var(--soft); }
 
 /* The "point at the code" panel. One canvas, opened on demand and torn down on
@@ -260,19 +273,27 @@ li canvas.thumb { width:48px; height:48px; border-radius:7px; display:block;
 #inspName { color:var(--dim); font-size:.82rem; word-break:break-all; }
 #inspHint, #inspKeys { color:var(--dim); font-size:.82rem; margin:.5rem 0 0; }
 #inspKeys { color:var(--faint); }
-#inspStage { position:relative; margin:.75rem 0; background:var(--soft);
-  border-radius:10px; display:flex; justify-content:center; }
+#inspStage { position:relative; margin:.75rem 0; background:#111417;
+  border-radius:10px; display:flex; justify-content:center; overflow:hidden; }
 #inspCanvas { max-width:100%; touch-action:none; cursor:crosshair;
   border-radius:10px; display:block; }
+/* Bottom left, where every annotation tool puts them. */
+#inspZoom { position:absolute; left:.5rem; bottom:.5rem; display:flex; gap:.25rem; }
+#inspZoom button { min-width:34px; height:34px; padding:0 .5rem; border-radius:8px;
+  border:1px solid rgba(255,255,255,.25); background:rgba(0,0,0,.55); color:#fff;
+  font:inherit; font-size:.9rem; cursor:pointer; }
+#inspZoom button:hover { background:rgba(0,0,0,.75); }
 #inspMsg { font-size:.86rem; margin:.35rem 0 0; min-height:1.2em; }
 #inspMsg.ok { color:var(--ok); }
 #inspMsg.bad { color:var(--warn); }
 #inspBtns { display:flex; gap:.5rem; flex-wrap:wrap; margin-top:.6rem; }
-li .point { font:inherit; font-size:.78rem; padding:.2rem .5rem; cursor:pointer;
+li .point { font:inherit; font-size:.78rem; padding:.25rem .6rem; cursor:pointer;
   border:1px solid var(--line); background:var(--panel); color:var(--dim);
-  border-radius:7px; }
+  border-radius:999px; white-space:nowrap; }
 li .point:hover { border-color:var(--brand); color:var(--brand); }
-li .shim { width:48px; height:48px; border-radius:7px; background:var(--soft);
+li .point.lead { background:var(--warn-soft); border-color:var(--warn); color:var(--warn);
+  font-weight:600; }
+li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
   animation:shim 1.1s ease-in-out infinite; }
 @keyframes shim { 0%,100% { opacity:.55; } 50% { opacity:1; } }
 
@@ -325,7 +346,7 @@ li .shim { width:48px; height:48px; border-radius:7px; background:var(--soft);
       </div>
 
       <div class="pbody" id="paneFiles" role="tabpanel">
-        <div id="drop">
+        <div id="drop" class="roomy">
           <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
             <path d="M12 16V4"/><path d="M7.5 8.5L12 4l4.5 4.5"/>
             <path d="M4 15v3a2 2 0 002 2h12a2 2 0 002-2v-3"/>
@@ -397,15 +418,23 @@ li .shim { width:48px; height:48px; border-radius:7px; background:var(--soft);
         <div class="stats">
           <div id="fAll" role="button" aria-pressed="true"><b id="sTotal">0</b><span data-t="stat.images"></span></div>
           <div id="fWith" class="hit" role="button" aria-pressed="false"><b id="sWith">0</b><span data-t="stat.with"></span></div>
-          <div id="fCodes" role="button" aria-pressed="false"><b id="sCodes">0</b><span data-t="stat.codes"></span></div>
-          <div id="fUniq" role="button" aria-pressed="false"><b id="sUniq">0</b><span data-t="stat.unique"></span></div>
           <div id="fUnread" class="warn" role="button" aria-pressed="false"><b id="sUnread">0</b><span data-t="stat.unread"></span></div>
           <div id="fWithout" role="button" aria-pressed="false"><b id="sWithout">0</b><span data-t="stat.without"></span></div>
-          <div id="fErr" role="button" aria-pressed="false"><b id="sErr">0</b><span data-t="stat.unopened"></span></div>
+          <!-- Only rendered when something actually failed to open. A tile
+               reading 0 forever is a number the reader has to dismiss on every
+               glance. -->
+          <div id="fErr" class="hide" role="button" aria-pressed="false"><b id="sErr">0</b><span data-t="stat.unopened"></span></div>
+          <!-- "codes" duplicated the "with a code" filter exactly - same rows,
+               different number - and "unique" is a view, not a bucket. Both
+               moved out of the tile row: the counts to a summary line, the
+               unique view to a toggle beside the search. -->
         </div>
+
+        <div id="summary"></div>
 
         <div class="toolbar">
           <input type="search" id="search" data-t-ph="res.search">
+          <button id="fUniq" class="chip" role="button" aria-pressed="false" data-t="stat.unique"></button>
           <button id="copyAll" data-t="act.copyAll"></button>
           <select id="fmt"><option>csv</option><option>json</option><option>txt</option></select>
           <button id="save" data-t="act.download"></button>
@@ -468,7 +497,14 @@ li .shim { width:48px; height:48px; border-radius:7px; background:var(--soft);
     <h3 id="inspTitle" data-t="insp.title"></h3>
     <div id="inspName"></div>
     <p id="inspHint" data-t="insp.hint"></p>
-    <div id="inspStage"><canvas id="inspCanvas" tabindex="0"></canvas></div>
+    <div id="inspStage">
+      <canvas id="inspCanvas" tabindex="0"></canvas>
+      <div id="inspZoom">
+        <button id="inspZoomOut" data-t-title="insp.zoomOut" aria-label="-">&minus;</button>
+        <button id="inspFit" data-t-title="insp.fit" data-t="insp.fitShort"></button>
+        <button id="inspZoomIn" data-t-title="insp.zoomIn" aria-label="+">+</button>
+      </div>
+    </div>
     <p id="inspKeys" data-t="insp.keys"></p>
     <p id="inspMsg" role="status" aria-live="polite"></p>
     <div id="inspBtns">
@@ -870,15 +906,22 @@ function paintStats() {
   }
   $("sTotal").textContent = rows.length;
   $("sWith").textContent = withQR;
-  $("sCodes").textContent = codes;
-  $("sUniq").textContent = uniq.size;
   $("sUnread").textContent = unread;
   $("sWithout").textContent = settled - withQR - errs - unread;
   $("sErr").textContent = errs;
+  // The failure tile appears only when something failed. A tile reading 0
+  // forever is a number the reader dismisses on every glance.
+  $("fErr").classList.toggle("hide", errs === 0);
+  // Totals that are not buckets: how many codes came out, and how many of them
+  // are distinct. They were tiles, and as tiles they looked like two more
+  // filters - one of which filtered exactly the same rows as its neighbour.
+  $("summary").textContent = codes ? t("res.summary", { codes, uniq: uniq.size }) : "";
 }
 
 let activeTile = "fAll";
-const FILTERS = { fAll: "all", fWith: "with", fCodes: "with", fUniq: "unique",
+// fCodes used to sit here mapping to "with" - the same rows as fWith, beside
+// it, with a different number on it. One filter, one control.
+const FILTERS = { fAll: "all", fWith: "with", fUniq: "unique",
                   fUnread: "unread", fWithout: "without", fErr: "error" };
 const filterOf = () => FILTERS[activeTile] || "all";
 
@@ -932,6 +975,7 @@ function applyFilters() {
   // Once anything has been loaded the big empty state stays out of the way;
   // an empty filter says so from inside the list instead.
   if (rows.length) $("empty").classList.add("hide");
+  $("drop").classList.toggle("tight", rows.length > 0);
   $("noMatch").textContent = t("res.noMatch");
   $("noMatch").classList.toggle("hide", shown > 0 || !rows.length);
 }
@@ -1115,7 +1159,7 @@ function paintBoxes(r) {
     // The row may have been re-rendered or cleared while the thumbnail loaded.
     if (r.canvas !== canvas) return;
     const dpr = window.devicePixelRatio || 1;
-    const side = canvas.clientWidth || 48;
+    const side = canvas.clientWidth || 72;
     canvas.width = Math.round(side * dpr);
     canvas.height = Math.round(side * dpr);
 
@@ -1152,21 +1196,10 @@ window.addEventListener("resize", () => {
   clearTimeout(repaintTimer);
   repaintTimer = setTimeout(() => {
     for (const r of rows) if (r.canvas) paintBoxes(r);
-    // The panel's canvas is sized from the viewport, so a resize moves the
-    // image under a selection that was measured against the old layout. The
-    // selection is carried across in image-relative terms rather than dropped.
-    if (!$("insp").hidden && insp.bmp && insp.drawn) {
-      const before = insp.drawn, sel = insp.sel;
-      layoutInspector();
-      if (sel && before) {
-        insp.sel = Select.clamp(Coords.naturalToDisplay(
-          Coords.displayToNatural(sel,
-            { w: insp.bmp.width, h: insp.bmp.height, naturalW: insp.bmp.width, naturalH: insp.bmp.height }, before),
-          { w: insp.bmp.width, h: insp.bmp.height, naturalW: insp.bmp.width, naturalH: insp.bmp.height },
-          insp.drawn), insp.drawn);
-      }
-      paintInspector();
-    }
+    // The panel's canvas is sized from the viewport. Nothing has to be carried
+    // across: the selection is stored in image pixels, so re-laying out the
+    // canvas just re-projects it.
+    if (!$("insp").hidden && insp.bmp) { layoutInspector(); paintInspector(); }
   }, 100);
 });
 
@@ -1174,25 +1207,39 @@ window.addEventListener("resize", () => {
 
 // One panel, one image at a time. A hundred rows each holding a
 // full-resolution bitmap is what kills this page, which is why the row
-// thumbnails are 48px and why this is torn down on close.
+// thumbnails are small and why this is torn down on close.
+//
+// THE SELECTION LIVES IN IMAGE PIXELS, not canvas pixels. That is the whole
+// reason zoom and pan are possible: every time the view changes, a selection
+// stored in canvas coordinates would have to be carried across by hand and
+// would drift a little each time. Stored against the image, it is simply
+// re-projected, and the projection is coords.js's tested mapping.
 const insp = {
-  row: null,      // the row being inspected
-  bmp: null,      // the source ImageBitmap, at the file's own resolution
-  drawn: null,    // where that image is drawn inside the canvas, in canvas px
-  sel: null,      // the selection, in canvas px
-  drag: null,     // { handle, lastX, lastY } while a pointer is down
+  row: null,
+  bmp: null,       // the source ImageBitmap, at the file's own resolution
+  view: null,      // where the image is drawn in the canvas, in canvas px
+  selNat: null,    // THE selection, in image px
+  zoom: 1,
+  pan: { x: 0, y: 0 },
+  drag: null,      // { mode, handle, lastX, lastY, at } while a pointer is down
   busy: false,
 };
 
-// openInspector is available on every row that still has its file, not only
-// the ones the scanner flagged. The case it most needs to cover is the
-// opposite one: an image where nothing was detected at all and the person
-// looking at it can plainly see a code. Restricting this to rows the scanner
-// already understood would withhold it exactly where it is needed.
+const INSP_MAX_ZOOM = 24;
+
+// The frame record the mapping wants. The panel draws the file at its own
+// resolution, so frame and natural are the same space here.
+const inspFrame = () => ({ w: insp.bmp.width, h: insp.bmp.height, naturalW: insp.bmp.width, naturalH: insp.bmp.height });
+const selDisp = () => (insp.selNat && insp.view ? Coords.naturalToDisplay(insp.selNat, inspFrame(), insp.view) : null);
+const setSelFromDisp = (d) => { const n = d && Coords.displayToNatural(d, inspFrame(), insp.view); if (n) insp.selNat = n; };
+
 async function openInspector(r) {
   if (!r.file) return;
   insp.row = r;
   insp.busy = false;
+  insp.zoom = 1;
+  insp.pan = { x: 0, y: 0 };
+  insp.drag = null;
   $("inspName").textContent = r.name;
   setInspMsg("", "");
   $("insp").hidden = false;
@@ -1212,57 +1259,94 @@ async function openInspector(r) {
   // user adjusts a rectangle instead of tracing one. Everything else opens
   // with a centred box to drag.
   const pre = (r.detections && r.detections[0] && r.frame)
-    ? Coords.detectionToDisplay(r.detections[0], r.frame, insp.drawn)
+    ? Coords.frameToNatural(r.detections[0].box, r.frame)
     : null;
-  insp.sel = Select.initial(pre, insp.drawn);
-  if (pre) setInspMsg(t("insp.prefilled"), "");
+  insp.selNat = Select.initial(pre, { x: 0, y: 0, w: insp.bmp.width, h: insp.bmp.height });
+  if (pre) {
+    setInspMsg(t("insp.prefilled"), "");
+    // Open zoomed onto what the scanner found, rather than making the user
+    // zoom to the thing the tool is already pointing at.
+    zoomToSelection();
+  }
   paintInspector();
   $("inspCanvas").focus();
 }
 
-// layoutInspector sizes the canvas to the space available and works out where
-// the image sits inside it. Recomputed on every resize, because the display
-// size is an argument to the mapping and a stale one puts the box elsewhere.
+// layoutInspector sizes the canvas to the space available. The backing store
+// follows devicePixelRatio, because a magnified crop drawn at CSS resolution
+// is exactly the blur the zoom exists to remove.
 function layoutInspector() {
   if (!insp.bmp) return;
   const canvas = $("inspCanvas");
   const dpr = window.devicePixelRatio || 1;
-  const avail = Math.min($("inspBox").clientWidth - 32, 700);
-  const maxH = Math.max(240, window.innerHeight * 0.6);
-  const k = Math.min(avail / insp.bmp.width, maxH / insp.bmp.height, 1);
-  const cssW = Math.max(120, Math.round(insp.bmp.width * k));
-  const cssH = Math.max(120, Math.round(insp.bmp.height * k));
+  const avail = Math.min($("inspBox").clientWidth - 32, 760);
+  const cssW = Math.max(200, Math.round(avail));
+  const cssH = Math.max(220, Math.round(Math.min(window.innerHeight * 0.56, cssW * 0.75)));
   canvas.style.width = cssW + "px";
   canvas.style.height = cssH + "px";
   canvas.width = Math.round(cssW * dpr);
   canvas.height = Math.round(cssH * dpr);
-  insp.drawn = Coords.fitContain(insp.bmp.width, insp.bmp.height, canvas.width, canvas.height);
+  computeView();
 }
 
-function paintInspector() {
+// computeView is where zoom and pan turn into a rectangle. Everything else
+// reads insp.view and never recomputes this itself.
+function computeView() {
   const canvas = $("inspCanvas");
-  if (!insp.bmp || !insp.drawn) return;
-  const ctx = canvas.getContext("2d");
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(insp.bmp, insp.drawn.x, insp.drawn.y, insp.drawn.w, insp.drawn.h);
-  if (!insp.sel) return;
+  const base = Coords.fitContain(insp.bmp.width, insp.bmp.height, canvas.width, canvas.height);
+  if (!base) return;
+  const w = base.w * insp.zoom, h = base.h * insp.zoom;
+  let x = base.x + insp.pan.x, y = base.y + insp.pan.y;
+  // Zoomed out, the image is centred. Zoomed in, it may be panned but its
+  // edges may not come inside the frame: an image floating in the middle of a
+  // grey field is disorienting and serves nothing.
+  x = w <= canvas.width ? (canvas.width - w) / 2 : Math.min(0, Math.max(canvas.width - w, x));
+  y = h <= canvas.height ? (canvas.height - h) / 2 : Math.min(0, Math.max(canvas.height - h, y));
+  insp.pan = { x: x - base.x, y: y - base.y };
+  insp.view = { x, y, w, h };
+}
 
-  const dpr = window.devicePixelRatio || 1;
-  const s = insp.sel;
-  // Everything outside the selection is dimmed, which says what will be read
-  // far more directly than an outline does.
-  ctx.fillStyle = "rgba(0,0,0,.45)";
-  ctx.beginPath();
-  ctx.rect(insp.drawn.x, insp.drawn.y, insp.drawn.w, insp.drawn.h);
-  ctx.rect(s.x + s.w, s.y, -s.w, s.h); // reverse winding punches the hole
-  ctx.fill();
+// zoomBy keeps the image point under (fx, fy) exactly where it is, which is
+// what makes wheel-zoom feel like it is following the pointer rather than
+// jumping.
+function zoomBy(factor, fx, fy) {
+  if (!insp.view) return;
+  const canvas = $("inspCanvas");
+  if (fx === undefined) { fx = canvas.width / 2; fy = canvas.height / 2; }
+  const ix = (fx - insp.view.x) / insp.view.w;
+  const iy = (fy - insp.view.y) / insp.view.h;
+  const base = Coords.fitContain(insp.bmp.width, insp.bmp.height, canvas.width, canvas.height);
+  insp.zoom = Math.min(INSP_MAX_ZOOM, Math.max(1, insp.zoom * factor));
+  const w = base.w * insp.zoom, h = base.h * insp.zoom;
+  insp.pan = { x: (fx - ix * w) - base.x, y: (fy - iy * h) - base.y };
+  computeView();
+  paintInspector();
+}
 
-  ctx.lineWidth = Math.max(1, 2 * dpr);
-  ctx.strokeStyle = "#f0a500";
-  ctx.strokeRect(s.x, s.y, s.w, s.h);
-  const hs = Math.max(4, 5 * dpr);
-  ctx.fillStyle = "#f0a500";
-  for (const h of Select.handlePoints(s)) ctx.fillRect(h.x - hs, h.y - hs, hs * 2, hs * 2);
+function fitInspector() {
+  insp.zoom = 1;
+  insp.pan = { x: 0, y: 0 };
+  computeView();
+  paintInspector();
+}
+
+// zoomToSelection frames the current selection with a margin, which is the
+// view a person wants the moment they open a row the scanner already flagged.
+function zoomToSelection() {
+  const canvas = $("inspCanvas");
+  if (!insp.selNat) return;
+  const base = Coords.fitContain(insp.bmp.width, insp.bmp.height, canvas.width, canvas.height);
+  const margin = 1.8;
+  const want = Math.min(
+    canvas.width / (insp.selNat.w * (base.w / insp.bmp.width) * margin),
+    canvas.height / (insp.selNat.h * (base.h / insp.bmp.height) * margin));
+  insp.zoom = Math.min(INSP_MAX_ZOOM, Math.max(1, want));
+  const w = base.w * insp.zoom, h = base.h * insp.zoom;
+  // Centre the selection's middle in the canvas.
+  const cx = (insp.selNat.x + insp.selNat.w / 2) / insp.bmp.width;
+  const cy = (insp.selNat.y + insp.selNat.h / 2) / insp.bmp.height;
+  insp.pan = { x: (canvas.width / 2 - cx * w) - base.x, y: (canvas.height / 2 - cy * h) - base.y };
+  computeView();
 }
 
 function setInspMsg(text, cls) {
@@ -1271,9 +1355,9 @@ function setInspMsg(text, cls) {
   el.className = cls || "";
 }
 
-// Canvas pixels from a pointer event. The canvas is a CSS size and a backing
+// Canvas pixels from a pointer event. The canvas has a CSS size and a backing
 // store size and they are not the same number; using the wrong one is the
-// classic way a selection lands somewhere the user did not click.
+// classic way a selection lands where the user did not click.
 function inspPoint(e) {
   const canvas = $("inspCanvas");
   const rect = canvas.getBoundingClientRect();
@@ -1283,12 +1367,102 @@ function inspPoint(e) {
   };
 }
 
+// Handle size in canvas pixels. WCAG 2.2 asks for a 24x24 CSS px target as a
+// minimum; the grab radius is larger than the drawn square so the target is
+// comfortably past it on a touch screen, where the finger also hides the thing
+// being aimed at - which is what the loupe below is for.
+const HANDLE_DRAW = 7;   // half-size, CSS px
+const HANDLE_GRAB = 16;  // radius, CSS px
+const inspDpr = () => window.devicePixelRatio || 1;
+
+function paintInspector() {
+  const canvas = $("inspCanvas");
+  if (!insp.bmp || !insp.view) return;
+  const ctx = canvas.getContext("2d");
+  const dpr = inspDpr();
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.imageSmoothingEnabled = insp.zoom < 2; // past 2x, show the pixels honestly
+  ctx.drawImage(insp.bmp, insp.view.x, insp.view.y, insp.view.w, insp.view.h);
+
+  const s = selDisp();
+  if (!s) return;
+
+  // Everything outside the selection is dimmed, which says what will be read
+  // far more directly than an outline does.
+  ctx.fillStyle = "rgba(0,0,0,.5)";
+  ctx.beginPath();
+  ctx.rect(0, 0, canvas.width, canvas.height);
+  ctx.rect(s.x + s.w, s.y, -s.w, s.h); // reverse winding punches the hole
+  ctx.fill();
+
+  ctx.lineWidth = Math.max(1, 2 * dpr);
+  ctx.strokeStyle = "#f0a500";
+  ctx.strokeRect(s.x, s.y, s.w, s.h);
+  const hs = HANDLE_DRAW * dpr;
+  ctx.fillStyle = "#f0a500";
+  ctx.strokeStyle = "rgba(0,0,0,.6)";
+  ctx.lineWidth = Math.max(1, dpr);
+  for (const h of Select.handlePoints(s)) {
+    ctx.fillRect(h.x - hs, h.y - hs, hs * 2, hs * 2);
+    ctx.strokeRect(h.x - hs, h.y - hs, hs * 2, hs * 2);
+  }
+  if (insp.drag && insp.drag.at) paintLoupe(ctx, canvas, insp.drag.at);
+}
+
+// paintLoupe magnifies what is under the pointer, in the corner furthest from
+// it. On a touch screen the finger covers the exact pixel being positioned,
+// and every annotation tool that takes precision seriously solves that with a
+// magnifier rather than by asking for a steadier hand.
+function paintLoupe(ctx, canvas, at) {
+  const dpr = inspDpr();
+  const size = 108 * dpr, zoom = 3.5, pad = 10 * dpr;
+  const left = at.x > canvas.width / 2 ? pad : canvas.width - size - pad;
+  const top = at.y > canvas.height / 2 ? pad : canvas.height - size - pad;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(left, top, size, size);
+  ctx.clip();
+  ctx.fillStyle = "#000";
+  ctx.fillRect(left, top, size, size);
+  // Draw the same view again, scaled about the pointer, so what appears in the
+  // loupe is exactly what is under the finger and not a second rendering that
+  // could disagree with it.
+  ctx.imageSmoothingEnabled = false;
+  const vw = insp.view.w * zoom, vh = insp.view.h * zoom;
+  const vx = left + size / 2 - (at.x - insp.view.x) * zoom;
+  const vy = top + size / 2 - (at.y - insp.view.y) * zoom;
+  ctx.drawImage(insp.bmp, vx, vy, vw, vh);
+
+  const s = selDisp();
+  if (s) {
+    ctx.lineWidth = Math.max(1, 2 * dpr);
+    ctx.strokeStyle = "#f0a500";
+    ctx.strokeRect(vx + (s.x - insp.view.x) * zoom, vy + (s.y - insp.view.y) * zoom, s.w * zoom, s.h * zoom);
+  }
+  // Crosshair on the exact point being positioned.
+  ctx.strokeStyle = "rgba(255,255,255,.9)";
+  ctx.lineWidth = Math.max(1, dpr);
+  ctx.beginPath();
+  ctx.moveTo(left + size / 2 - 8 * dpr, top + size / 2);
+  ctx.lineTo(left + size / 2 + 8 * dpr, top + size / 2);
+  ctx.moveTo(left + size / 2, top + size / 2 - 8 * dpr);
+  ctx.lineTo(left + size / 2, top + size / 2 + 8 * dpr);
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.strokeStyle = "rgba(255,255,255,.75)";
+  ctx.lineWidth = Math.max(1, dpr);
+  ctx.strokeRect(left, top, size, size);
+}
+
 function closeInspector() {
   $("insp").hidden = true;
   if (insp.bmp) insp.bmp.close();
   insp.bmp = null;
   insp.row = null;
-  insp.sel = null;
+  insp.selNat = null;
+  insp.view = null;
   insp.drag = null;
 }
 
@@ -1342,7 +1516,9 @@ function renderRow(r) {
   // anyway; restricting it to flagged rows would withhold it exactly there.
   if (r.file) {
     const point = document.createElement("button");
-    point.className = "point";
+    // On a row holding a code nobody could read, pointing at it is THE action,
+    // so it looks like one. Elsewhere it is a quiet offer.
+    point.className = isUnread(r) ? "point lead" : "point";
     point.type = "button";
     point.textContent = t("insp.open");
     point.onclick = () => openInspector(r);
@@ -1358,6 +1534,8 @@ function renderRow(r) {
     where.textContent = r.path.slice(0, r.path.length - r.name.length - 1);
     line.appendChild(where);
   }
+  if (!r.pending && !r.error) line.appendChild(svgPath(ICONS.tick, "tick"));
+  else if (r.pending) { const sp = document.createElement("div"); sp.className = "spin"; line.appendChild(sp); }
   meta.appendChild(line);
 
   if (!r.pending) {
@@ -1411,16 +1589,6 @@ function renderRow(r) {
   }
   li.appendChild(meta);
 
-  const state = document.createElement("div");
-  state.className = "state";
-  if (r.pending) {
-    const spin = document.createElement("div");
-    spin.className = "spin";
-    state.appendChild(spin);
-  } else if (!r.error) {
-    state.appendChild(svgPath(ICONS.tick, "tick"));
-  }
-  li.appendChild(state);
 }
 
 function repaintAll() {
@@ -1544,55 +1712,126 @@ $("search").oninput = applyFilters;
 
 $("inspClose").onclick = closeInspector;
 $("insp").onclick = (e) => { if (e.target === $("insp")) closeInspector(); };
+$("inspZoomIn").onclick = () => zoomBy(1.5);
+$("inspZoomOut").onclick = () => zoomBy(1 / 1.5);
+$("inspFit").onclick = fitInspector;
+
+// Space held down turns the whole canvas into a pan surface, the convention
+// every drawing tool shares. Without it, dragging the background has to mean
+// one thing, and here it means "draw a box" because that is the primary act.
+let inspSpace = false;
+document.addEventListener("keydown", (e) => {
+  if (e.code === "Space" && !$("insp").hidden) { inspSpace = true; $("inspCanvas").style.cursor = "grab"; e.preventDefault(); }
+});
+document.addEventListener("keyup", (e) => {
+  if (e.code === "Space") { inspSpace = false; $("inspCanvas").style.cursor = ""; }
+});
+
+// Two fingers pan and pinch; one finger draws. Tracked here rather than in
+// select.js because it is pointer bookkeeping, not geometry.
+const inspTouches = new Map();
 
 $("inspCanvas").addEventListener("pointerdown", (e) => {
-  if (!insp.sel || !insp.drawn) return;
-  const p = inspPoint(e);
-  const grab = Select.hit(insp.sel, p.x, p.y, Select.GRAB * (window.devicePixelRatio || 1));
-  // Outside the current selection starts a fresh one from that corner, which
-  // is what every drawing tool does and what makes a bad first box cheap to
-  // redo.
-  if (!grab) {
-    insp.sel = Select.clamp({ x: p.x, y: p.y, w: Select.MIN, h: Select.MIN }, insp.drawn);
-    insp.drag = { handle: "se", lastX: p.x, lastY: p.y };
-  } else {
-    insp.drag = { handle: grab, lastX: p.x, lastY: p.y };
-  }
+  if (!insp.view) return;
   $("inspCanvas").setPointerCapture(e.pointerId);
+  inspTouches.set(e.pointerId, inspPoint(e));
+  if (inspTouches.size === 2) { insp.drag = { mode: "pinch", start: pinchState() }; paintInspector(); return; }
+
+  const p = inspPoint(e);
+  if (inspSpace || e.button === 1) { insp.drag = { mode: "pan", lastX: p.x, lastY: p.y }; return; }
+
+  const s = selDisp();
+  const grab = s ? Select.hit(s, p.x, p.y, HANDLE_GRAB * inspDpr()) : null;
+  if (!grab) {
+    // Outside the current selection starts a fresh one from that corner, which
+    // is what every drawing tool does and what makes a bad first box cheap to
+    // redo.
+    setSelFromDisp(Select.clamp({ x: p.x, y: p.y, w: Select.MIN, h: Select.MIN }, insp.view));
+    insp.drag = { mode: "resize", handle: "se", lastX: p.x, lastY: p.y, at: p };
+  } else {
+    insp.drag = { mode: grab === "move" ? "move" : "resize", handle: grab, lastX: p.x, lastY: p.y, at: p };
+  }
   paintInspector();
 });
 
+function pinchState() {
+  const [a, b] = [...inspTouches.values()];
+  return { d: Math.hypot(a.x - b.x, a.y - b.y), cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2 };
+}
+
 $("inspCanvas").addEventListener("pointermove", (e) => {
-  if (!insp.drag || !insp.sel) return;
+  if (!insp.drag || !insp.view) return;
   const p = inspPoint(e);
+  inspTouches.set(e.pointerId, p);
+
+  if (insp.drag.mode === "pinch") {
+    if (inspTouches.size < 2) return;
+    const now = pinchState(), was = insp.drag.start;
+    if (was.d > 0) zoomBy(now.d / was.d, now.cx, now.cy);
+    insp.drag.start = now;
+    return;
+  }
+  if (insp.drag.mode === "pan") {
+    insp.pan.x += p.x - insp.drag.lastX;
+    insp.pan.y += p.y - insp.drag.lastY;
+    insp.drag.lastX = p.x; insp.drag.lastY = p.y;
+    computeView();
+    paintInspector();
+    return;
+  }
+
   const dx = p.x - insp.drag.lastX, dy = p.y - insp.drag.lastY;
-  insp.drag.lastX = p.x;
-  insp.drag.lastY = p.y;
-  insp.sel = insp.drag.handle === "move"
-    ? Select.move(insp.sel, dx, dy, insp.drawn)
-    : Select.resize(insp.sel, insp.drag.handle, dx, dy, insp.drawn);
+  insp.drag.lastX = p.x; insp.drag.lastY = p.y;
+  insp.drag.at = p;
+  const s = selDisp();
+  if (!s) return;
+  setSelFromDisp(insp.drag.mode === "move"
+    ? Select.move(s, dx, dy, insp.view)
+    : Select.resize(s, insp.drag.handle, dx, dy, insp.view));
   paintInspector();
 });
 
 for (const ev of ["pointerup", "pointercancel"]) {
-  $("inspCanvas").addEventListener(ev, () => { insp.drag = null; });
+  $("inspCanvas").addEventListener(ev, (e) => {
+    inspTouches.delete(e.pointerId);
+    if (inspTouches.size < 2) insp.drag = null;
+    paintInspector();
+  });
 }
 
+// Wheel zooms at the pointer; with no modifier a trackpad's two-finger scroll
+// pans, which is what a trackpad user expects a two-finger gesture to do.
+$("inspCanvas").addEventListener("wheel", (e) => {
+  if (!insp.view) return;
+  e.preventDefault();
+  const p = inspPoint(e);
+  if (e.ctrlKey || e.metaKey || e.deltaMode !== 0) {
+    zoomBy(Math.exp(-e.deltaY * 0.002), p.x, p.y);
+  } else {
+    insp.pan.x -= e.deltaX;
+    insp.pan.y -= e.deltaY;
+    computeView();
+    paintInspector();
+  }
+}, { passive: false });
+
 // A keyboard alternative, because a rectangle that can only be dragged is a
-// feature some people simply cannot use.
+// feature some people cannot use at all.
 $("inspCanvas").addEventListener("keydown", (e) => {
-  if (!insp.sel) return;
-  const step = (e.shiftKey ? 1 : 1) * (e.altKey ? 1 : 8) * (window.devicePixelRatio || 1);
+  const s = selDisp();
+  if (!s) return;
+  const step = (e.altKey ? 1 : 8) * inspDpr();
   const d = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
   if (d) {
-    insp.sel = e.shiftKey
-      ? Select.resize(insp.sel, "se", d[0], d[1], insp.drawn)
-      : Select.move(insp.sel, d[0], d[1], insp.drawn);
+    setSelFromDisp(e.shiftKey ? Select.resize(s, "se", d[0], d[1], insp.view) : Select.move(s, d[0], d[1], insp.view));
     paintInspector();
     e.preventDefault();
     return;
   }
-  if (e.key === "Enter") { rescanSelection(); e.preventDefault(); }
+  if (e.key === "+" || e.key === "=") { zoomBy(1.5); e.preventDefault(); }
+  else if (e.key === "-") { zoomBy(1 / 1.5); e.preventDefault(); }
+  else if (e.key === "0") { fitInspector(); e.preventDefault(); }
+  else if (e.key === "Enter") { rescanSelection(); e.preventDefault(); }
 });
 
 document.addEventListener("keydown", (e) => {
@@ -1609,14 +1848,10 @@ $("inspRescan").onclick = rescanSelection;
 // identical worker, so there is no network path here to relax the CSP for.
 function rescanSelection() {
   const r = insp.row;
-  if (!r || !insp.sel || !insp.bmp || insp.busy) return;
-  // Display pixels to source pixels. The frame here is the source itself,
-  // because the panel drew the file at its own resolution rather than the
-  // decode's shrunken one.
-  const nat = Coords.displayToNatural(insp.sel,
-    { w: insp.bmp.width, h: insp.bmp.height, naturalW: insp.bmp.width, naturalH: insp.bmp.height },
-    insp.drawn);
-  if (!nat) return;
+  if (!r || !insp.selNat || !insp.bmp || insp.busy) return;
+  // Already in source pixels: the selection is stored against the image, not
+  // against the canvas, so zoom and pan never touched it.
+  const nat = insp.selNat;
 
   insp.busy = true;
   $("inspRescan").disabled = true;

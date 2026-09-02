@@ -20,10 +20,15 @@
   };
 
   S.en = {
+    "insp.keys": "Drag a box, or drag it by its handles. Scroll to pan, pinch or ctrl-scroll to zoom, space and drag to pan. Arrows nudge, shift and arrows resize, Enter reads, Escape closes.",
+    "res.summary": "{codes} codes read, {uniq} of them different.",
+    "insp.zoomIn": "Zoom in",
+    "insp.zoomOut": "Zoom out",
+    "insp.fit": "Fit the whole picture",
+    "insp.fitShort": "Fit",
     "insp.open": "Point at the code",
     "insp.title": "Point at the code",
     "insp.hint": "Drag a box around the code, then read that area. Nothing is uploaded - the crop is read here, in this tab.",
-    "insp.keys": "Arrow keys move the box, shift and arrows resize it, Enter reads the area, Escape closes.",
     "insp.rescan": "Read this area",
     "insp.close": "Close",
     "insp.working": "Reading that area...",
@@ -133,10 +138,15 @@
   };
 
   S.it = {
+    "insp.keys": "Trascina un riquadro, o spostalo dalle maniglie. Scorri per muoverti, pizzica o ctrl+rotella per zoomare, spazio e trascina per spostare. Le frecce spostano, shift e frecce ridimensionano, Invio legge, Esc chiude.",
+    "res.summary": "{codes} codici letti, di cui {uniq} diversi.",
+    "insp.zoomIn": "Ingrandisci",
+    "insp.zoomOut": "Riduci",
+    "insp.fit": "Mostra tutta l'immagine",
+    "insp.fitShort": "Adatta",
     "insp.open": "Indica il codice",
     "insp.title": "Indica il codice",
     "insp.hint": "Trascina un riquadro attorno al codice, poi leggi quell'area. Non viene caricato niente: il ritaglio si legge qui, in questa scheda.",
-    "insp.keys": "Le frecce spostano il riquadro, shift e frecce lo ridimensionano, Invio legge l'area, Esc chiude.",
     "insp.rescan": "Leggi quest'area",
     "insp.close": "Chiudi",
     "insp.working": "Sto leggendo quell'area...",
@@ -246,10 +256,15 @@
   };
 
   S.es = {
+    "insp.keys": "Arrastra un recuadro o muévelo por los tiradores. Desplaza para moverte, pellizca o ctrl+rueda para acercar, espacio y arrastrar para desplazar. Las flechas mueven, shift y flechas redimensionan, Intro lee, Esc cierra.",
+    "res.summary": "{codes} códigos leídos, {uniq} de ellos distintos.",
+    "insp.zoomIn": "Acercar",
+    "insp.zoomOut": "Alejar",
+    "insp.fit": "Ver la imagen entera",
+    "insp.fitShort": "Ajustar",
     "insp.open": "Señala el código",
     "insp.title": "Señala el código",
     "insp.hint": "Arrastra un recuadro alrededor del código y luego lee esa zona. No se sube nada: el recorte se lee aquí, en esta pestaña.",
-    "insp.keys": "Las flechas mueven el recuadro, shift y flechas lo redimensionan, Intro lee la zona, Esc cierra.",
     "insp.rescan": "Leer esta zona",
     "insp.close": "Cerrar",
     "insp.working": "Leyendo esa zona...",
@@ -359,10 +374,15 @@
   };
 
   S.fr = {
+    "insp.keys": "Tracez un cadre, ou déplacez-le par ses poignées. Défilez pour vous déplacer, pincez ou ctrl+molette pour zoomer, espace et glisser pour déplacer. Les flèches déplacent, maj et flèches redimensionnent, Entrée lit, Échap ferme.",
+    "res.summary": "{codes} codes lus, dont {uniq} différents.",
+    "insp.zoomIn": "Agrandir",
+    "insp.zoomOut": "Réduire",
+    "insp.fit": "Voir toute l'image",
+    "insp.fitShort": "Ajuster",
     "insp.open": "Montrez le code",
     "insp.title": "Montrez le code",
     "insp.hint": "Tracez un cadre autour du code, puis lisez cette zone. Rien n'est envoyé : le recadrage est lu ici, dans cet onglet.",
-    "insp.keys": "Les flèches déplacent le cadre, maj et flèches le redimensionnent, Entrée lit la zone, Échap ferme.",
     "insp.rescan": "Lire cette zone",
     "insp.close": "Fermer",
     "insp.working": "Lecture de cette zone...",
@@ -472,10 +492,15 @@
   };
 
   S.de = {
+    "insp.keys": "Zieh einen Rahmen oder verschieb ihn an den Griffen. Scrollen bewegt, Pinch oder Strg+Rad zoomt, Leertaste und Ziehen verschiebt. Pfeile bewegen, Umschalt und Pfeile ändern die Größe, Enter liest, Esc schließt.",
+    "res.summary": "{codes} Codes gelesen, davon {uniq} verschiedene.",
+    "insp.zoomIn": "Vergrößern",
+    "insp.zoomOut": "Verkleinern",
+    "insp.fit": "Ganzes Bild anzeigen",
+    "insp.fitShort": "Einpassen",
     "insp.open": "Auf den Code zeigen",
     "insp.title": "Auf den Code zeigen",
     "insp.hint": "Zieh einen Rahmen um den Code und lies dann diesen Bereich. Es wird nichts hochgeladen: der Ausschnitt wird hier gelesen, in diesem Tab.",
-    "insp.keys": "Pfeiltasten verschieben den Rahmen, Umschalt und Pfeile ändern die Größe, Enter liest den Bereich, Esc schließt.",
     "insp.rescan": "Diesen Bereich lesen",
     "insp.close": "Schließen",
     "insp.working": "Der Bereich wird gelesen...",
@@ -585,10 +610,15 @@
   };
 
   S.pt = {
+    "insp.keys": "Arraste uma caixa, ou mova-a pelas pegas. Role para se deslocar, faça pinça ou ctrl+roda para ampliar, espaço e arrastar para deslocar. As setas movem, shift e setas redimensionam, Enter lê, Esc fecha.",
+    "res.summary": "{codes} códigos lidos, {uniq} deles diferentes.",
+    "insp.zoomIn": "Aumentar",
+    "insp.zoomOut": "Diminuir",
+    "insp.fit": "Ver a imagem toda",
+    "insp.fitShort": "Ajustar",
     "insp.open": "Aponte para o código",
     "insp.title": "Aponte para o código",
     "insp.hint": "Arraste uma caixa à volta do código e depois leia essa área. Nada é enviado: o recorte é lido aqui, neste separador.",
-    "insp.keys": "As setas movem a caixa, shift e setas redimensionam, Enter lê a área, Esc fecha.",
     "insp.rescan": "Ler esta área",
     "insp.close": "Fechar",
     "insp.working": "A ler essa área...",
