@@ -214,7 +214,26 @@ function encodeBatch(job) {
   self.postMessage({ type: "encodeResult", id: job.id, matrices });
 }
 
-const HANDLERS = { crop, encode: encodeBatch };
+// frame decodes raw pixels straight, with no image decoding in front of it.
+//
+// The live view sends one of these several times a second, so every step that
+// is not decoding has to go: no blob, no createImageBitmap, no re-encode. The
+// page hands over the buffer it already has and gets back the codes and where
+// they are.
+function frame(job) {
+  const out = { type: "frameResult", id: job.id, w: job.w, h: job.h };
+  try {
+    const res = qrDecode(job.w, job.h, new Uint8ClampedArray(job.buf));
+    Object.assign(out, Result.carry(res, { w: job.w, h: job.h, naturalW: job.natW, naturalH: job.natH }));
+  } catch (e) {
+    out.error = String((e && e.message) || e);
+    out.codes = [];
+    out.detections = [];
+  }
+  self.postMessage(out);
+}
+
+const HANDLERS = { crop, encode: encodeBatch, frame };
 
 self.onmessage = (e) => {
   const job = e.data;

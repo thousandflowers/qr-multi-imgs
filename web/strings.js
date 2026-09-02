@@ -20,6 +20,14 @@
   };
 
   S.en = {
+    "trust.badge": "100% local · nothing is uploaded",
+    "cam.zoneTitle": "Point the camera at a code",
+    "cam.zoneSub": "Scans while you move — nothing is recorded",
+    "drop.orChoose": "Or choose from this computer",
+    "cam.title": "Live scan",
+    "cam.freeze": "Freeze",
+    "cam.resume": "Resume",
+    "cam.frozen": "Frozen. Drag a box around a code to read it.",
     "qrgen.label": "Recreate the codes",
     "qrgen.download": "Download ({n})",
     "qrgen.none": "There is no code to recreate yet.",
@@ -143,6 +151,14 @@
   };
 
   S.it = {
+    "trust.badge": "100% in locale · niente upload",
+    "cam.zoneTitle": "Inquadra un codice",
+    "cam.zoneSub": "Legge mentre muovi — non viene registrato niente",
+    "drop.orChoose": "Oppure scegli da questo computer",
+    "cam.title": "Scansione dal vivo",
+    "cam.freeze": "Congela",
+    "cam.resume": "Riprendi",
+    "cam.frozen": "Immagine ferma. Trascina un riquadro attorno a un codice per leggerlo.",
     "qrgen.label": "Ricrea i codici",
     "qrgen.download": "Scarica ({n})",
     "qrgen.none": "Non c'è ancora nessun codice da ricreare.",
@@ -266,6 +282,14 @@
   };
 
   S.es = {
+    "trust.badge": "100% local · no se sube nada",
+    "cam.zoneTitle": "Enfoca un código",
+    "cam.zoneSub": "Lee mientras mueves — no se graba nada",
+    "drop.orChoose": "O elige desde este ordenador",
+    "cam.title": "Escaneo en vivo",
+    "cam.freeze": "Congelar",
+    "cam.resume": "Reanudar",
+    "cam.frozen": "Imagen fija. Arrastra un recuadro alrededor de un código para leerlo.",
     "qrgen.label": "Recrear los códigos",
     "qrgen.download": "Descargar ({n})",
     "qrgen.none": "Todavía no hay ningún código que recrear.",
@@ -389,6 +413,14 @@
   };
 
   S.fr = {
+    "trust.badge": "100% local · rien n'est envoyé",
+    "cam.zoneTitle": "Visez un code",
+    "cam.zoneSub": "Lit pendant que vous bougez — rien n'est enregistré",
+    "drop.orChoose": "Ou choisissez sur cet ordinateur",
+    "cam.title": "Scan en direct",
+    "cam.freeze": "Figer",
+    "cam.resume": "Reprendre",
+    "cam.frozen": "Image figée. Tracez un cadre autour d'un code pour le lire.",
     "qrgen.label": "Recréer les codes",
     "qrgen.download": "Télécharger ({n})",
     "qrgen.none": "Il n'y a encore aucun code à recréer.",
@@ -512,6 +544,14 @@
   };
 
   S.de = {
+    "trust.badge": "100% lokal · nichts wird hochgeladen",
+    "cam.zoneTitle": "Auf einen Code richten",
+    "cam.zoneSub": "Liest während du bewegst — nichts wird aufgezeichnet",
+    "drop.orChoose": "Oder von diesem Computer wählen",
+    "cam.title": "Live-Scan",
+    "cam.freeze": "Einfrieren",
+    "cam.resume": "Fortsetzen",
+    "cam.frozen": "Bild steht. Zieh einen Rahmen um einen Code, um ihn zu lesen.",
     "qrgen.label": "Codes neu erzeugen",
     "qrgen.download": "Herunterladen ({n})",
     "qrgen.none": "Es gibt noch keinen Code zum Neuerzeugen.",
@@ -635,6 +675,14 @@
   };
 
   S.pt = {
+    "trust.badge": "100% local · nada é enviado",
+    "cam.zoneTitle": "Aponte para um código",
+    "cam.zoneSub": "Lê enquanto move — nada é gravado",
+    "drop.orChoose": "Ou escolha deste computador",
+    "cam.title": "Leitura ao vivo",
+    "cam.freeze": "Congelar",
+    "cam.resume": "Retomar",
+    "cam.frozen": "Imagem parada. Arraste uma caixa à volta de um código para o ler.",
     "qrgen.label": "Recriar os códigos",
     "qrgen.download": "Descarregar ({n})",
     "qrgen.none": "Ainda não há nenhum código para recriar.",

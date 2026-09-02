@@ -649,8 +649,14 @@ func ScanDecodedImageDetail(img image.Image) (Detail, error) {
 	hits, infos, attempts, err := decodeRasterDetail(img)
 	codes := hitTexts(hits)
 	d := Detail{Codes: codes, Classification: classify(codes, infos)}
+	// Boxes for both outcomes here, unlike the path-based scan: this is the
+	// seam a viewfinder decodes through, and it needs to draw every code it can
+	// see, in one colour for the ones it read and another for the ones it only
+	// found.
 	if d.Classification == QRDetectedDecodeFailed {
 		d.Detections = detectionsFrom(infos, img.Bounds())
+	} else {
+		d.Detections = detectionsFromHits(hits, img.Bounds())
 	}
 	d.Metadata = metadataOf(img, attempts)
 	return d, err

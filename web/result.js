@@ -42,6 +42,9 @@
       box: { x: b.x, y: b.y, w: b.w, h: b.h },
       moduleSize: typeof d.module_size === "number" ? d.module_size : 0,
       version: typeof d.version === "number" ? d.version : 0,
+      // The payload when this code was read, empty when it was only located.
+      // It is what decides the colour a viewfinder draws it in.
+      text: typeof d.text === "string" ? d.text : "",
     };
   }
 
@@ -111,6 +114,9 @@
     if (d.moduleSize !== 4.5 || d.version !== 7) {
       throw new Error("carry lost the module size or version: " + JSON.stringify(d));
     }
+    if (d.text !== "") throw new Error("an unread detection must carry no text");
+    const read = carry({ detections: [{ box, text: "hello" }] }, frame);
+    if (read.detections[0].text !== "hello") throw new Error("carry dropped a decoded detection's payload");
     if (carried.reason !== "QR_DETECTED_DECODE_FAILED") {
       throw new Error("carry lost the classification");
     }

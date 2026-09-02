@@ -79,10 +79,21 @@ type Box struct {
 	H int `json:"h"`
 }
 
-// Detection is one located-but-unread QR code: where it is, how big its
-// modules are, and which version it looks like.
+// Detection is one QR code located in an image: where it is, how big its
+// modules are, which version it looks like, and - when it could be read - what
+// it says.
+//
+// Text was added for the live camera view, which draws a box on every code it
+// can see and colours it by whether the payload came out. Before that, boxes
+// were produced only for codes that failed, on the reasoning that a decoded
+// code has its payload and a rectangle adds nothing. That reasoning holds for
+// a list of files and breaks the moment something has to point at a code in a
+// moving picture.
 type Detection struct {
 	Box Box `json:"box"`
+	// Text is the payload when this code was read, empty when it was located
+	// and could not be. It is what tells a viewfinder which colour to draw.
+	Text string `json:"text,omitempty"`
 	// ModuleSize is the detector's estimate in pixels, averaged over the three
 	// finder patterns.
 	ModuleSize float64 `json:"module_size"`
@@ -219,4 +230,49 @@ func clampInt(v, lo, hi int) int {
 		return hi
 	}
 	return v
+}
+
+// detectionsFromHits boxes codes that DID decode, from the result points the
+// decoder returned with each one.
+//
+// The points are the finder-pattern centres, which sit 3.5 modules inside the
+// code's own edge, so a box drawn straight through them cuts the corners off.
+// Module size is not known here - the payload came out, so nothing measured
+// it - and it is approximated as a fraction of the code's span. The
+// approximation errs outward for the same reason detectionOf's does: a box
+// slightly too big still contains the code, one slightly too small does not.
+func detectionsFromHits(hits []hit, bounds image.Rectangle) []Detection {
+	var out []Detection
+	for _, h := range hits {
+		if len(h.points) < 2 {
+			continue // zbarimg and the mask decoder report no geometry at all
+		}
+		minX, minY := math.Inf(1), math.Inf(1)
+		maxX, maxY := math.Inf(-1), math.Inf(-1)
+		for _, p := range h.points {
+			minX, maxX = math.Min(minX, p.GetX()), math.Max(maxX, p.GetX())
+			minY, maxY = math.Min(minY, p.GetY()), math.Max(maxY, p.GetY())
+		}
+		if math.IsInf(minX, 0) || math.IsInf(minY, 0) {
+			continue
+		}
+		// The pad is a fraction of the span because the exact answer is not
+		// available here: it is 3.5 modules, and nothing on this path measured
+		// the module size - the payload came out, so no detector ran. The
+		// fraction that would be exact is 3.5/(modules-7), which is 25% for a
+		// version-1 code and 4% for a version-20 one, so any single number is
+		// wrong for most codes. 15% sits between them and errs outward on the
+		// dense ones, which is the harmless direction: the box is a hint about
+		// where a code is, and one slightly too big still contains it.
+		pad := 0.15 * math.Max(maxX-minX, maxY-minY)
+		x0 := clampInt(int(math.Floor(minX-pad)), bounds.Min.X, bounds.Max.X)
+		y0 := clampInt(int(math.Floor(minY-pad)), bounds.Min.Y, bounds.Max.Y)
+		x1 := clampInt(int(math.Ceil(maxX+pad)), bounds.Min.X, bounds.Max.X)
+		y1 := clampInt(int(math.Ceil(maxY+pad)), bounds.Min.Y, bounds.Max.Y)
+		if x1 <= x0 || y1 <= y0 {
+			continue
+		}
+		out = append(out, Detection{Box: Box{X: x0, Y: y0, W: x1 - x0, H: y1 - y0}, Text: h.text})
+	}
+	return out
 }

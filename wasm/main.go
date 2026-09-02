@@ -89,6 +89,9 @@ func result(d scanner.Detail) any {
 			},
 			"module_size": det.ModuleSize,
 			"version":     det.Version,
+			// Empty when the code was located and not read. A viewfinder draws
+			// those in a different colour from the ones it could read.
+			"text": det.Text,
 		}
 	}
 	out := map[string]any{

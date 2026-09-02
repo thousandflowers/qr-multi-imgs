@@ -353,6 +353,45 @@ li canvas.thumb { width:72px; height:72px; border-radius:9px; display:block;
 /* The "point at the code" panel. One canvas, opened on demand and torn down on
    close: a hundred rows each holding a full-resolution image is the thing that
    kills the page, and the row thumbnails stay 48px for exactly that reason. */
+#scan[hidden] { display:none; }
+#scan { position:fixed; inset:0; z-index:60; display:flex; align-items:center;
+  justify-content:center; background:rgba(0,0,0,.72); padding:16px; }
+#scanBox { background:var(--panel); border-radius:14px; padding:16px; width:min(96vw,1100px);
+  max-height:96vh; display:flex; flex-direction:column; gap:12px;
+  box-shadow:0 20px 60px rgba(0,0,0,.35); }
+#scanHead { display:flex; align-items:center; gap:8px; }
+#scanHead h3 { margin:0; font-size:var(--fs-5); }
+#scanStage { position:relative; flex:1; min-height:0; background:#000;
+  border-radius:12px; overflow:hidden; display:flex; justify-content:center; }
+/* The video is a source, never a displayed element. It used to sit under the
+   overlay canvas, laid out by its own object-fit rules, and the two disagreed
+   about where the picture actually was - so every box was drawn dozens of
+   pixels off. One element, one geometry, no way for them to drift. */
+#scanStage video { display:none; }
+#scanCanvas { width:100%; height:min(70vh,70vw); touch-action:none; display:block; }
+#camMsg { margin:0; font-size:var(--fs-3); color:var(--dim); min-height:1.2em; }
+#scanFound { display:flex; flex-direction:column; gap:4px; max-height:20vh; overflow:auto; }
+#scanFound div { font-family:var(--mono); font-size:var(--fs-2); color:var(--ok);
+  background:var(--ok-soft); border-radius:8px; padding:4px 8px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+/* The camera as a target, sized and shaped like the drop zone above it. */
+#camZone { display:block; width:100%; margin-top:12px; padding:16px 12px; text-align:center;
+  border:2px dashed var(--line); border-radius:10px; background:var(--soft);
+  color:var(--fg); cursor:pointer; }
+#camZone:hover { border-color:var(--brand); background:var(--brand-soft); }
+#camZone svg { width:28px; height:28px; margin:0 auto 8px; color:var(--faint); display:block; }
+#camZone:hover svg { color:var(--brand); }
+#camZone strong { display:block; font-size:var(--fs-3); }
+#camZone small { color:var(--dim); font-size:var(--fs-2); }
+/* Clear air before the smaller ways in, so the two targets above read as the
+   offer and these as the fallback. */
+.sourcesLabel { margin-top:24px; font-size:var(--fs-2); color:var(--dim); }
+.trustBadge { margin-top:8px; display:flex; align-items:center; justify-content:center;
+  gap:8px; font-size:var(--fs-2); font-weight:600; color:var(--ok);
+  background:var(--ok-soft); border:1px solid var(--ok); border-radius:999px; padding:6px 12px; }
+.trustBadge svg { width:16px; height:16px; flex:none; }
+
 #insp[hidden] { display:none; }
 #insp { position:fixed; inset:0; z-index:50; display:flex; align-items:center;
   justify-content:center; background:rgba(0,0,0,.55); padding:16px; }
@@ -446,8 +485,32 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
           <small data-t="drop.sub"></small>
           <div class="formats">PNG JPG WEBP GIF BMP AVIF HEIC ZIP</div>
         </div>
+        <!-- Where the decision to trust actually gets made: next to the thing
+             the user is about to drop their photographs onto, not in a hero
+             line they scrolled past. -->
+        <div class="trustBadge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M12 3l7 3v6c0 4.2-2.9 7.6-7 9-4.1-1.4-7-4.8-7-9V6z"/><path d="M9 12l2 2 4-4"/>
+          </svg>
+          <span data-t="trust.badge"></span>
+        </div>
+        <!-- The camera is a target, like the drop zone above it, not a button
+             in a list. It is one of the two ways in that a person arrives
+             wanting to use; the file and folder pickers are the ways in they
+             fall back to. -->
+        <button id="camZone">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+            <path d="M3 8a2 2 0 012-2h2l1.5-2h7L17 6h2a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+            <circle cx="12" cy="12.5" r="3.4"/>
+          </svg>
+          <strong data-t="cam.zoneTitle"></strong>
+          <small data-t="cam.zoneSub"></small>
+        </button>
+
+        <div class="sourcesLabel" data-t="drop.orChoose"></div>
+
         <div class="actions">
-          <div class="span2" id="shootWrap">
+          <div class="span2 hide" id="shootWrap">
             <button id="shoot" class="primary" style="width:100%">
               <svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8a2 2 0 012-2h2l1.5-2h7L17 6h2a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><circle cx="12" cy="12.5" r="3.2"/></svg>
               <span data-t="drop.shoot"></span>
@@ -465,27 +528,11 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
             <svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="8" y="3" width="8" height="4" rx="1"/><path d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-2"/></svg>
             <span data-t="drop.paste"></span>
           </button>
-          <button id="tabCam" aria-expanded="false" aria-controls="paneCam">
-            <svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8a2 2 0 012-2h2l1.5-2h7L17 6h2a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><circle cx="12" cy="12.5" r="3.2"/></svg>
-            <span data-t="tab.camera"></span>
-          </button>
         </div>
         <input type="file" id="files" multiple>
         <input type="file" id="folder" webkitdirectory directory multiple>
         <input type="file" id="camshot" accept="image/*" capture="environment">
 
-        <!-- The viewfinder opens in place, under the buttons, instead of on a
-             screen of its own. -->
-        <div id="paneCam" class="hide">
-          <div id="camWrap">
-            <video id="cam" playsinline muted class="hide"></video>
-            <div id="camOff" data-t-html="cam.off"></div>
-          </div>
-          <div class="actions">
-            <button id="camStart" class="primary span2" data-t="cam.start"></button>
-          </div>
-          <div id="camMsg"></div>
-        </div>
       </div>
 
     </aside>
@@ -588,6 +635,29 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
     <a href="https://github.com/thousandflowers/qr-multi-imgs/blob/main/LICENSE">MIT</a>
   </div>
 </footer>
+<!-- The live scanner. Nearly the whole page, because the job is looking at a
+     moving picture and deciding whether the code is inside the frame - and a
+     viewfinder the size of a thumbnail cannot answer that. It draws a box on
+     every code it can see: green for the ones it read, amber for the ones it
+     found and could not. Freezing keeps the last frame so a box can be drawn
+     by hand over a code the machine could not manage. -->
+<div id="scan" hidden role="dialog" aria-modal="true" aria-labelledby="scanTitle">
+  <div id="scanBox">
+    <div id="scanHead">
+      <h3 id="scanTitle" data-t="cam.title"></h3>
+      <span class="grow"></span>
+      <button id="scanFreeze" data-t="cam.freeze"></button>
+      <button id="scanClose" data-t="insp.close"></button>
+    </div>
+    <div id="scanStage">
+      <video id="cam" playsinline muted></video>
+      <canvas id="scanCanvas"></canvas>
+    </div>
+    <p id="camMsg" role="status" aria-live="polite"></p>
+    <div id="scanFound"></div>
+  </div>
+</div>
+
 <!-- The area picker. Hidden until a row asks for it, and its canvas is torn
      down on close: one full-resolution image at a time is the whole memory
      budget this page has. -->
@@ -681,7 +751,6 @@ function paintEngineState() {
   if (!engineFailed) return;
   if (localAppFound) {
     $("engine").textContent = "";
-    $("paneCam").classList.add("hide");
     return;
   }
   $("engine").textContent = engineReason;
@@ -702,14 +771,19 @@ function onWorkerMessage(w, msg) {
   // An assisted decode of one region the user pointed at. Routed here rather
   // than into finish(), which would overwrite the row's own scan with the
   // crop's — the crop is an addition to what the row knows, not a replacement.
-  if (msg.type === "cropResult") { adoptCropResult(byId.get(msg.id), msg); idle.push(w); pump(); return; }
+  if (msg.type === "cropResult") {
+    const waiting = cropWaiting.get(msg.id);
+    if (waiting) { cropWaiting.delete(msg.id); waiting(msg); }
+    else adoptCropResult(byId.get(msg.id), msg);
+    idle.push(w); pump(); return;
+  }
   if (msg.type === "encodeResult") {
     const done = encodeWaiting.get(msg.id);
     encodeWaiting.delete(msg.id);
     if (done) done(msg.matrices || []);
     idle.push(w); pump(); return;
   }
-  if (msg.id === CAMERA_JOB) { onCameraResult(msg); idle.push(w); pump(); return; }
+  if (msg.type === "frameResult") { adoptFrameResult(msg); idle.push(w); pump(); return; }
   finish(msg);
   idle.push(w);
   pump();
@@ -867,11 +941,41 @@ function bounce() {
 
 /* the camera */
 
-const CAMERA_JOB = -1;
-let stream = null, camBusy = false, camTimer = 0;
-const seenLive = new Set();
+let stream = null;
 
-async function startCamera() {
+// The live scanner.
+//
+// A viewfinder that stops to think is a viewfinder you cannot aim, so nothing
+// here waits: one frame is in flight at a time, the next is grabbed when the
+// last comes back, and the drawing keeps happening either way. If decoding
+// takes 200ms the boxes lag 200ms behind the picture, which is what a person
+// expects; blocking the page would not be.
+const live = {
+  seq: 0,
+  inFlight: false,
+  dets: [],        // last detections, in the decoded frame's pixels
+  frame: null,     // the space those are measured in
+  frozen: null,    // an ImageBitmap of the held frame, when frozen
+  selNat: null,    // a hand-drawn box on the held frame, in frame pixels
+  drag: null,
+  raf: 0,
+  found: new Map(),
+};
+
+// The long side the live decode runs at. Smaller than the capture on purpose:
+// a code big enough to aim at is big enough to read at 720, and the frame rate
+// is what makes aiming possible.
+const LIVE_CAP = 720;
+
+async function openScanner() {
+  $("scan").hidden = false;
+  $("camMsg").textContent = "";
+  $("scanFound").replaceChildren();
+  live.found.clear();
+  live.dets = [];
+  live.frozen = null;
+  live.selNat = null;
+  setFreezeLabel(false);
   try {
     stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } }, audio: false,
@@ -883,56 +987,168 @@ async function startCamera() {
   const v = $("cam");
   v.srcObject = stream;
   await v.play();
-  v.classList.remove("hide");
-  $("camOff").classList.add("hide");
-  $("camStart").textContent = t("cam.stop");
   $("camMsg").textContent = t("cam.looking");
-  camTimer = setInterval(grabFrame, 350);
+  live.raf = requestAnimationFrame(liveTick);
 }
 
-function stopCamera() {
-  clearInterval(camTimer);
-  camTimer = 0;
+function closeScanner() {
+  $("scan").hidden = true;
+  cancelAnimationFrame(live.raf);
+  live.raf = 0;
+  if (live.frozen) { live.frozen.close(); live.frozen = null; }
   if (stream) for (const tr of stream.getTracks()) tr.stop();
   stream = null;
-  const v = $("cam");
-  v.srcObject = null;
-  v.classList.add("hide");
-  $("camOff").classList.remove("hide");
-  $("camStart").textContent = t("cam.start");
-  $("camMsg").textContent = "";
+  $("cam").srcObject = null;
 }
+
+function setFreezeLabel(frozen) {
+  $("scanFreeze").textContent = t(frozen ? "cam.resume" : "cam.freeze");
+}
+
+// stageRect is where the picture actually sits inside the overlay canvas. The
+// video is object-fit contained, so the canvas is bigger than the image on one
+// axis and a box drawn against the canvas would be offset by the letterbox.
+function stageRect() {
+  const c = $("scanCanvas"), v = $("cam");
+  const w = live.frozen ? live.frozen.width : v.videoWidth;
+  const h = live.frozen ? live.frozen.height : v.videoHeight;
+  if (!w || !h) return null;
+  return Coords.fitContain(w, h, c.width, c.height);
+}
+
+function liveTick() {
+  live.raf = requestAnimationFrame(liveTick);
+  const v = $("cam"), c = $("scanCanvas");
+  if (!live.frozen && (!v.videoWidth || v.readyState < 2)) return;
+
+  const dpr = window.devicePixelRatio || 1;
+  const box = c.getBoundingClientRect();
+  if (c.width !== Math.round(box.width * dpr) || c.height !== Math.round(box.height * dpr)) {
+    c.width = Math.round(box.width * dpr);
+    c.height = Math.round(box.height * dpr);
+  }
+  if (!live.frozen) sendFrame(v);
+  paintScanner(v);
+}
+
+// sendFrame hands the worker raw pixels and transfers the buffer, so nothing
+// is copied on the way out.
+function sendFrame(v) {
+  if (live.inFlight) return;
+  const scale = Math.min(1, LIVE_CAP / Math.max(v.videoWidth, v.videoHeight));
+  const w = Math.max(1, Math.round(v.videoWidth * scale));
+  const h = Math.max(1, Math.round(v.videoHeight * scale));
+  const off = liveCanvas(w, h);
+  const ctx = off.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(v, 0, 0, w, h);
+  const data = ctx.getImageData(0, 0, w, h);
+  const worker = idle.pop();
+  if (!worker) return;
+  live.inFlight = true;
+  live.worker = worker;
+  worker.postMessage({ type: "frame", id: ++live.seq, w, h,
+    natW: v.videoWidth, natH: v.videoHeight, buf: data.data.buffer }, [data.data.buffer]);
+}
+
+let _liveCanvas = null;
+function liveCanvas(w, h) {
+  if (!_liveCanvas) _liveCanvas = document.createElement("canvas");
+  if (_liveCanvas.width !== w) _liveCanvas.width = w;
+  if (_liveCanvas.height !== h) _liveCanvas.height = h;
+  return _liveCanvas;
+}
+
+function adoptFrameResult(msg) {
+  live.inFlight = false;
+  live.dets = msg.detections || [];
+  live.frame = msg.frame || null;
+  for (const c of msg.codes || []) {
+    if (live.found.has(c)) continue;
+    live.found.set(c, true);
+    const row = document.createElement("div");
+    row.textContent = c;
+    $("scanFound").prepend(row);
+    // A code seen live is a result like any other, so it joins the list.
+    enqueueDecodedFromCamera(c);
+  }
+  if (msg.codes && msg.codes.length) $("camMsg").textContent = t("cam.read", { n: live.found.size });
+}
+
+function paintScanner(v) {
+  const c = $("scanCanvas");
+  const ctx = c.getContext("2d");
+  const dpr = window.devicePixelRatio || 1;
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, c.width, c.height);
+
+  const rect = stageRect();
+  if (!rect) return;
+  // The picture itself, drawn here rather than shown underneath.
+  const src = live.frozen || v || $("cam");
+  try { ctx.drawImage(src, rect.x, rect.y, rect.w, rect.h); } catch { /* first frames */ }
+
+  for (const d of live.dets) {
+    const b = live.frame ? Coords.detectionToDisplay(d, live.frame, rect) : null;
+    if (!b) continue;
+    // Green when the payload came out, amber when the code was found and could
+    // not be read. The colours are the classification, drawn.
+    const read = !!d.text;
+    ctx.lineWidth = Math.max(2, 3 * dpr);
+    ctx.strokeStyle = read ? "#19c46a" : "#f0a500";
+    ctx.strokeRect(b.x, b.y, b.w, b.h);
+    if (read) {
+      ctx.fillStyle = "rgba(25,196,106,.16)";
+      ctx.fillRect(b.x, b.y, b.w, b.h);
+    }
+  }
+
+  if (live.frozen && live.selNat) {
+    const s = Coords.naturalToDisplay(live.selNat, { w: live.frozen.width, h: live.frozen.height,
+      naturalW: live.frozen.width, naturalH: live.frozen.height }, rect);
+    if (s) {
+      ctx.fillStyle = "rgba(0,0,0,.45)";
+      ctx.beginPath();
+      ctx.rect(0, 0, c.width, c.height);
+      ctx.rect(s.x + s.w, s.y, -s.w, s.h);
+      ctx.fill();
+      ctx.lineWidth = Math.max(2, 2 * dpr);
+      ctx.strokeStyle = "#f0a500";
+      ctx.strokeRect(s.x, s.y, s.w, s.h);
+      const hs = 7 * dpr;
+      ctx.fillStyle = "#f0a500";
+      for (const h of Select.handlePoints(s)) ctx.fillRect(h.x - hs, h.y - hs, hs * 2, hs * 2);
+    }
+  }
+}
+
+async function toggleFreeze() {
+  if (live.frozen) {
+    live.frozen.close();
+    live.frozen = null;
+    live.selNat = null;
+    setFreezeLabel(false);
+    $("camMsg").textContent = t("cam.looking");
+    return;
+  }
+  const v = $("cam");
+  if (!v.videoWidth) return;
+  live.frozen = await createImageBitmap(v);
+  live.dets = [];
+  setFreezeLabel(true);
+  $("camMsg").textContent = t("cam.frozen");
+}
+
 
 // One frame in flight at a time: queuing them builds a backlog of moments the
 // user has already moved past.
-function grabFrame() {
-  if (camBusy || !stream || !idle.length) return;
-  const v = $("cam");
-  if (!v.videoWidth) return;
-  const canvas = document.createElement("canvas");
-  canvas.width = v.videoWidth;
-  canvas.height = v.videoHeight;
-  canvas.getContext("2d").drawImage(v, 0, 0);
-  camBusy = true;
-  canvas.toBlob((blob) => {
-    if (!blob || !idle.length) { camBusy = false; return; }
-    idle.pop().postMessage({ id: CAMERA_JOB, name: "camera", path: "camera", blob });
-  }, "image/jpeg", 0.85);
-}
-
-function onCameraResult(msg) {
-  camBusy = false;
-  const fresh = (msg.codes || []).filter((c) => !seenLive.has(c));
-  if (!fresh.length) return;
-  for (const c of fresh) seenLive.add(c);
-  for (const c of fresh) seenCount.set(c, (seenCount.get(c) || 0) + 1);
+// A code seen through the camera becomes a row like any other, so it exports,
+// copies and renames the same way. There is no file behind it, which is what
+// keeps the area picker off it.
+function enqueueDecodedFromCamera(code) {
+  seenCount.set(code, (seenCount.get(code) || 0) + 1);
   const r = Result.adopt({ id: nextId++, name: t("tab.camera"), path: "", file: null,
-              error: "",
-              thumbURL: msg.thumb ? URL.createObjectURL(msg.thumb) : "",
-              pending: false, seq: rows.length + 1, at: new Date() }, msg);
-  // A live frame reports only the codes nobody has seen yet, so the payload
-  // list is the filtered one rather than everything the frame held.
-  r.codes = fresh;
+    error: "", thumbURL: "", pending: false, seq: rows.length + 1, at: new Date() },
+    { codes: [code], reason: "DECODED", detections: [], frame: null });
   rows.push(r);
   byId.set(r.id, r);
   $("empty").classList.add("hide");
@@ -940,7 +1156,6 @@ function onCameraResult(msg) {
   renderRow(r);
   paintStats();
   applyFilters();
-  $("camMsg").textContent = t("cam.read", { n: seenLive.size });
 }
 
 /* naming */
@@ -972,6 +1187,10 @@ function newNameFor(r) {
 // so encoding is a round trip like every other decode. Found the hard way: the
 // first version called qrEncode() straight from the page and got
 // "qrEncode is not defined".
+// A crop can belong to a row (the area picker) or to nobody (a box drawn on a
+// frozen camera frame). The map holds the second kind; the first is found by
+// row id.
+const cropWaiting = new Map();
 const encodeWaiting = new Map();
 let encodeSeq = 0;
 function encodeAll(texts) {
@@ -1851,7 +2070,6 @@ document.addEventListener("dragleave", (e) => { if (e.relatedTarget === null) dr
 document.addEventListener("drop", async (e) => {
   e.preventDefault();
   drop.classList.remove("over");
-  showTab("files");
   accept(await fromDataTransfer(e.dataTransfer));
 });
 
@@ -1859,7 +2077,6 @@ document.addEventListener("paste", (e) => {
   const items = [...(e.clipboardData ? e.clipboardData.files : [])].filter(worthTrying);
   if (!items.length) return;
   e.preventDefault();
-  showTab("files");
   accept(items.map((f) => ({ file: f, path: f.name })));
 });
 
@@ -1881,18 +2098,68 @@ $("pasteBtn").onclick = async () => {
   }
 };
 
-// The camera is one acquisition method among the others now, not a place. The
-// button opens the viewfinder in place and closes it again, and closing it
-// releases the camera rather than leaving the light on behind a hidden pane.
-function showTab(which) {
-  const open = which === "camera";
-  $("tabCam").setAttribute("aria-expanded", String(open));
-  $("tabCam").classList.toggle("primary", open);
-  $("paneCam").classList.toggle("hide", !open);
-  if (!open && stream) stopCamera();
+$("camZone").onclick = openScanner;
+$("scanClose").onclick = closeScanner;
+$("scanFreeze").onclick = toggleFreeze;
+
+// On a frozen frame the overlay behaves like the area picker: drag a box, and
+// reading it goes through the same crop path.
+$("scanCanvas").addEventListener("pointerdown", (e) => {
+  if (!live.frozen) return;
+  const rect = stageRect();
+  if (!rect) return;
+  const c = $("scanCanvas"), r = c.getBoundingClientRect();
+  const p = { x: (e.clientX - r.left) * (c.width / r.width), y: (e.clientY - r.top) * (c.height / r.height) };
+  const space = { w: live.frozen.width, h: live.frozen.height, naturalW: live.frozen.width, naturalH: live.frozen.height };
+  const cur = live.selNat && Coords.naturalToDisplay(live.selNat, space, rect);
+  const grab = cur ? Select.hit(cur, p.x, p.y, 16 * (window.devicePixelRatio || 1)) : null;
+  if (!grab) {
+    live.selNat = Coords.displayToNatural(Select.clamp({ x: p.x, y: p.y, w: Select.MIN, h: Select.MIN }, rect), space, rect);
+    live.drag = { handle: "se", lastX: p.x, lastY: p.y };
+  } else {
+    live.drag = { handle: grab, lastX: p.x, lastY: p.y };
+  }
+  c.setPointerCapture(e.pointerId);
+});
+
+$("scanCanvas").addEventListener("pointermove", (e) => {
+  if (!live.drag || !live.frozen) return;
+  const rect = stageRect();
+  const c = $("scanCanvas"), r = c.getBoundingClientRect();
+  const p = { x: (e.clientX - r.left) * (c.width / r.width), y: (e.clientY - r.top) * (c.height / r.height) };
+  const dx = p.x - live.drag.lastX, dy = p.y - live.drag.lastY;
+  live.drag.lastX = p.x; live.drag.lastY = p.y;
+  const space = { w: live.frozen.width, h: live.frozen.height, naturalW: live.frozen.width, naturalH: live.frozen.height };
+  const cur = Coords.naturalToDisplay(live.selNat, space, rect);
+  const next = live.drag.handle === "move" ? Select.move(cur, dx, dy, rect) : Select.resize(cur, live.drag.handle, dx, dy, rect);
+  live.selNat = Coords.displayToNatural(next, space, rect);
+});
+
+for (const ev of ["pointerup", "pointercancel"]) {
+  $("scanCanvas").addEventListener(ev, async () => {
+    if (!live.drag || !live.frozen || !live.selNat) { live.drag = null; return; }
+    live.drag = null;
+    // Reading the hand-drawn box goes through the same crop job the picker
+    // uses, so a code found this way is found the same way.
+    const c = document.createElement("canvas");
+    c.width = live.frozen.width; c.height = live.frozen.height;
+    c.getContext("2d").drawImage(live.frozen, 0, 0);
+    const blob = await new Promise((res) => c.toBlob(res, "image/png"));
+    const id = "cam" + ++live.seq;
+    cropWaiting.set(id, (msg) => {
+      const fresh = (msg.codes || []).filter((x) => !live.found.has(x));
+      if (!fresh.length) { $("camMsg").textContent = t("insp.none"); return; }
+      for (const x of fresh) { live.found.set(x, true); enqueueDecodedFromCamera(x); const d = document.createElement("div"); d.textContent = x; $("scanFound").prepend(d); }
+      $("camMsg").textContent = t("insp.found", { n: fresh.length });
+    });
+    queue.push({ type: "crop", id, blob, rect: live.selNat });
+    pump();
+  });
 }
-$("tabCam").onclick = () => showTab($("paneCam").classList.contains("hide") ? "camera" : "files");
-$("camStart").onclick = () => (stream ? stopCamera() : startCamera());
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !$("scan").hidden) closeScanner();
+});
 
 $("pickFiles").onclick = () => $("files").click();
 $("pickFolder").onclick = () => $("folder").click();
@@ -2126,7 +2393,6 @@ $("clearYes").onclick = () => {
   queue.length = 0;
   batches.length = 0;
   byId.clear();
-  seenLive.clear();
   seenCount.clear();
   done = expected = 0;
   activeTile = "fAll";
@@ -2162,7 +2428,6 @@ $("lang").onchange = (e) => I18N.setLang(e.target.value);
 I18N.onChange(() => { if (typeof rows !== "undefined") applyFilters(); });
 I18N.onChange(() => {
   paintLang();
-  if (stream) $("camStart").textContent = t("cam.stop");
   if (enginesReady) { $("engine").textContent = t("engine.ready"); $("engine").classList.add("ready"); }
   if (rows.length) repaintAll(); else $("emptyText").textContent = t("res.empty");
 });

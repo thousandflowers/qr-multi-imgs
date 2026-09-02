@@ -21,9 +21,43 @@ func TestClassifyDecoded(t *testing.T) {
 	if len(d.Codes) != 1 || d.Codes[0] != "READABLE" {
 		t.Errorf("codes = %v, want [READABLE]", d.Codes)
 	}
-	// A decoded code needs no box: the payload is the answer.
+	// A decoded code DOES get a box here, and it carries its payload.
+	//
+	// This reverses an earlier decision, deliberately. "The payload is the
+	// answer and a box adds nothing" holds for a list of files and breaks the
+	// moment something has to point at a code in a moving picture: the live
+	// camera view draws every code it can see and colours it by whether the
+	// text came out. The path-based scan is unchanged - see
+	// TestScanImageDetailDecodedHasNoBox - so no export or API consumer moves.
+	if len(d.Detections) != 1 {
+		t.Fatalf("detections on a decoded image = %d, want 1", len(d.Detections))
+	}
+	if d.Detections[0].Text != "READABLE" {
+		t.Errorf("detection text = %q, want READABLE", d.Detections[0].Text)
+	}
+	b := d.Detections[0].Box
+	if b.W <= 0 || b.H <= 0 {
+		t.Errorf("decoded detection has no area: %+v", b)
+	}
+	if b.X < 0 || b.Y < 0 || b.X+b.W > 256 || b.Y+b.H > 256 {
+		t.Errorf("decoded detection escaped the image: %+v", b)
+	}
+}
+
+// TestScanImageDetailDecodedHasNoBox pins the half that did NOT change. The
+// file path feeds the JSON export and the local API, where a box on a decoded
+// row is a new field in a released output format for no reader.
+func TestScanImageDetailDecodedHasNoBox(t *testing.T) {
+	path := createTestQR(t, "READABLE")
+	d, err := ScanImageDetail(path, ScanFast)
+	if err != nil {
+		t.Fatalf("ScanImageDetail: %v", err)
+	}
+	if d.Classification != Decoded {
+		t.Fatalf("classification = %q, want %q", d.Classification, Decoded)
+	}
 	if len(d.Detections) != 0 {
-		t.Errorf("detections on a decoded image = %d, want 0", len(d.Detections))
+		t.Errorf("the file path grew boxes on a decoded image: %d", len(d.Detections))
 	}
 }
 
