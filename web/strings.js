@@ -20,6 +20,16 @@
   };
 
   S.en = {
+    "insp.open": "Point at the code",
+    "insp.title": "Point at the code",
+    "insp.hint": "Drag a box around the code, then read that area. Nothing is uploaded - the crop is read here, in this tab.",
+    "insp.keys": "Arrow keys move the box, shift and arrows resize it, Enter reads the area, Escape closes.",
+    "insp.rescan": "Read this area",
+    "insp.close": "Close",
+    "insp.working": "Reading that area...",
+    "insp.found": "Codes read in that area: {n}",
+    "insp.none": "Still nothing readable in that area. A closer or straighter photo is the next thing to try.",
+    "insp.prefilled": "This box is where the scanner saw a code. Adjust it if it is off.",
     "app.tagline": "QR scanner",
     "nav.source": "Source",
 
@@ -123,6 +133,16 @@
   };
 
   S.it = {
+    "insp.open": "Indica il codice",
+    "insp.title": "Indica il codice",
+    "insp.hint": "Trascina un riquadro attorno al codice, poi leggi quell'area. Non viene caricato niente: il ritaglio si legge qui, in questa scheda.",
+    "insp.keys": "Le frecce spostano il riquadro, shift e frecce lo ridimensionano, Invio legge l'area, Esc chiude.",
+    "insp.rescan": "Leggi quest'area",
+    "insp.close": "Chiudi",
+    "insp.working": "Sto leggendo quell'area...",
+    "insp.found": "Codici letti in quell'area: {n}",
+    "insp.none": "In quell'area ancora niente di leggibile. Il passo successivo è una foto più vicina o più dritta.",
+    "insp.prefilled": "Questo riquadro è dove lo scanner ha visto un codice. Correggilo se è sbagliato.",
     "app.tagline": "lettore QR",
     "nav.source": "Codice",
 
@@ -226,6 +246,16 @@
   };
 
   S.es = {
+    "insp.open": "Señala el código",
+    "insp.title": "Señala el código",
+    "insp.hint": "Arrastra un recuadro alrededor del código y luego lee esa zona. No se sube nada: el recorte se lee aquí, en esta pestaña.",
+    "insp.keys": "Las flechas mueven el recuadro, shift y flechas lo redimensionan, Intro lee la zona, Esc cierra.",
+    "insp.rescan": "Leer esta zona",
+    "insp.close": "Cerrar",
+    "insp.working": "Leyendo esa zona...",
+    "insp.found": "Códigos leídos en esa zona: {n}",
+    "insp.none": "En esa zona sigue sin haber nada legible. Lo siguiente que probar es una foto más cercana o más recta.",
+    "insp.prefilled": "Este recuadro es donde el escáner vio un código. Ajústalo si no cuadra.",
     "app.tagline": "lector QR",
     "nav.source": "Código fuente",
 
@@ -329,6 +359,16 @@
   };
 
   S.fr = {
+    "insp.open": "Montrez le code",
+    "insp.title": "Montrez le code",
+    "insp.hint": "Tracez un cadre autour du code, puis lisez cette zone. Rien n'est envoyé : le recadrage est lu ici, dans cet onglet.",
+    "insp.keys": "Les flèches déplacent le cadre, maj et flèches le redimensionnent, Entrée lit la zone, Échap ferme.",
+    "insp.rescan": "Lire cette zone",
+    "insp.close": "Fermer",
+    "insp.working": "Lecture de cette zone...",
+    "insp.found": "Codes lus dans cette zone : {n}",
+    "insp.none": "Toujours rien de lisible dans cette zone. Essayez une photo plus proche ou plus droite.",
+    "insp.prefilled": "Ce cadre est l'endroit où le scanner a vu un code. Ajustez-le s'il tombe à côté.",
     "app.tagline": "lecteur QR",
     "nav.source": "Code source",
 
@@ -432,6 +472,16 @@
   };
 
   S.de = {
+    "insp.open": "Auf den Code zeigen",
+    "insp.title": "Auf den Code zeigen",
+    "insp.hint": "Zieh einen Rahmen um den Code und lies dann diesen Bereich. Es wird nichts hochgeladen: der Ausschnitt wird hier gelesen, in diesem Tab.",
+    "insp.keys": "Pfeiltasten verschieben den Rahmen, Umschalt und Pfeile ändern die Größe, Enter liest den Bereich, Esc schließt.",
+    "insp.rescan": "Diesen Bereich lesen",
+    "insp.close": "Schließen",
+    "insp.working": "Der Bereich wird gelesen...",
+    "insp.found": "Gelesene Codes in diesem Bereich: {n}",
+    "insp.none": "In diesem Bereich immer noch nichts Lesbares. Als Nächstes hilft ein näheres oder geraderes Foto.",
+    "insp.prefilled": "Dieser Rahmen ist die Stelle, an der der Scanner einen Code gesehen hat. Korrigier ihn, falls er danebenliegt.",
     "app.tagline": "QR-Leser",
     "nav.source": "Quelltext",
 
@@ -535,6 +585,16 @@
   };
 
   S.pt = {
+    "insp.open": "Aponte para o código",
+    "insp.title": "Aponte para o código",
+    "insp.hint": "Arraste uma caixa à volta do código e depois leia essa área. Nada é enviado: o recorte é lido aqui, neste separador.",
+    "insp.keys": "As setas movem a caixa, shift e setas redimensionam, Enter lê a área, Esc fecha.",
+    "insp.rescan": "Ler esta área",
+    "insp.close": "Fechar",
+    "insp.working": "A ler essa área...",
+    "insp.found": "Códigos lidos nessa área: {n}",
+    "insp.none": "Nessa área continua a não haver nada legível. O passo seguinte é uma foto mais perto ou mais direita.",
+    "insp.prefilled": "Esta caixa é onde o scanner viu um código. Ajuste-a se estiver ao lado.",
     "app.tagline": "leitor QR",
     "nav.source": "Código fonte",
 

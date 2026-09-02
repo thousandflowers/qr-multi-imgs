@@ -52,6 +52,7 @@ jobs:
           node web/order.js --test
           node web/result.js --test
           node web/coords.js --test
+          node web/select.js --test
 
       - name: Test
         run: go test -v -count=1 -coverprofile=${{ runner.temp }}/coverage.txt . ./exporter ./scanner ./cmd/...

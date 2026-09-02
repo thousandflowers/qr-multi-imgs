@@ -283,7 +283,37 @@
     near((onThumb.x - thumb.x) / thumb.w, 0.5, 1e-9, "thumb relative x");
     near(onThumb.w / thumb.w, 0.25, 1e-9, "thumb relative w");
 
-    return "coords self-test passed (frame -> natural -> display -> natural, shrunk, non-square, contained)";
+    // A crop travelling back to source pixels on a photo the browser rotated.
+    //
+    // The file stores 4032x3024 landscape with an EXIF orientation of 6.
+    // createImageBitmap hands back 3024x4032 portrait — measured, see the note
+    // at the top — so NATURAL is the portrait size and the stored landscape
+    // size must never appear in this mapping. A crop mapped against 4032x3024
+    // would land rotated ninety degrees and rescan a region the user did not
+    // choose, and nothing downstream would report it: the answer would just
+    // come back "still nothing".
+    const rotated = { w: 1200, h: 1600, naturalW: 3024, naturalH: 4032 };
+    const shown = fitContain(3024, 4032, 400, 400);
+    near(shown.w, 300, 1e-9, "rotated contain w");
+    near(shown.h, 400, 1e-9, "rotated contain h");
+    // The user drags a box over the top-left quarter of what they can see.
+    const crop = displayToNatural(
+      { x: shown.x, y: shown.y, w: shown.w / 2, h: shown.h / 2 }, rotated, shown);
+    near(crop.x, 0, 1e-9, "rotated crop x");
+    near(crop.y, 0, 1e-9, "rotated crop y");
+    near(crop.w, 1512, 1e-9, "rotated crop w");
+    near(crop.h, 2016, 1e-9, "rotated crop h");
+    // Portrait in, portrait out. If this ever comes back landscape, the stored
+    // dimensions have leaked into the mapping.
+    if (!(crop.h > crop.w)) {
+      throw new Error("a crop on a rotated photo came back landscape: the stored size leaked in");
+    }
+    // And it round trips: what the user selected is what gets re-scanned.
+    const backToDisplay = naturalToDisplay(crop, rotated, shown);
+    near(backToDisplay.w, shown.w / 2, 1e-9, "rotated crop round trip w");
+    near(backToDisplay.h, shown.h / 2, 1e-9, "rotated crop round trip h");
+
+    return "coords self-test passed (frame -> natural -> display -> natural, shrunk, non-square, contained, rotated crop)";
   }
 
   global.Coords = {

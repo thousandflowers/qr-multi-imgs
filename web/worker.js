@@ -30,7 +30,7 @@ const pending = [];
 
 self.qrWasmReady = () => {
   ready = true;
-  for (const job of pending.splice(0)) run(job);
+  for (const job of pending.splice(0)) (job && job.type === "crop" ? crop : run)(job);
   self.postMessage({ type: "ready" });
 };
 
@@ -142,9 +142,63 @@ async function run(job) {
   self.postMessage(out);
 }
 
+// crop re-reads one region the user pointed at, at the source's own
+// resolution.
+//
+// No cap, unlike the first pass. The caps exist because most images in a folder
+// hold nothing and paying full price for all of them makes the page feel slow.
+// This is the opposite case: the user has looked at the picture, decided there
+// is a code in that rectangle, and spent their attention saying so. Spending a
+// second of ours in return is the trade they already made.
+//
+// The rectangle arrives in the coordinates of createImageBitmap(blob) — the
+// natural, orientation-applied image — and is handed straight to
+// createImageBitmap's own crop arguments, which are in that same space. No
+// rotation term, for the reason in coords.js: both sides inherit whatever the
+// browser decided about EXIF.
+async function crop(job) {
+  const out = { type: "cropResult", id: job.id, codes: [] };
+  let bmp = null, cut = null;
+  try {
+    bmp = await createImageBitmap(job.blob);
+    const r = job.rect;
+    // Clamp again here rather than trusting the caller. The page clamps to the
+    // image it drew, this clamps to the image it decoded, and a disagreement
+    // between the two would be a crop of a region that does not exist.
+    const x = Math.max(0, Math.min(Math.round(r.x), bmp.width - 1));
+    const y = Math.max(0, Math.min(Math.round(r.y), bmp.height - 1));
+    const w = Math.max(1, Math.min(Math.round(r.w), bmp.width - x));
+    const h = Math.max(1, Math.min(Math.round(r.h), bmp.height - y));
+
+    cut = await createImageBitmap(bmp, x, y, w, h);
+    const canvas = new OffscreenCanvas(cut.width, cut.height);
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(cut, 0, 0);
+    const data = ctx.getImageData(0, 0, cut.width, cut.height);
+
+    const res = qrDecode(data.width, data.height, data.data);
+    if (res.error) out.error = res.error;
+    Object.assign(out, Result.carry(res, {
+      w: data.width, h: data.height, naturalW: data.width, naturalH: data.height,
+    }));
+    // Where the crop sat in the source, so a caller can put its geometry back
+    // where it came from without remembering what it asked for.
+    out.origin = { x, y, w, h };
+  } catch (e) {
+    out.errorKey = "err.unopenable";
+    out.error = "could not be read — unsupported format, or a damaged file";
+    out.detail = String((e && e.message) || e);
+  } finally {
+    if (cut) cut.close();
+    if (bmp) bmp.close();
+  }
+  self.postMessage(out);
+}
+
 self.onmessage = (e) => {
   const job = e.data;
   if (job && job.type === "module") { boot(job.module); return; }
-  if (ready) run(job);
+  const go = job && job.type === "crop" ? crop : run;
+  if (ready) go(job);
   else pending.push(job);
 };

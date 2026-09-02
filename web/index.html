@@ -246,6 +246,32 @@ li .thumbwrap { position:relative; flex:none; }
    rectangle around the tile competes with it. */
 li canvas.thumb { width:48px; height:48px; border-radius:7px; display:block;
   background:var(--soft); }
+
+/* The "point at the code" panel. One canvas, opened on demand and torn down on
+   close: a hundred rows each holding a full-resolution image is the thing that
+   kills the page, and the row thumbnails stay 48px for exactly that reason. */
+#insp[hidden] { display:none; }
+#insp { position:fixed; inset:0; z-index:50; display:flex; align-items:center;
+  justify-content:center; background:rgba(0,0,0,.55); padding:1rem; }
+#inspBox { background:var(--panel); border-radius:14px; padding:1rem;
+  max-width:min(96vw,760px); width:100%; max-height:94vh; overflow:auto;
+  box-shadow:0 20px 60px rgba(0,0,0,.35); }
+#inspBox h3 { margin:0 0 .15rem; font-size:1rem; }
+#inspName { color:var(--dim); font-size:.82rem; word-break:break-all; }
+#inspHint, #inspKeys { color:var(--dim); font-size:.82rem; margin:.5rem 0 0; }
+#inspKeys { color:var(--faint); }
+#inspStage { position:relative; margin:.75rem 0; background:var(--soft);
+  border-radius:10px; display:flex; justify-content:center; }
+#inspCanvas { max-width:100%; touch-action:none; cursor:crosshair;
+  border-radius:10px; display:block; }
+#inspMsg { font-size:.86rem; margin:.35rem 0 0; min-height:1.2em; }
+#inspMsg.ok { color:var(--ok); }
+#inspMsg.bad { color:var(--warn); }
+#inspBtns { display:flex; gap:.5rem; flex-wrap:wrap; margin-top:.6rem; }
+li .point { font:inherit; font-size:.78rem; padding:.2rem .5rem; cursor:pointer;
+  border:1px solid var(--line); background:var(--panel); color:var(--dim);
+  border-radius:7px; }
+li .point:hover { border-color:var(--brand); color:var(--brand); }
 li .shim { width:48px; height:48px; border-radius:7px; background:var(--soft);
   animation:shim 1.1s ease-in-out infinite; }
 @keyframes shim { 0%,100% { opacity:.55; } 50% { opacity:1; } }
@@ -434,8 +460,27 @@ li .shim { width:48px; height:48px; border-radius:7px; background:var(--soft);
     <a href="https://github.com/thousandflowers/qr-multi-imgs/blob/main/LICENSE">MIT</a>
   </div>
 </footer>
+<!-- The area picker. Hidden until a row asks for it, and its canvas is torn
+     down on close: one full-resolution image at a time is the whole memory
+     budget this page has. -->
+<div id="insp" hidden role="dialog" aria-modal="true" aria-labelledby="inspTitle">
+  <div id="inspBox">
+    <h3 id="inspTitle" data-t="insp.title"></h3>
+    <div id="inspName"></div>
+    <p id="inspHint" data-t="insp.hint"></p>
+    <div id="inspStage"><canvas id="inspCanvas" tabindex="0"></canvas></div>
+    <p id="inspKeys" data-t="insp.keys"></p>
+    <p id="inspMsg" role="status" aria-live="polite"></p>
+    <div id="inspBtns">
+      <button id="inspRescan" class="primary" data-t="insp.rescan"></button>
+      <button id="inspClose" data-t="insp.close"></button>
+    </div>
+  </div>
+</div>
+
 <script src="strings.js"></script>
 <script src="i18n.js"></script>
+<script src="select.js"></script>
 <script src="result.js"></script>
 <script src="coords.js"></script>
 <script src="order.js"></script>
@@ -517,6 +562,10 @@ function onWorkerMessage(w, msg) {
     return;
   }
   if (msg.type === "fatal") { engineDied("decoder failed: " + msg.error); return; }
+  // An assisted decode of one region the user pointed at. Routed here rather
+  // than into finish(), which would overwrite the row's own scan with the
+  // crop's — the crop is an addition to what the row knows, not a replacement.
+  if (msg.type === "cropResult") { adoptCropResult(byId.get(msg.id), msg); idle.push(w); pump(); return; }
   if (msg.id === CAMERA_JOB) { onCameraResult(msg); idle.push(w); pump(); return; }
   finish(msg);
   idle.push(w);
@@ -1103,8 +1152,145 @@ window.addEventListener("resize", () => {
   clearTimeout(repaintTimer);
   repaintTimer = setTimeout(() => {
     for (const r of rows) if (r.canvas) paintBoxes(r);
+    // The panel's canvas is sized from the viewport, so a resize moves the
+    // image under a selection that was measured against the old layout. The
+    // selection is carried across in image-relative terms rather than dropped.
+    if (!$("insp").hidden && insp.bmp && insp.drawn) {
+      const before = insp.drawn, sel = insp.sel;
+      layoutInspector();
+      if (sel && before) {
+        insp.sel = Select.clamp(Coords.naturalToDisplay(
+          Coords.displayToNatural(sel,
+            { w: insp.bmp.width, h: insp.bmp.height, naturalW: insp.bmp.width, naturalH: insp.bmp.height }, before),
+          { w: insp.bmp.width, h: insp.bmp.height, naturalW: insp.bmp.width, naturalH: insp.bmp.height },
+          insp.drawn), insp.drawn);
+      }
+      paintInspector();
+    }
   }, 100);
 });
+
+/* pointing at a code the scanner could not read (or could not see) */
+
+// One panel, one image at a time. A hundred rows each holding a
+// full-resolution bitmap is what kills this page, which is why the row
+// thumbnails are 48px and why this is torn down on close.
+const insp = {
+  row: null,      // the row being inspected
+  bmp: null,      // the source ImageBitmap, at the file's own resolution
+  drawn: null,    // where that image is drawn inside the canvas, in canvas px
+  sel: null,      // the selection, in canvas px
+  drag: null,     // { handle, lastX, lastY } while a pointer is down
+  busy: false,
+};
+
+// openInspector is available on every row that still has its file, not only
+// the ones the scanner flagged. The case it most needs to cover is the
+// opposite one: an image where nothing was detected at all and the person
+// looking at it can plainly see a code. Restricting this to rows the scanner
+// already understood would withhold it exactly where it is needed.
+async function openInspector(r) {
+  if (!r.file) return;
+  insp.row = r;
+  insp.busy = false;
+  $("inspName").textContent = r.name;
+  setInspMsg("", "");
+  $("insp").hidden = false;
+
+  try {
+    // The same createImageBitmap the decode used, which is what makes the
+    // whole mapping safe without a rotation term: whatever this browser does
+    // with EXIF orientation, the pixels drawn here and the pixels decoded
+    // inherited the same decision. See coords.js.
+    insp.bmp = await createImageBitmap(r.file);
+  } catch {
+    setInspMsg(t("err.unopenable"), "bad");
+    return;
+  }
+  layoutInspector();
+  // A located-but-unread code opens with its own box as the selection, so the
+  // user adjusts a rectangle instead of tracing one. Everything else opens
+  // with a centred box to drag.
+  const pre = (r.detections && r.detections[0] && r.frame)
+    ? Coords.detectionToDisplay(r.detections[0], r.frame, insp.drawn)
+    : null;
+  insp.sel = Select.initial(pre, insp.drawn);
+  if (pre) setInspMsg(t("insp.prefilled"), "");
+  paintInspector();
+  $("inspCanvas").focus();
+}
+
+// layoutInspector sizes the canvas to the space available and works out where
+// the image sits inside it. Recomputed on every resize, because the display
+// size is an argument to the mapping and a stale one puts the box elsewhere.
+function layoutInspector() {
+  if (!insp.bmp) return;
+  const canvas = $("inspCanvas");
+  const dpr = window.devicePixelRatio || 1;
+  const avail = Math.min($("inspBox").clientWidth - 32, 700);
+  const maxH = Math.max(240, window.innerHeight * 0.6);
+  const k = Math.min(avail / insp.bmp.width, maxH / insp.bmp.height, 1);
+  const cssW = Math.max(120, Math.round(insp.bmp.width * k));
+  const cssH = Math.max(120, Math.round(insp.bmp.height * k));
+  canvas.style.width = cssW + "px";
+  canvas.style.height = cssH + "px";
+  canvas.width = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssH * dpr);
+  insp.drawn = Coords.fitContain(insp.bmp.width, insp.bmp.height, canvas.width, canvas.height);
+}
+
+function paintInspector() {
+  const canvas = $("inspCanvas");
+  if (!insp.bmp || !insp.drawn) return;
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(insp.bmp, insp.drawn.x, insp.drawn.y, insp.drawn.w, insp.drawn.h);
+  if (!insp.sel) return;
+
+  const dpr = window.devicePixelRatio || 1;
+  const s = insp.sel;
+  // Everything outside the selection is dimmed, which says what will be read
+  // far more directly than an outline does.
+  ctx.fillStyle = "rgba(0,0,0,.45)";
+  ctx.beginPath();
+  ctx.rect(insp.drawn.x, insp.drawn.y, insp.drawn.w, insp.drawn.h);
+  ctx.rect(s.x + s.w, s.y, -s.w, s.h); // reverse winding punches the hole
+  ctx.fill();
+
+  ctx.lineWidth = Math.max(1, 2 * dpr);
+  ctx.strokeStyle = "#f0a500";
+  ctx.strokeRect(s.x, s.y, s.w, s.h);
+  const hs = Math.max(4, 5 * dpr);
+  ctx.fillStyle = "#f0a500";
+  for (const h of Select.handlePoints(s)) ctx.fillRect(h.x - hs, h.y - hs, hs * 2, hs * 2);
+}
+
+function setInspMsg(text, cls) {
+  const el = $("inspMsg");
+  el.textContent = text;
+  el.className = cls || "";
+}
+
+// Canvas pixels from a pointer event. The canvas is a CSS size and a backing
+// store size and they are not the same number; using the wrong one is the
+// classic way a selection lands somewhere the user did not click.
+function inspPoint(e) {
+  const canvas = $("inspCanvas");
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: (e.clientX - rect.left) * (canvas.width / rect.width),
+    y: (e.clientY - rect.top) * (canvas.height / rect.height),
+  };
+}
+
+function closeInspector() {
+  $("insp").hidden = true;
+  if (insp.bmp) insp.bmp.close();
+  insp.bmp = null;
+  insp.row = null;
+  insp.sel = null;
+  insp.drag = null;
+}
 
 // A row is built once and rewritten in place, so the file appears in the list
 // the moment it is queued and gains its answer where it already sits.
@@ -1151,7 +1337,21 @@ function renderRow(r) {
   const name = document.createElement("span");
   name.className = "name";
   name.textContent = r.name;
+  // Offered on every row that still has its file. The case this most needs to
+  // serve is the one where nothing was detected and the person can see a code
+  // anyway; restricting it to flagged rows would withhold it exactly there.
+  if (r.file) {
+    const point = document.createElement("button");
+    point.className = "point";
+    point.type = "button";
+    point.textContent = t("insp.open");
+    point.onclick = () => openInspector(r);
+    r.pointBtn = point;
+  }
   line.appendChild(name);
+  // Only once the row has settled: offering to point at a code while the
+  // scanner is still reading the file invites the user to race it.
+  if (r.pointBtn && !r.pending) line.appendChild(r.pointBtn);
   if (r.path && r.path !== r.name) {
     const where = document.createElement("span");
     where.className = "where";
@@ -1339,6 +1539,125 @@ for (const id in FILTERS) {
   $(id).onclick = () => { activeTile = id === activeTile ? "fAll" : id; applyFilters(); };
 }
 $("search").oninput = applyFilters;
+
+/* the area picker's controls */
+
+$("inspClose").onclick = closeInspector;
+$("insp").onclick = (e) => { if (e.target === $("insp")) closeInspector(); };
+
+$("inspCanvas").addEventListener("pointerdown", (e) => {
+  if (!insp.sel || !insp.drawn) return;
+  const p = inspPoint(e);
+  const grab = Select.hit(insp.sel, p.x, p.y, Select.GRAB * (window.devicePixelRatio || 1));
+  // Outside the current selection starts a fresh one from that corner, which
+  // is what every drawing tool does and what makes a bad first box cheap to
+  // redo.
+  if (!grab) {
+    insp.sel = Select.clamp({ x: p.x, y: p.y, w: Select.MIN, h: Select.MIN }, insp.drawn);
+    insp.drag = { handle: "se", lastX: p.x, lastY: p.y };
+  } else {
+    insp.drag = { handle: grab, lastX: p.x, lastY: p.y };
+  }
+  $("inspCanvas").setPointerCapture(e.pointerId);
+  paintInspector();
+});
+
+$("inspCanvas").addEventListener("pointermove", (e) => {
+  if (!insp.drag || !insp.sel) return;
+  const p = inspPoint(e);
+  const dx = p.x - insp.drag.lastX, dy = p.y - insp.drag.lastY;
+  insp.drag.lastX = p.x;
+  insp.drag.lastY = p.y;
+  insp.sel = insp.drag.handle === "move"
+    ? Select.move(insp.sel, dx, dy, insp.drawn)
+    : Select.resize(insp.sel, insp.drag.handle, dx, dy, insp.drawn);
+  paintInspector();
+});
+
+for (const ev of ["pointerup", "pointercancel"]) {
+  $("inspCanvas").addEventListener(ev, () => { insp.drag = null; });
+}
+
+// A keyboard alternative, because a rectangle that can only be dragged is a
+// feature some people simply cannot use.
+$("inspCanvas").addEventListener("keydown", (e) => {
+  if (!insp.sel) return;
+  const step = (e.shiftKey ? 1 : 1) * (e.altKey ? 1 : 8) * (window.devicePixelRatio || 1);
+  const d = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
+  if (d) {
+    insp.sel = e.shiftKey
+      ? Select.resize(insp.sel, "se", d[0], d[1], insp.drawn)
+      : Select.move(insp.sel, d[0], d[1], insp.drawn);
+    paintInspector();
+    e.preventDefault();
+    return;
+  }
+  if (e.key === "Enter") { rescanSelection(); e.preventDefault(); }
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !$("insp").hidden) closeInspector();
+});
+
+$("inspRescan").onclick = rescanSelection;
+
+// rescanSelection sends the chosen region back through the same engine, at the
+// source's own resolution.
+//
+// It is a worker job like any other: nothing is uploaded, on either surface.
+// The hosted page and the --serve page run the identical wasm build in the
+// identical worker, so there is no network path here to relax the CSP for.
+function rescanSelection() {
+  const r = insp.row;
+  if (!r || !insp.sel || !insp.bmp || insp.busy) return;
+  // Display pixels to source pixels. The frame here is the source itself,
+  // because the panel drew the file at its own resolution rather than the
+  // decode's shrunken one.
+  const nat = Coords.displayToNatural(insp.sel,
+    { w: insp.bmp.width, h: insp.bmp.height, naturalW: insp.bmp.width, naturalH: insp.bmp.height },
+    insp.drawn);
+  if (!nat) return;
+
+  insp.busy = true;
+  $("inspRescan").disabled = true;
+  setInspMsg(t("insp.working"), "");
+  // Through the same queue as every other job, so it waits its turn behind a
+  // running scan instead of racing one on a worker that is already busy.
+  queue.push({ type: "crop", id: r.id, blob: r.file, rect: nat });
+  pump();
+}
+
+// adoptCropResult folds an assisted decode into the row it came from.
+//
+// The result is a normal decoded code: same row, same copy button, same
+// payload recogniser, same exports. Indistinguishable downstream, which is the
+// point — a code the user had to point at is still just a code.
+function adoptCropResult(r, msg) {
+  insp.busy = false;
+  $("inspRescan").disabled = false;
+  if (!r) return; // the run was cleared while the crop was decoding
+  const read = msg.codes || [];
+  const fresh = read.filter((c) => !r.codes.includes(c));
+  if (!read.length) {
+    setInspMsg(msg.errorKey ? t(msg.errorKey) : t("insp.none"), "bad");
+    return;
+  }
+  // What the message reports is what the AREA held, not what the row gained.
+  // Re-reading a code the row already had is a successful read of that area,
+  // and saying "still nothing readable" there would be a plain falsehood: the
+  // user is looking at the code while the tool denies finding it.
+  setInspMsg(t("insp.found", { n: read.length }), "ok");
+  if (!fresh.length) return;
+  const found = fresh;
+  r.codes = r.codes.concat(found);
+  r.reason = "DECODED";
+  r.error = "";
+  r.errorKey = "";
+  for (const c of found) seenCount.set(c, (seenCount.get(c) || 0) + 1);
+  renderRow(r);
+  paintStats();
+  applyFilters();
+}
 $("pattern").onchange = repaintAll;
 $("zip").onclick = downloadZip;
 $("save").onclick = () => saveBlob(

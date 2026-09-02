@@ -963,6 +963,53 @@ Verified end to end on the real page: a genuine corpus image that classifies
 `QR_DETECTED_DECODE_FAILED`, decoded by the real `qr.wasm` in a real worker,
 producing one detection and one box drawn tight around the code.
 
+## Step D — point at the code (SHIPPED)
+
+Manual region selection, and an assisted decode of that region. This is the
+phase's actual feature; everything before it was making the geometry arrive
+intact.
+
+- **Offered on every row that still has its file**, not only the flagged ones.
+  The case it most needs to serve is the opposite one: an image where nothing
+  was detected at all and the person looking at it can plainly see a code.
+  Restricting it to rows the scanner already understood would withhold it
+  exactly where it is needed.
+- **The pre-drawn box is the initial selection** when the scanner located a
+  code it could not read. That is the detail the roadmap called the highest
+  leverage in the phase: it turns the interaction from "find the code and box
+  it" into "nudge this box". With no detection it opens with a centred
+  rectangle over the middle 60%, as something to drag rather than a guess.
+- **One panel, one image, torn down on close.** A hundred rows each holding a
+  full-resolution bitmap is what kills this page — the reason the row
+  thumbnails are 48 px in the first place.
+- **`web/select.js`** holds the geometry: handles, hit testing, clamping,
+  flipping when a side is dragged past its opposite. Pure functions with a
+  self-test in CI, because the pointer plumbing is untestable without a browser
+  and this is the part that decides where the rectangle actually lands.
+- **Keyboard alternative**: arrows move, shift and arrows resize, Enter reads,
+  Escape closes. A rectangle that can only be dragged is a feature some people
+  cannot use at all.
+- **The crop is read at the source's own resolution**, with no cap. The caps
+  exist because most images in a folder hold nothing; this is the opposite
+  case, where the user has already spent their attention saying where to look.
+- **Nothing is uploaded, on either surface.** The crop is a worker job like any
+  other, running the same wasm build. There is no network path here, so the CSP
+  needed no change and got none.
+
+**Verified end to end over CDP on the real page.** A 3024×4032 photograph: the
+picker opened, nine regions were pointed at in turn through the real rescan
+path, and the eighth read the code — selection `{x:756, y:2016, w:1512,
+h:2016}` in source pixels. On the corpus image the pre-drawn box arrived at
+exactly `{54, 25, 200, 185}`, the detection's own geometry, and the crop
+honestly reported that the area still held nothing readable: that image defeats
+the pure-Go engine cropped or whole.
+
+**One bug caught by that run, worth recording.** The first version reported
+"still nothing readable" whenever the crop found only codes the row already
+had. That is a plain falsehood — the user is looking at the code while the tool
+denies finding it. The message now reports what the *area* held, and the row
+merges only what is new.
+
 ## Cheap vs. project
 
 **Cheap** (1–2 days each):
