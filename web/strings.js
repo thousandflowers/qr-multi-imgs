@@ -20,6 +20,13 @@
   };
 
   S.en = {
+    "stat.toRead": "to read",
+    "res.filters": "Filter",
+    "res.export": "Export",
+    "rename.toggle": "Rename the files first",
+    "row.flag": "Flag to check",
+    "row.unflag": "Remove flag",
+    "filter.flagged": "Flagged",
     "csv.loaded": "{n} codes from {file} — column “{col}”",
     "csv.clear": "Remove them",
     "csv.noHeader": "no header found, first column used",
@@ -178,6 +185,13 @@
   };
 
   S.it = {
+    "stat.toRead": "da leggere",
+    "res.filters": "Filtra",
+    "res.export": "Esporta",
+    "rename.toggle": "Rinomina i file prima",
+    "row.flag": "Segna da controllare",
+    "row.unflag": "Togli il segno",
+    "filter.flagged": "Segnati",
     "csv.loaded": "{n} codici da {file} — colonna “{col}”",
     "csv.clear": "Toglili",
     "csv.noHeader": "nessuna intestazione trovata, usata la prima colonna",
@@ -336,6 +350,13 @@
   };
 
   S.es = {
+    "stat.toRead": "por leer",
+    "res.filters": "Filtrar",
+    "res.export": "Exportar",
+    "rename.toggle": "Renombrar los archivos antes",
+    "row.flag": "Marcar para revisar",
+    "row.unflag": "Quitar la marca",
+    "filter.flagged": "Marcados",
     "csv.loaded": "{n} códigos de {file} — columna «{col}»",
     "csv.clear": "Quitarlos",
     "csv.noHeader": "sin encabezado, se usó la primera columna",
@@ -494,6 +515,13 @@
   };
 
   S.fr = {
+    "stat.toRead": "à lire",
+    "res.filters": "Filtrer",
+    "res.export": "Exporter",
+    "rename.toggle": "Renommer les fichiers d'abord",
+    "row.flag": "Marquer à vérifier",
+    "row.unflag": "Retirer la marque",
+    "filter.flagged": "Marqués",
     "csv.loaded": "{n} codes de {file} — colonne « {col} »",
     "csv.clear": "Les retirer",
     "csv.noHeader": "aucun en-tête trouvé, première colonne utilisée",
@@ -652,6 +680,13 @@
   };
 
   S.de = {
+    "stat.toRead": "zu lesen",
+    "res.filters": "Filtern",
+    "res.export": "Exportieren",
+    "rename.toggle": "Dateien vorher umbenennen",
+    "row.flag": "Zum Prüfen markieren",
+    "row.unflag": "Markierung entfernen",
+    "filter.flagged": "Markiert",
     "csv.loaded": "{n} Codes aus {file} — Spalte „{col}“",
     "csv.clear": "Entfernen",
     "csv.noHeader": "keine Kopfzeile gefunden, erste Spalte benutzt",
@@ -810,6 +845,13 @@
   };
 
   S.pt = {
+    "stat.toRead": "por ler",
+    "res.filters": "Filtrar",
+    "res.export": "Exportar",
+    "rename.toggle": "Renomear os ficheiros primeiro",
+    "row.flag": "Marcar para verificar",
+    "row.unflag": "Retirar a marca",
+    "filter.flagged": "Marcados",
     "csv.loaded": "{n} códigos de {file} — coluna «{col}»",
     "csv.clear": "Remover",
     "csv.noHeader": "sem cabeçalho, usada a primeira coluna",
