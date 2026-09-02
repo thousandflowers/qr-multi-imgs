@@ -239,6 +239,13 @@ li.pending { opacity:.72; }
 .tick { width:16px; height:16px; color:var(--ok); flex:none; }
 .state { display:flex; align-items:center; padding-top:.15rem; }
 li .thumbwrap { position:relative; flex:none; }
+/* The overlay canvas fills the same 48px slot an <img> thumbnail does, but it
+   contains the picture instead of covering it: a code that failed to decode is
+   often at an edge, and a cover crop would throw away the thing the box points
+   at. No border of its own — the drawn box is the signal, and a second
+   rectangle around the tile competes with it. */
+li canvas.thumb { width:48px; height:48px; border-radius:7px; display:block;
+  background:var(--soft); }
 li .shim { width:48px; height:48px; border-radius:7px; background:var(--soft);
   animation:shim 1.1s ease-in-out infinite; }
 @keyframes shim { 0%,100% { opacity:.55; } 50% { opacity:1; } }
@@ -1025,6 +1032,80 @@ function hitBox(raw) {
   return box;
 }
 
+// showsBox decides which rows get geometry drawn on them, and the answer is
+// one bucket: an image holding a code that was located and could not be read.
+//
+// A decoded row does not need a box — it has the payload, which is the answer
+// the box was only ever a route to. A NO_QR_FOUND row has no geometry at all,
+// because nothing was found to have geometry. And a row whose detections came
+// back empty or malformed draws nothing rather than a fallback shape: an
+// invented rectangle would tell the user the tool saw a code where it did not,
+// which is the failure this whole line of work exists to stop, pointed the
+// other way.
+function showsBox(r) {
+  return isUnread(r) && Array.isArray(r.detections) && r.detections.length > 0 && !!r.frame;
+}
+
+// paintBoxes draws the thumbnail and strokes each detection over it.
+//
+// The thumbnail is derived from the same ImageBitmap the decode ran on, which
+// is what makes this safe without a rotation term: whatever the browser decided
+// about EXIF orientation, both the pixels the decoder saw and the pixels drawn
+// here inherited that same decision. Mixing sources — decoding from a bitmap
+// and drawing from an <img> of the original file — is the bug this avoids, and
+// it would be invisible on a desktop image and wrong on every phone photo.
+//
+// Sizes are recomputed on every call rather than cached: the backing store
+// depends on devicePixelRatio, which changes when a window moves between
+// displays, and a cached size would leave the box drawn for the old screen.
+function paintBoxes(r) {
+  const canvas = r.canvas;
+  if (!canvas || !r.thumbURL) return;
+  const img = new Image();
+  img.onload = () => {
+    // The row may have been re-rendered or cleared while the thumbnail loaded.
+    if (r.canvas !== canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    const side = canvas.clientWidth || 48;
+    canvas.width = Math.round(side * dpr);
+    canvas.height = Math.round(side * dpr);
+
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const fit = Coords.fitContain(img.naturalWidth, img.naturalHeight, canvas.width, canvas.height);
+    if (!fit) return;
+    ctx.drawImage(img, fit.x, fit.y, fit.w, fit.h);
+
+    // Two strokes, dark under bright, so the box reads on a white receipt and
+    // on a night photo without knowing which it is.
+    for (const det of r.detections) {
+      const b = Coords.detectionToDisplay(det, r.frame, fit);
+      if (!b) continue;
+      ctx.lineWidth = Math.max(1, 3 * dpr);
+      ctx.strokeStyle = "rgba(0,0,0,.55)";
+      ctx.strokeRect(b.x, b.y, b.w, b.h);
+      ctx.lineWidth = Math.max(1, 1.5 * dpr);
+      ctx.strokeStyle = "#f0a500";
+      ctx.strokeRect(b.x, b.y, b.w, b.h);
+    }
+    canvas.dataset.painted = String(Number(canvas.dataset.painted || 0) + 1);
+  };
+  img.src = r.thumbURL;
+}
+
+// The display size is an argument to the mapping, so anything that changes it
+// invalidates every box already drawn. The thumbnail slot is a fixed 48 px, so
+// a window resize does not move it — but devicePixelRatio does change when a
+// window is dragged to a different display, and that changes the backing store
+// this draws into. Repainting on resize is cheap and covers both.
+let repaintTimer = 0;
+window.addEventListener("resize", () => {
+  clearTimeout(repaintTimer);
+  repaintTimer = setTimeout(() => {
+    for (const r of rows) if (r.canvas) paintBoxes(r);
+  }, 100);
+});
+
 // A row is built once and rewritten in place, so the file appears in the list
 // the moment it is queued and gains its answer where it already sits.
 function renderRow(r) {
@@ -1039,12 +1120,24 @@ function renderRow(r) {
 
   const wrap = document.createElement("div");
   wrap.className = "thumbwrap";
-  if (r.thumbURL) {
+  if (r.thumbURL && showsBox(r)) {
+    // The one row type that gets geometry drawn on it. See showsBox.
+    const canvas = document.createElement("canvas");
+    canvas.className = "thumb";
+    // Decorative: the row already says in words why it has no payload, and a
+    // screen reader has nothing to gain from a rectangle.
+    canvas.setAttribute("aria-hidden", "true");
+    r.canvas = canvas;
+    wrap.appendChild(canvas);
+    paintBoxes(r);
+  } else if (r.thumbURL) {
+    r.canvas = null;
     const img = document.createElement("img");
     img.src = r.thumbURL;
     img.alt = "";
     wrap.appendChild(img);
   } else {
+    r.canvas = null;
     const box = document.createElement("div");
     box.className = r.pending ? "shim" : "noimg";
     wrap.appendChild(box);

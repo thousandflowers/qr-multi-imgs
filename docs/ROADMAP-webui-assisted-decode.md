@@ -926,6 +926,43 @@ be mistaken for done.
 The EXIF measurement above did run inside a real Worker, so the *decode* side of
 that boundary is exercised on Chromium. The *result* side is not.
 
+## Step C — draw the box (SHIPPED, read-only)
+
+`coords.js` was dead code until this. The row now draws what the decoder found.
+
+- **One bucket gets a box.** `QR_DETECTED_DECODE_FAILED`, and only when the
+  detections survived validation and a frame is present (`showsBox`). A decoded
+  row has the payload, which is the answer the box was a route to. A
+  `NO_QR_FOUND` row has no geometry, because nothing was found to have any. A
+  row whose detections came back empty or malformed **draws nothing** rather
+  than a fallback shape — an invented rectangle would say the tool saw a code
+  where it did not, which is the failure this whole line of work exists to stop,
+  pointed the other way.
+- **Contained, not covered.** The row's `<img>` thumbnails are `object-fit:
+  cover`, which centre-crops to a square. A code that failed to decode is often
+  at an edge — part of why it failed — and a cover crop would throw it away and
+  leave the box pointing off the visible square: correct and useless at once.
+  The overlay canvas contains the image instead, via `Coords.fitContain`.
+- **The thumbnail is drawn from the same `ImageBitmap` lineage the decode used**,
+  which is what makes this safe with no rotation term. Whatever the browser
+  decided about EXIF orientation, both sides inherited that decision.
+- **No click target, no rescan button, no crop rectangle.** An overlay with no
+  action behind it is the whole scope — the same reasoning that pulled the
+  thumbnail overlay out of PR #20, except now the action it leads to is the next
+  step rather than a phase away.
+
+**Resize was verified, not assumed.** The thumbnail slot is a fixed 48 px so a
+window resize does not move it, but `devicePixelRatio` changes when a window is
+dragged to another display, and that changes the backing store. Measured in
+headless Chrome by simulating a DPR change and dispatching `resize`: the canvas
+backing store went **48 → 96** while its CSS size stayed **48**, the repaint
+count went 1 → 2, and the drawn box scaled 37.5 → 75 px with it. The same run
+confirmed the decoded row has **no canvas at all**.
+
+Verified end to end on the real page: a genuine corpus image that classifies
+`QR_DETECTED_DECODE_FAILED`, decoded by the real `qr.wasm` in a real worker,
+producing one detection and one box drawn tight around the code.
+
 ## Cheap vs. project
 
 **Cheap** (1–2 days each):

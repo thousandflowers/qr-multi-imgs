@@ -136,6 +136,25 @@
     return naturalToDisplay(nat, frame, display);
   }
 
+  // fitContain places a source rectangle inside a box without cropping it,
+  // centred, preserving aspect. The returned rect is the DISPLAY space to hand
+  // the mapping functions above.
+  //
+  // Contain rather than cover, and that is a deliberate difference from the
+  // row thumbnails elsewhere on the page, which are `object-fit: cover`. A
+  // cover crop throws away the edges of the image — and a code that failed to
+  // decode is very often at an edge, which is part of why it failed. Cropping
+  // it away and then drawing a box that points off the visible square is worse
+  // than drawing nothing: the box would be correct and useless at the same
+  // time.
+  function fitContain(srcW, srcH, boxW, boxH) {
+    const src = space({ w: srcW, h: srcH }), b = space({ w: boxW, h: boxH });
+    if (!src || !b) return null;
+    const k = Math.min(b.w / src.w, b.h / src.h);
+    const w = src.w * k, h = src.h * k;
+    return { x: (b.w - w) / 2, y: (b.h - h) / 2, w, h };
+  }
+
   function selfTest() {
     const near = (a, b, tol, what) => {
       if (Math.abs(a - b) > tol) throw new Error(`${what}: ${a} vs ${b} (tol ${tol})`);
@@ -228,11 +247,48 @@
       throw new Error("a box past the frame edge escaped the image: " + JSON.stringify(out));
     }
 
-    return "coords self-test passed (frame -> natural -> display -> natural, shrunk and non-square)";
+    // fitContain: the whole image is inside the box, centred, aspect kept.
+    const land = fitContain(72, 54, 48, 48);
+    near(land.w, 48, 1e-9, "landscape contain w");
+    near(land.h, 36, 1e-9, "landscape contain h");
+    near(land.x, 0, 1e-9, "landscape contain x");
+    near(land.y, 6, 1e-9, "landscape contain y");
+    const port = fitContain(54, 72, 48, 48);
+    near(port.w, 36, 1e-9, "portrait contain w");
+    near(port.x, 6, 1e-9, "portrait contain x");
+    const sq = fitContain(72, 72, 48, 48);
+    near(sq.w, 48, 1e-9, "square contain w");
+    near(sq.y, 0, 1e-9, "square contain y");
+    if (fitContain(0, 10, 48, 48) !== null || fitContain(10, 10, 0, 48) !== null) {
+      throw new Error("fitContain accepted a space with no area");
+    }
+
+    // The whole chain a row actually walks: a 12-megapixel photo, decoded under
+    // the 1600 cap, thumbnailed to 72 px on its long side, drawn contained into
+    // a 48 px square at 2x device pixel ratio. Five reductions, and the box has
+    // to land inside the drawn image at the end of them.
+    const dpr = 2;
+    const thumb = fitContain(72, 54, 48 * dpr, 48 * dpr);
+    const onThumb = detectionToDisplay(
+      { box: { x: 800, y: 600, w: 400, h: 300 } },
+      { w: 1600, h: 1200, naturalW: 4032, naturalH: 3024 },
+      thumb,
+    );
+    if (onThumb.x < thumb.x - 1e-6 || onThumb.y < thumb.y - 1e-6 ||
+        onThumb.x + onThumb.w > thumb.x + thumb.w + 1e-6 ||
+        onThumb.y + onThumb.h > thumb.y + thumb.h + 1e-6) {
+      throw new Error("the box left the drawn image: " + JSON.stringify({ onThumb, thumb }));
+    }
+    // Half way across the frame stays half way across the drawing.
+    near((onThumb.x - thumb.x) / thumb.w, 0.5, 1e-9, "thumb relative x");
+    near(onThumb.w / thumb.w, 0.25, 1e-9, "thumb relative w");
+
+    return "coords self-test passed (frame -> natural -> display -> natural, shrunk, non-square, contained)";
   }
 
   global.Coords = {
-    detectionToDisplay, frameToNatural, naturalToDisplay, displayToNatural, selfTest,
+    detectionToDisplay, frameToNatural, naturalToDisplay, displayToNatural,
+    fitContain, selfTest,
   };
 
   if (typeof process !== "undefined" && process.argv && process.argv.includes("--test")) {
