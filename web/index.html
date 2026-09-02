@@ -260,6 +260,11 @@ ul { margin-top:8px; }
 .linkish { background:none; border:0; padding:0; color:var(--brand);
   text-decoration:underline; cursor:pointer; text-align:left; font:inherit;
   font-family:var(--mono); font-size:var(--fs-2); word-break:break-all; }
+.hitShort { padding:8px 12px; font-family:var(--mono); font-size:var(--fs-2);
+  color:var(--fg); word-break:break-all; }
+.hitMore > summary { padding:6px 12px 10px; cursor:pointer; font-size:var(--fs-2);
+  color:var(--dim); }
+.hitMore > summary:hover { color:var(--brand); }
 .chip { font-size:var(--fs-2); padding:4px 8px; border-radius:999px;
   border:1px solid var(--line); background:var(--panel); color:var(--dim); cursor:pointer; }
 .chip[aria-pressed="true"] { background:var(--brand-soft); border-color:var(--brand); color:var(--brand); }
@@ -1805,10 +1810,30 @@ function hitBox(raw) {
   top.appendChild(copyButton(raw));
   box.appendChild(top);
 
-  const fields = document.createElement("div");
-  fields.className = "fields";
-  for (const f of d.fields) fields.appendChild(fieldRow(f));
-  box.appendChild(fields);
+  // The value itself, on the same line as its label. A URL used to occupy a
+  // header plus three field rows plus four copy buttons; the row it sits in is
+  // a list entry, not a record card, and what a person needs from a glance is
+  // what the code says.
+  const short = document.createElement("div");
+  short.className = "hitShort";
+  short.textContent = d.short || raw;
+  box.appendChild(short);
+
+  // Everything the recogniser pulled apart, closed. It is genuinely useful -
+  // a reference number worth copying on its own, a Wi-Fi password - and it is
+  // useful to one row at a time, not to all of them at once.
+  if (d.fields.length > 1) {
+    const more = document.createElement("details");
+    more.className = "hitMore";
+    const sum = document.createElement("summary");
+    sum.textContent = t("act.details");
+    more.appendChild(sum);
+    const fields = document.createElement("div");
+    fields.className = "fields";
+    for (const f of d.fields) fields.appendChild(fieldRow(f));
+    more.appendChild(fields);
+    box.appendChild(more);
+  }
   return box;
 }
 

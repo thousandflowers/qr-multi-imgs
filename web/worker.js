@@ -223,7 +223,10 @@ function encodeBatch(job) {
 function frame(job) {
   const out = { type: "frameResult", id: job.id, w: job.w, h: job.h };
   try {
-    const res = qrDecode(job.w, job.h, new Uint8ClampedArray(job.buf));
+    // The viewfinder's own decoder: a short cascade, because another frame is
+    // fifty milliseconds away and a scanner that thinks for a third of a
+    // second cannot be aimed. Measured in scanner/live.go.
+    const res = qrDecodeLive(job.w, job.h, new Uint8ClampedArray(job.buf));
     Object.assign(out, Result.carry(res, { w: job.w, h: job.h, naturalW: job.natW, naturalH: job.natH }));
   } catch (e) {
     out.error = String((e && e.message) || e);

@@ -20,6 +20,7 @@
   };
 
   S.en = {
+    "act.details": "Details",
     "stat.toRead": "to read",
     "res.filters": "Filter",
     "res.export": "Export",
@@ -185,6 +186,7 @@
   };
 
   S.it = {
+    "act.details": "Dettagli",
     "stat.toRead": "da leggere",
     "res.filters": "Filtra",
     "res.export": "Esporta",
@@ -350,6 +352,7 @@
   };
 
   S.es = {
+    "act.details": "Detalles",
     "stat.toRead": "por leer",
     "res.filters": "Filtrar",
     "res.export": "Exportar",
@@ -515,6 +518,7 @@
   };
 
   S.fr = {
+    "act.details": "Détails",
     "stat.toRead": "à lire",
     "res.filters": "Filtrer",
     "res.export": "Exporter",
@@ -680,6 +684,7 @@
   };
 
   S.de = {
+    "act.details": "Details",
     "stat.toRead": "zu lesen",
     "res.filters": "Filtern",
     "res.export": "Exportieren",
@@ -845,6 +850,7 @@
   };
 
   S.pt = {
+    "act.details": "Detalhes",
     "stat.toRead": "por ler",
     "res.filters": "Filtrar",
     "res.export": "Exportar",

@@ -47,23 +47,10 @@ import (
 // scale-dependent and comparing it across differently-capped runs is
 // meaningless. The dimensions travel with the numbers so that is checkable.
 func decode(_ js.Value, args []js.Value) any {
-	if len(args) < 3 {
-		return errResult("decode(width, height, pixels) takes three arguments")
+	img, argErr := frameFrom(args)
+	if argErr != "" {
+		return errResult(argErr)
 	}
-	w, h := args[0].Int(), args[1].Int()
-	if w <= 0 || h <= 0 {
-		return errResult("image has no pixels")
-	}
-
-	want := w * h * 4
-	if n := args[2].Length(); n != want {
-		return errResult("pixel buffer is the wrong size for the given dimensions")
-	}
-
-	pix := make([]byte, want)
-	js.CopyBytesToGo(pix, args[2])
-	img := &image.RGBA{Pix: pix, Stride: w * 4, Rect: image.Rect(0, 0, w, h)}
-
 	d, err := scanner.ScanDecodedImageDetail(img)
 	if err != nil {
 		return errResult(err.Error())
@@ -171,8 +158,40 @@ func encode(_ js.Value, args []js.Value) any {
 	return map[string]any{"size": w, "bits": bits}
 }
 
+// decodeLive is decode for a viewfinder: the short cascade, no image measures.
+//
+// Same arguments, same result shape. What differs is what it is willing to
+// spend - see scanner/live.go for the measurements that made a separate path
+// necessary rather than a nice idea.
+func decodeLive(_ js.Value, args []js.Value) any {
+	img, err := frameFrom(args)
+	if err != "" {
+		return errResult(err)
+	}
+	return result(scanner.ScanLive(img))
+}
+
+// frameFrom is the argument checking both entry points share.
+func frameFrom(args []js.Value) (*image.RGBA, string) {
+	if len(args) < 3 {
+		return nil, "decode(width, height, pixels) takes three arguments"
+	}
+	w, h := args[0].Int(), args[1].Int()
+	if w <= 0 || h <= 0 {
+		return nil, "image has no pixels"
+	}
+	want := w * h * 4
+	if n := args[2].Length(); n != want {
+		return nil, "pixel buffer is the wrong size for the given dimensions"
+	}
+	pix := make([]byte, want)
+	js.CopyBytesToGo(pix, args[2])
+	return &image.RGBA{Pix: pix, Stride: w * 4, Rect: image.Rect(0, 0, w, h)}, ""
+}
+
 func main() {
 	js.Global().Set("qrDecode", js.FuncOf(decode))
+	js.Global().Set("qrDecodeLive", js.FuncOf(decodeLive))
 	js.Global().Set("qrEncode", js.FuncOf(encode))
 	// Tell the loader the module is live; without this the page cannot know
 	// whether it is safe to send work.
