@@ -92,6 +92,11 @@
     --warn:#e0b062; --warn-soft:#2a2314;
 }
 * { box-sizing:border-box; }
+/* A closed <details> hides its contents through a UA rule that any later
+   display: declaration silently beats - and the page has several, so two
+   drawers stood permanently open while looking like they were shut. This puts
+   the browser's own behaviour back, once, for all of them. */
+details:not([open]) > *:not(summary) { display:none !important; }
 /* Prose stops at a comfortable line length. The advice under a row was running
    the full width of a wide window, which is roughly 110 characters - past the
    point where the eye reliably finds the start of the next line. */
@@ -242,11 +247,26 @@ input[type=file] { display:none; }
 /* Secondary actions look like their labels: one primary act per bar. */
 button.quiet { background:none; border-color:transparent; color:var(--dim); }
 button.quiet:hover:not(:disabled) { background:var(--panel); border-color:var(--line); color:var(--fg); }
+/* A drawer, anchored under the control that opens it. */
+#moreWrap { position:relative; }
+#moreWrap > summary { list-style:none; cursor:pointer; font-size:var(--fs-2);
+  color:var(--dim); padding:6px 10px; border:1px solid var(--line);
+  border-radius:8px; background:var(--panel); }
+#moreWrap > summary::-webkit-details-marker { display:none; }
+#moreWrap[open] > summary { border-color:var(--brand); color:var(--brand); }
+/* Only when open. A bare display:flex on the contents of a <details>
+   overrides the browser's own hiding, and the drawer stands open forever. */
+#moreWrap[open] .drawer { position:absolute; right:0; top:calc(100% + 6px); z-index:5;
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap; width:max-content;
+  max-width:min(90vw,30rem); background:var(--panel); border:1px solid var(--line);
+  border-radius:10px; padding:12px; box-shadow:0 12px 32px rgba(0,0,0,.18); }
+#moreWrap .sep { width:1px; align-self:stretch; background:var(--line); }
+
 #renameWrap { border-bottom:1px solid var(--line); }
 #renameWrap summary { padding:12px 16px; cursor:pointer; font-size:var(--fs-2); color:var(--dim); }
 #renameWrap summary:hover { color:var(--brand); }
 #renameWrap[open] summary { color:var(--fg); }
-#renameWrap .bar2 { border-bottom:0; padding-top:0; }
+#renameWrap[open] .bar2 { border-bottom:0; padding-top:0; }
 /* Air between the controls and what they act on. */
 ul { margin-top:8px; }
 #summary { padding:8px 12px 0; color:var(--dim); font-size:var(--fs-2); }
@@ -473,6 +493,11 @@ li canvas.thumb { width:72px; height:72px; border-radius:9px; display:block;
 #inspMsg.ok { color:var(--ok); }
 #inspMsg.bad { color:var(--warn); }
 #inspBtns { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+/* Row actions stay out of the way until the row is the one being looked at.
+   Focus counts as looking, so nothing is lost to the keyboard. */
+li .point.onHover { opacity:0; transition:opacity .12s; }
+li:hover .point.onHover, li .point.onHover:focus-visible { opacity:1; }
+@media (hover:none) { li .point.onHover { opacity:1; } }
 li .point { font:inherit; font-size:var(--fs-2); padding:4px 8px; cursor:pointer;
   border:1px solid var(--line); background:var(--panel); color:var(--dim);
   border-radius:999px; white-space:nowrap; }
@@ -643,7 +668,10 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
         <!-- Filters on their own line, exports on another. They were mixed
              into one bar, so narrowing the list and taking it away looked like
              the same kind of act. -->
-        <div class="bar2">
+        <!-- Filters only when there is enough to filter. With four rows on
+             screen a search box and three filters are four controls to read
+             and nothing to do with them. -->
+        <div class="bar2 hide" id="filterBar">
           <span class="barLabel" data-t="res.filters"></span>
           <input type="search" id="search" data-t-ph="res.search">
           <button id="fUniq" class="chip" role="button" aria-pressed="false"
@@ -653,22 +681,31 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
           <select id="kind"><option value="" data-t="filter.kindAll"></option></select>
         </div>
 
+        <!-- Two acts a person actually came for, and a drawer for the rest.
+             There were six controls in a row here, all the same weight, and
+             four of them answer a question most people never ask. -->
         <div class="bar2 exports">
-          <span class="barLabel" data-t="res.export"></span>
-          <!-- One primary act. The rest are the same size as their labels. -->
-          <button id="zip" class="primary"></button>
-          <button id="copyAll" class="quiet" data-t="act.copyAll"></button>
-          <select id="fmt"><option>csv</option><option>json</option><option>txt</option></select>
-          <button id="save" class="quiet" data-t="act.download"></button>
+          <button id="copyAll" class="primary" data-t="act.copyAll"></button>
+          <button id="zip" class="quiet"></button>
           <span class="grow"></span>
-          <select id="qrFmt">
-            <option value="png">PNG</option>
-            <option value="jpg">JPEG</option>
-            <option value="svg">SVG</option>
-            <option value="pdf">PDF</option>
-          </select>
-          <button id="qrSave" class="quiet"></button>
-          <span id="qrMsg"></span>
+          <details id="moreWrap">
+            <summary data-t="res.more" data-t-title="res.moreHelp"></summary>
+            <div class="drawer">
+              <label class="barLabel" for="fmt" data-t="res.export"></label>
+              <select id="fmt"><option>csv</option><option>json</option><option>txt</option></select>
+              <button id="save" class="quiet" data-t="act.download"></button>
+              <span class="sep"></span>
+              <label class="barLabel" for="qrFmt" data-t="qrgen.label"></label>
+              <select id="qrFmt">
+                <option value="png">PNG</option>
+                <option value="jpg">JPEG</option>
+                <option value="svg">SVG</option>
+                <option value="pdf">PDF</option>
+              </select>
+              <button id="qrSave" class="quiet"></button>
+              <span id="qrMsg"></span>
+            </div>
+          </details>
         </div>
 
         <!-- Renaming is a decision most people never make, and it was three
@@ -1888,6 +1925,8 @@ function applyFilters() {
   // The label lives in the span, not on the button: setting textContent on the
   // button would wipe the icon sitting beside it.
   $("pickFolder").querySelector("span").textContent = t(rows.length ? "drop.folderMore" : "drop.folder");
+  // Eight is where a list stops being something the eye can scan whole.
+  $("filterBar").classList.toggle("hide", rows.length < 8);
   paintQrCount();
   paintKindFilter();
   paintRenameExample();
@@ -2456,7 +2495,7 @@ function renderRow(r) {
     const point = document.createElement("button");
     // On a row holding a code nobody could read, pointing at it is THE action,
     // so it looks like one. Elsewhere it is a quiet offer.
-    point.className = isUnread(r) ? "point lead" : "point";
+    point.className = isUnread(r) ? "point lead" : "point onHover";
     point.type = "button";
     point.textContent = t("insp.open");
     point.onclick = () => openInspector(r);
@@ -2471,7 +2510,7 @@ function renderRow(r) {
     // the scanner's opinion; this is the reader's.
     const flag = document.createElement("button");
     flag.type = "button";
-    flag.className = r.flagged ? "point flagged" : "point";
+    flag.className = r.flagged ? "point flagged" : "point onHover";
     flag.textContent = r.flagged ? "★" : "☆";
     flag.title = t(r.flagged ? "row.unflag" : "row.flag");
     flag.setAttribute("aria-label", flag.title);

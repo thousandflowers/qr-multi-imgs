@@ -20,6 +20,8 @@
   };
 
   S.en = {
+    "res.more": "More",
+    "res.moreHelp": "Other formats, and turning the codes back into images",
     "cam.flip": "Flip",
     "cam.flipHelp": "Some cameras hand the picture over already mirrored. This page never mirrors it; use this if yours does.",
     "cam.auto": "Auto",
@@ -197,6 +199,8 @@
   };
 
   S.it = {
+    "res.more": "Altro",
+    "res.moreHelp": "Altri formati, e ricreare i codici come immagini",
     "cam.flip": "Specchia",
     "cam.flipHelp": "Alcune fotocamere consegnano l'immagine già specchiata. Questa pagina non la specchia mai: usa questo se la tua lo fa.",
     "cam.auto": "Auto",
@@ -374,6 +378,8 @@
   };
 
   S.es = {
+    "res.more": "Más",
+    "res.moreHelp": "Otros formatos, y recrear los códigos como imágenes",
     "cam.flip": "Voltear",
     "cam.flipHelp": "Algunas cámaras entregan la imagen ya invertida. Esta página nunca la invierte; usa esto si la tuya lo hace.",
     "cam.auto": "Auto",
@@ -551,6 +557,8 @@
   };
 
   S.fr = {
+    "res.more": "Plus",
+    "res.moreHelp": "Autres formats, et recréer les codes en images",
     "cam.flip": "Miroir",
     "cam.flipHelp": "Certaines caméras livrent l'image déjà en miroir. Cette page ne la reflète jamais ; utilisez ceci si la vôtre le fait.",
     "cam.auto": "Auto",
@@ -728,6 +736,8 @@
   };
 
   S.de = {
+    "res.more": "Mehr",
+    "res.moreHelp": "Andere Formate, und die Codes wieder als Bilder",
     "cam.flip": "Spiegeln",
     "cam.flipHelp": "Manche Kameras liefern das Bild bereits gespiegelt. Diese Seite spiegelt nie; nutze das, falls deine es tut.",
     "cam.auto": "Auto",
@@ -905,6 +915,8 @@
   };
 
   S.pt = {
+    "res.more": "Mais",
+    "res.moreHelp": "Outros formatos, e recriar os códigos como imagens",
     "cam.flip": "Espelhar",
     "cam.flipHelp": "Algumas câmaras entregam a imagem já espelhada. Esta página nunca a espelha; usa isto se a tua o fizer.",
     "cam.auto": "Auto",
