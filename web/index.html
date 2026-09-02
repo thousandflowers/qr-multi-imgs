@@ -2194,7 +2194,10 @@ async function findLocalApp() {
   try {
     const info = await (await call("/api/health")).json();
     localAppFound = true;
-    $("ver").textContent = "v" + info.version;
+    // A real version or nothing. "vdev" is a build label, and putting it in
+    // the header tells a user something true about the binary and nothing they
+    // can act on - while looking like the product is unfinished.
+    $("ver").textContent = /^\d/.test(String(info.version || "")) ? "v" + info.version : "";
     paintEngineState();
   } catch { /* the normal case, and the page is fully usable without one */ }
 }

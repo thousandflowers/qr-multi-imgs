@@ -43,9 +43,9 @@
     "app.tagline": "QR scanner",
     "nav.source": "Source",
 
-    "hero.title": "Read every QR code in a folder of photos",
+    "hero.title": "Scan every QR code in a whole folder at once",
     "hero.sub": "Other scanners take one picture at a time. Drop a whole folder here, or a single photo, or a zip. You get every code in every image, with the file it came from.",
-    "hero.trust": "Nothing is uploaded. It all runs here, in your computer.",
+    "hero.trust": "Nothing is uploaded. It all runs here, on your computer.",
 
     "tab.images": "Images",
     "tab.camera": "Camera",
@@ -166,7 +166,7 @@
     "app.tagline": "lettore QR",
     "nav.source": "Codice",
 
-    "hero.title": "Leggi tutti i codici QR in una cartella di foto",
+    "hero.title": "Scansiona un'intera cartella di codici QR in una volta",
     "hero.sub": "Gli altri lettori prendono una foto alla volta. Qui trascini una cartella intera, o una sola foto, o uno zip. Ottieni ogni codice di ogni immagine, con il file da cui viene.",
     "hero.trust": "Non viene caricato niente. Funziona tutto qui, nel tuo computer.",
 
@@ -289,7 +289,7 @@
     "app.tagline": "lector QR",
     "nav.source": "Código fuente",
 
-    "hero.title": "Lee todos los códigos QR de una carpeta de fotos",
+    "hero.title": "Escanea una carpeta entera de códigos QR de una vez",
     "hero.sub": "Otros lectores tratan una foto cada vez. Aquí arrastras una carpeta entera, o una sola foto, o un zip. Obtienes todos los códigos de todas las imágenes, con el archivo del que vienen.",
     "hero.trust": "No se sube nada. Funciona todo aquí, en tu ordenador.",
 
@@ -412,7 +412,7 @@
     "app.tagline": "lecteur QR",
     "nav.source": "Code source",
 
-    "hero.title": "Lisez tous les codes QR d'un dossier de photos",
+    "hero.title": "Scannez un dossier entier de codes QR en une fois",
     "hero.sub": "Les autres lecteurs prennent une photo à la fois. Ici vous déposez un dossier entier, ou une seule photo, ou un zip. Vous obtenez chaque code de chaque image, avec le fichier dont il vient.",
     "hero.trust": "Rien n'est envoyé. Tout fonctionne ici, sur votre ordinateur.",
 
@@ -535,7 +535,7 @@
     "app.tagline": "QR-Leser",
     "nav.source": "Quelltext",
 
-    "hero.title": "Alle QR-Codes in einem Fotoordner lesen",
+    "hero.title": "Einen ganzen Ordner QR-Codes auf einmal scannen",
     "hero.sub": "Andere Leser nehmen ein Bild nach dem anderen. Hier ziehen Sie einen ganzen Ordner hinein, oder ein einzelnes Foto, oder ein ZIP. Sie bekommen jeden Code aus jedem Bild, mit der Datei dazu.",
     "hero.trust": "Nichts wird hochgeladen. Alles läuft hier, auf Ihrem Computer.",
 
@@ -658,7 +658,7 @@
     "app.tagline": "leitor QR",
     "nav.source": "Código fonte",
 
-    "hero.title": "Leia todos os códigos QR de uma pasta de fotos",
+    "hero.title": "Digitalize uma pasta inteira de códigos QR de uma vez",
     "hero.sub": "Outros leitores tratam uma foto de cada vez. Aqui arrasta uma pasta inteira, ou uma só foto, ou um zip. Obtém todos os códigos de todas as imagens, com o ficheiro de onde vêm.",
     "hero.trust": "Nada é enviado. Funciona tudo aqui, no seu computador.",
 
