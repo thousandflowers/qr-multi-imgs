@@ -820,10 +820,111 @@ frame.
 
 **What the page now has in hand, per row:** `detections[]` — each a `box` in the
 decoded frame's pixels, a `moduleSize`, and an estimated `version` — plus the
-`frame` those pixels belong to. Nothing renders any of it. The next step is the
-canvas, and it starts with three coordinate spaces to reconcile: the frame the
-decode ran on, the file's own pixels, and whatever size the canvas is displayed
-at. EXIF orientation is a fourth and is not yet accounted for anywhere.
+`frame` those pixels belong to. Nothing renders any of it.
+
+## Step B — settle the coordinate spaces (SHIPPED, still no drawing)
+
+Four spaces, and drawing before they are reconciled ships a box that lies:
+**stored** (the pixels the file encodes), **natural** (what
+`createImageBitmap` hands back), **frame** (what the decoder saw, after the
+1600 cap or the 3000 retry) and **display** (the size it is drawn at).
+
+### EXIF orientation, measured rather than assumed
+
+Measured on **Chrome for Testing 151.0.7922.34, macOS arm64, headless**, using a
+**real orientation-6 photograph** off this machine — an iPhone JPEG stored
+4032×3024 with an EXIF orientation tag of 6, read out of the file bytes by a
+hand-written parser rather than taken on trust. A second real photo with
+orientation 8 and one with EXIF but no orientation tag were run as controls. No
+photograph was copied into the repository.
+
+| mode | result for the orientation-6 photo |
+|---|---|
+| `createImageBitmap(blob)` | 3024×4032 — **swapped, orientation applied** |
+| `createImageBitmap(blob, {imageOrientation:"from-image"})` | 3024×4032 |
+| `createImageBitmap(blob, {imageOrientation:"none"})` | 3024×4032 |
+
+All three returned **byte-identical corner fingerprints**, in the **main thread
+and inside a Worker alike**. The control with no orientation tag came back at
+its stored size in every mode.
+
+Two things follow, and the second matters more than the first.
+
+**On this engine `imageOrientation: "none"` does nothing.** It does not hand
+back the unrotated image. Anyone reading the spec and reaching for that option
+to get stored-space pixels would get display-space pixels and no error. This is
+exactly why the option was measured instead of trusted.
+
+**The decoder therefore never sees an unrotated image**, the boxes come back
+already display-oriented, and there is no rotation term to apply anywhere in
+the mapping. The fourth space collapses into the second.
+
+### The rule that does not depend on the engine
+
+Only Chromium was measured. **WebKit/Safari and Firefox are unmeasured**, and
+Safari matters here because it is the browser where HEIC decodes at all. Rather
+than assume, the invariant is:
+
+> **Derive the canvas from the same `ImageBitmap` the decode used.**
+
+Then orientation cancels whatever the browser decides, because both sides of
+the mapping inherit the same decision. The bug this forecloses is mixing
+sources — decoding from an `ImageBitmap` while drawing from an `<img>`, which
+always applies orientation — and that bug is invisible on a desktop screenshot
+and wrong on every phone photo, which is the entire target population.
+
+`coords.js` has no rotation parameter, deliberately. Adding one would invite a
+caller to correct for an orientation that has already been applied.
+
+**If the invariant ever cannot hold**, the page can settle the question at
+runtime instead of assuming, without a network request and without touching the
+CSP: build a ~200-byte JPEG carrying an orientation-6 tag from a byte array in
+JS, wrap it with `new Blob([bytes], {type:"image/jpeg"})`, and call
+`createImageBitmap` on it. If the result comes back with its axes swapped, the
+engine applies orientation. No `fetch`, no `data:` URL, so neither `connect-src`
+nor `img-src` is involved. This is written down rather than shipped: it needs
+`createImageBitmap`, which node does not have, so it could not carry a test, and
+untested code in this path is how the last bug got in.
+
+### The mapping
+
+One named function, `Coords.detectionToDisplay(detection, frame, display)`
+(`web/coords.js`). Every space it crosses is an argument — none is implicit,
+global, or read off the DOM. Both scale steps live in it: the 1600 cap, the
+3000 retry, and the display size. `Coords.displayToNatural` is the inverse, and
+it is the one that matters most: **the user's crop travels the same mapping
+backwards, and an error there silently re-scans the wrong region** and reports
+that nothing was found.
+
+Scaling is **per axis**, not by one shared factor. The worker's resize rounds
+each side independently, so a 4032×3024 photo capped at 1600 lands at 1600×1200
+and the two factors differ in the last decimal — invisible with square test
+inputs and visible on a phone. Boxes are returned as floats: rounding is a
+rendering decision, and rounding here would make the crop's return trip lossy.
+
+The tests cover what the previous verification could not. The 256×256 corpus
+image had a scale factor of exactly 1 on every axis and would have passed with
+the scaling code deleted. Added: a 12-megapixel source decoded under the 1600
+cap and shown at 800 px, the same source under the 3000 retry, a 4000×1000
+non-square case where a single shared factor would be right on one axis and
+wrong on the other, an unshrunk frame shown smaller, and a letterboxed canvas
+with a drawn origin. Each asserts a **round trip** — frame → natural → display →
+natural returns to where it started, exactly in floats and within one display
+pixel after rounding.
+
+### Coverage gap, stated plainly
+
+**`worker.postMessage` is not exercised under node.** The self-tests call
+`Result.carry` and `Result.adopt` directly, and the engine-level check drives
+`qr.wasm` in-process. The one boundary still untested is the one the original
+`detections` drop slipped through: the structured clone between worker and page.
+A field that survives `carry` and `adopt` could still be lost by a message
+handler that does not forward it. Closing that needs a browser harness driving
+the real page, which is a bigger piece of work than this step, and it should not
+be mistaken for done.
+
+The EXIF measurement above did run inside a real Worker, so the *decode* side of
+that boundary is exercised on Chromium. The *result* side is not.
 
 ## Cheap vs. project
 
