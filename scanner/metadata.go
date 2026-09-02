@@ -87,13 +87,23 @@ const (
 	strategyZbarimg = "zbarimg"
 )
 
-// name identifies a raster strategy in the annotation, as channel/binarizer/scale.
+// name identifies a raster strategy in the annotation, as
+// channel[+prep]/binarizer/scale.
+//
+// A strategy with no preprocessing keeps exactly the name it had before
+// transforms existed, so a measurement taken against an older build still
+// lines up row for row. That is the point of appending the prep rather than
+// slotting it into a fourth field of the name.
 func (s decodeStrategy) name() string {
 	bin := "hybrid"
 	if s.global {
 		bin = "global"
 	}
-	return s.channel + "/" + bin + "/" + strconv.Itoa(s.scale) + "x"
+	channel := s.channel
+	if s.prep != "" {
+		channel += "+" + s.prep
+	}
+	return channel + "/" + bin + "/" + strconv.Itoa(s.scale) + "x"
 }
 
 // edgeWindow is the block size, in pixels, over which edge density is measured.

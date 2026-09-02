@@ -63,9 +63,9 @@ describes decoding:
 
 | | |
 |---|---|
-| **Recall, image pixels only** | **58.4%** (1947 / 3332) |
-| **Time** | 97 s |
-| **Throughput** | 34 img/s |
+| **Recall, image pixels only** | **59.2%** (1972 / 3332) |
+| **Time** | 137 s |
+| **Throughput** | 24 img/s |
 
 Pure Go, no Apple Vision, no `zbarimg`, companion masks ignored. Reproduce with
 `go test -tags corpus ./scanner -run TestCorpus` after building the manifest

@@ -174,11 +174,31 @@ func TestStrategyNamesAreDistinct(t *testing.T) {
 			t.Errorf("strategy name %q is not channel/binarizer/scale", n)
 		}
 	}
-	if got := (decodeStrategy{"lum", true, 2}).name(); got != "lum/global/2x" {
+	if got := (decodeStrategy{channel: "lum", global: true, scale: 2}).name(); got != "lum/global/2x" {
 		t.Errorf("name() = %q, want lum/global/2x", got)
 	}
-	if got := (decodeStrategy{"r", false, 1}).name(); got != "r/hybrid/1x" {
+	if got := (decodeStrategy{channel: "r", scale: 1}).name(); got != "r/hybrid/1x" {
 		t.Errorf("name() = %q, want r/hybrid/1x", got)
+	}
+	// A preprocessing rung is named for its transform, and a rung without one
+	// keeps the name it had before transforms existed so old measurements still
+	// line up.
+	if got := (decodeStrategy{channel: "lum", global: true, scale: 1, prep: "sauvola"}).name(); got != "lum+sauvola/global/1x" {
+		t.Errorf("name() = %q, want lum+sauvola/global/1x", got)
+	}
+}
+
+// TestStrategyPrepsExist stops a table row naming a transform that is not
+// registered. decodeAttempt skips such a strategy rather than panicking, which
+// means the failure would otherwise show up as a quiet loss of recall.
+func TestStrategyPrepsExist(t *testing.T) {
+	for _, s := range strategies {
+		if s.prep == "" {
+			continue
+		}
+		if _, ok := transforms[s.prep]; !ok {
+			t.Errorf("strategy %q names transform %q, which is not in the registry", s.name(), s.prep)
+		}
 	}
 }
 

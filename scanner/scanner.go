@@ -226,6 +226,15 @@ type decodeStrategy struct {
 	channel string // lum, r, g, b, min, max
 	global  bool   // global-histogram binarizer vs hybrid (local) default
 	scale   int    // integer nearest-neighbor upscale
+	// prep names a pixel transform from the transforms registry in
+	// binarize.go, applied after the channel projection and before any
+	// upscale. Empty means the pixels go to gozxing as they are.
+	//
+	// Before the upscale rather than after, for two reasons: a local threshold
+	// wants its window measured in source modules, not in interpolated copies
+	// of them, and running the transform on a quarter of the pixels is a
+	// quarter of the work.
+	prep string
 }
 
 // decodeAttempt runs one strategy and returns every code it found.
@@ -235,6 +244,17 @@ type decodeStrategy struct {
 // divided back here, at capture time, to honour hit's coordinate contract.
 func decodeAttempt(img image.Image, s decodeStrategy) []hit {
 	src := projectChannel(img, s.channel)
+	if s.prep != "" {
+		t, ok := transforms[s.prep]
+		if !ok {
+			// A strategy naming a transform that does not exist is a
+			// programming error, and skipping the attempt is how it costs
+			// recall instead of the scan. TestStrategyPrepsExist catches it
+			// before it can get here.
+			return nil
+		}
+		src = t(src)
+	}
 	if s.scale > 1 {
 		src = nearestNeighborScale(src, s.scale)
 	}
@@ -350,16 +370,28 @@ func nearestNeighborScale(src image.Image, factor int) *image.RGBA {
 // (useless on noisy renders) and no upscale past 2x (no marginal recall, ~3x
 // slower). Measured: 25.7% -> 27.3% on the hard set, easy set stays ~100%.
 var strategies = []decodeStrategy{
-	{"lum", false, 1}, // hybrid, native — clean QRs
-	{"lum", true, 1},  // global, native — biggest colored-set winner
-	{"lum", false, 2}, // hybrid, 2x
-	{"lum", true, 2},  // global, 2x
-	{"r", true, 1},    // red channel
-	{"g", true, 1},    // green channel
-	{"b", true, 1},    // blue channel
-	{"min", true, 1},  // darkest channel
-	{"max", true, 1},  // brightest channel
-	{"r", false, 2},   // red channel, hybrid 2x
+	{channel: "lum", scale: 1},               // hybrid, native — clean QRs
+	{channel: "lum", scale: 1, global: true}, // global, native — biggest colored-set winner
+	{channel: "lum", scale: 2},               // hybrid, 2x
+	{channel: "lum", scale: 2, global: true}, // global, 2x
+	{channel: "r", scale: 1, global: true},   // red channel
+	{channel: "g", scale: 1, global: true},   // green channel
+	{channel: "b", scale: 1, global: true},   // blue channel
+	{channel: "min", scale: 1, global: true}, // darkest channel
+	{channel: "max", scale: 1, global: true}, // brightest channel
+	{channel: "r", scale: 2},                 // red channel, hybrid 2x
+
+	// The rungs below were added after the ten above, and they run last on
+	// purpose. The ten are a measured greedy cover; appending means an image
+	// that already decoded takes exactly the path it took before, so a recall
+	// delta is attributable to the new rungs and nothing else. Their own order
+	// among themselves is not measured and is not a ranking.
+	//
+	// A transform outputs a two-valued image, so the binarizer after it has
+	// nothing left to decide and the cheapest one is the right one.
+	{channel: "lum", scale: 1, global: true, prep: "sauvola"}, // local threshold — glare, gradients, shadow
+	{channel: "lum", scale: 1, global: true, prep: "otsu"},    // variance-optimal global threshold
+	{channel: "lum", scale: 1, prep: "invert"},                // light-on-dark codes the detector cannot see
 }
 
 // projectionChannels are the distinct colour projections the strategies use,

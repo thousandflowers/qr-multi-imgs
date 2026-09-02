@@ -285,7 +285,8 @@ it was.
 
 | build | recall | wall clock | throughput |
 |---|---|---|---|
-| pure Go, no Vision, no `zbarimg` | **58.43%** (1947/3332) | 97.4 s | 34.2 img/s |
+| pure Go, no Vision, no `zbarimg` (Step A) | **58.43%** (1947/3332) | 97.4 s | 34.2 img/s |
+| the same, plus Step C's three rungs | 59.18% (1972/3332) | 136.6 s | 24.4 img/s |
 | macOS CLI as shipped, + Vision + `zbarimg` | 75.36% (2511/3332) | 57m27s | 1.0 img/s |
 
 The second row is the same corpus through the whole cascade. Apple Vision was
@@ -420,6 +421,178 @@ would produce a number that means nothing. Same for perspective correction: the
 generator's `ShiftScaleRotate` is limited to ±8°, which is not the warp a
 photograph of a receipt on a table has.
 
+## Step C — three rungs, and the ones deliberately not written
+
+Three rungs, chosen from Step B's evidence and capped at three. The rest of the
+ladder waits for a corpus of photographs, because this one cannot judge it.
+
+### Written
+
+| rung | name in the table | target | how it was judged |
+|---|---|---|---|
+| Sauvola adaptive threshold | `lum+sauvola/global/1x` | the 850 detected-but-unread | recall delta on lovasoa, per version |
+| Otsu global threshold | `lum+otsu/global/1x` | same | recall delta on lovasoa |
+| Inversion | `lum+invert/hybrid/1x` | light-on-dark codes | **synthetic fixtures, not a corpus number** |
+
+All three are pixel transforms rather than gozxing `Binarizer` implementations
+(`scanner/binarize.go`). A transform that outputs a two-valued image has
+already made the decision a binarizer would make, so it can be handed to the
+cheapest one and pass through — which keeps each rung a pure function over
+pixels, testable on its own.
+
+They are **appended** to the strategy table, after the measured ten. An image
+that already decoded therefore takes exactly the path it took before, and the
+recall delta is attributable to the new rungs and to nothing else.
+
+**Inversion ships on correctness, not on measured recall, and that is stated
+rather than glossed.** lovasoa contains no light-on-dark codes, so its recall
+delta on this corpus is exactly zero and would say nothing about whether the
+rung works. What the fixtures establish is stronger than a delta anyway: an
+inverted code produces **zero finder-pattern triples**
+(`TestInvertedQRIsUndecodableUntilInverted`), so it is invisible to the
+detector rather than merely unreadable, and no binarizer choice recovers it.
+One subtraction per pixel does.
+
+### Otsu was checked for redundancy before being written
+
+`GlobalHistogramBinarizer` is already a global threshold, so the question was
+whether Otsu duplicates it. Reading the source
+(`gozxing/global_histogram_binarizer.go`): it builds a **32-bucket** histogram
+from **four sampled rows** — `height*y/5` for y in 1..4 — across the middle 60%
+of each, takes the tallest peak, takes a second peak weighted by squared
+distance, and picks a valley between them by a heuristic score.
+
+That is a peak-valley heuristic, not Otsu's criterion, and the two disagree in
+four specific places:
+
+1. **Four rows versus every pixel.** A code that does not lie across those rows
+   is thresholded from a histogram it barely appears in.
+2. **Five-bit versus eight-bit search.** 32 candidate thresholds versus 256.
+3. **A valley heuristic assumes bimodality.** This dataset renders codes under
+   vertical, radial and horizontal colour gradients, which smear it; between-class
+   variance still has a maximum where no valley is visible.
+4. **It gives up.** When the two peaks land within two buckets it returns
+   `NotFound` and nothing is thresholded at all. Otsu always returns a
+   threshold — on a low-contrast image, the difference between a bad attempt
+   and no attempt.
+
+So: not redundant, and written. Whether it earns its place is the measurement,
+not the argument.
+
+### What the three rungs actually bought
+
+Same corpus, same build, masks ignored, pure Go, nothing else changed:
+
+| | before Step C | after Step C |
+|---|---|---|
+| per-code recall | 58.43% (1947/3332) | **59.18%** (1972/3332) |
+| wall clock | 97.4 s | 136.6 s |
+| throughput | 34.2 img/s | 24.4 img/s |
+| regressions | — | **0 images lost** |
+
+**+0.75 points for 1.40× the time.** Against the standing rule — *a strategy
+buying under 1 point while costing more than 2× is reported and left out* — the
+three together clear the cost half of the bar and fail the recall half, so they
+stay. That is the rule applied, not the rule dodged: it takes both.
+
+Of the 25 images gained, **Otsu found 13 and Sauvola 12**. Inversion found
+**zero**, exactly as predicted, on a corpus with no light-on-dark codes; it
+costs roughly a third of the added 39 seconds and buys nothing measurable here.
+It ships anyway, because the fixtures show it recovers a case this corpus does
+not contain.
+
+**The predicted shape did not appear.** The expectation was that a local
+threshold would win at low version and vanish at high, since a dense code fails
+for want of pixels rather than for want of contrast. The measurement says
+otherwise:
+
+| | n | before | after | delta | images |
+|---|---|---|---|---|---|
+| version 1–4 | 1939 | 72.3% | 72.9% | +0.62 pts | 12 |
+| version 5–9 | 512 | 54.9% | 55.7% | +0.78 pts | 4 |
+| version 10–14 | 309 | 45.0% | 45.0% | **+0.00 pts** | 0 |
+| version 15+ | 572 | 22.0% | 23.6% | **+1.57 pts** | 9 |
+
+The largest proportional gain is at version 15 and above — the densest codes,
+2.7 px per module and below — and the band that gains nothing at all is the
+middle. Nine images is a small number and the per-version rows are noisy at
+that scale, so this is not a law. It is enough to say the "wins at low version,
+vanishes at high" story is not what happened, and nobody should plan the next
+rung on it.
+
+**The more useful surprise: 14 of the 25 gained images were `NO_QR_FOUND`
+before, and 11 were `QR_DETECTED_DECODE_FAILED`.** A better threshold did not
+merely make readable codes readable — on the majority of its wins it made
+codes *detectable*, by giving the finder-pattern scan a cleaner image to work
+on. That blurs the tidy split Step B drew between "detected-but-unread wants
+binarization" and "not-found wants detection": preprocessing feeds the
+detector too. It is also a warning about ordering the ladder by bucket, which
+Step B's split invited.
+
+**Reading the per-stage `found` column correctly.** It counts attempts that
+found *something*, not marginal recall. Sauvola's 78 and Otsu's 59 are mostly
+codes earlier stages had already read: when `detectFinders` locates nothing the
+early exit is disabled entirely, so every stage runs even on an image that has
+already decoded, and every stage that also reads it is counted. The marginal
+number is the images-gained column above — 12 and 13 — and it is an order of
+magnitude smaller. This applies to the whole per-stage table, including the
+original ten.
+
+### Not written, and why
+
+- **4× upscale.** Nearest-neighbour cannot add detail a 256×256 render never
+  had, and the existing 2× rungs are already the first stage to find anything on
+  only 2.6% and 0.2% of hits. There is no mechanism by which more of the same
+  helps.
+- **Sharpening.** No measurable target on this corpus. It would be added on
+  intuition and measured against a distribution that cannot test it.
+- **`HIGH_EDGE_DENSITY_REGION` — dropped permanently, as a negative result.**
+  Local edge density on 3332 images: hits median **0.1310**, misses median
+  **0.1279**; means 0.133 and 0.143; the whole interquartile range overlaps.
+  The bucket was always conditional on evidence that images landing in it are
+  likelier to hold a code, and the evidence is against. The **metric stays** as
+  annotation on every image — it costs one shared pass and it may behave
+  differently on photographs — but the proposed bucket is closed, not deferred.
+  Re-proposing it needs new evidence from a different corpus, not a new sprint.
+- **Tiling, sliding window, downscale, perspective correction.** Unmeasurable
+  here, **not disproved**. Every lovasoa image is one code filling a 256×256
+  frame, so there is no small-code-in-a-big-photo case to measure a tiling
+  strategy against, and `ShiftScaleRotate` is capped at ±8°, which is not the
+  warp a photographed receipt has. These are the rungs that matter for
+  photographs and they wait for the real set.
+
+### Nothing was removed
+
+The sub-1% stages — `lum/global/2x`, `min/global/1x`, `max/global/1x` — stay.
+Throughput is 34 img/s and nobody is waiting on it; recall is the constraint.
+A stage earning 0.5% on synthetic renders is not evidence about what it earns
+on a photograph of a coloured code on a coloured background, which is the case
+it was added for.
+
+## Findings that outlive this corpus
+
+**Laplacian variance is a density proxy here, and its sign is inverted against
+the intuitive reading.** Misses score *higher* than hits — median 1806 against
+1340, mean 5857 against 3118, p90 19064 against 8351. A dense code has more
+edges than a sparse one and that swamps whatever the blur removed. The metric
+is not wrong; it measures what it says it measures. But anyone reaching for it
+as "how blurred is this image" on this corpus gets the sign backwards. On
+photographs, where code density and image sharpness are independent, it may
+behave as intended. **Unverified until the photo set exists**, and it should not
+be used for anything before then.
+
+**The remaining recall lives in detection, not in preprocessing, and that is
+the ceiling of the zero-cgo path.** Apple Vision was offered the 1385 images
+that ten pure-Go channel and binarizer combinations could not read, and it read
+**564 of them — 40.7%**. `zbarimg` was then offered the remaining 821 and read
+**none**. A detector recovering two fifths of what every binarizer in the
+cascade cannot is the plainest statement available of where the ceiling is: it
+is not a thresholding problem. Sauvola and Otsu are worth adding because they
+are cheap and because some of the 850 detected-but-unread are genuinely
+threshold failures, but no stack of preprocessing rungs reaches what a learned
+detector reaches. The zero-cgo path tops out below Vision, deliberately, and
+the roadmap should stop implying otherwise.
+
 **A second corpus, for real photographs.** `QR_CORPUS_DIR` takes any directory
 with a manifest, HEIC included: paths are opened by name and nothing filters by
 extension. What Step A added is a guard — a build that cannot read HEIC (no
@@ -434,14 +607,14 @@ Extend the strategy set with, roughly in the order they are worth trying:
 
 | Rung | Note |
 |---|---|
-| Otsu binarization | Global, one pass. The existing global-histogram binarizer is close but not the same. |
-| Adaptive (Sauvola) | Local threshold. The real win on uneven lighting and glare. |
-| Inversion | Light-on-dark codes. Nearly free. |
-| 2× / 4× upscale | 2× is already in the list; 4× was measured as not paying (see the note above `strategies`, `scanner/scanner.go:346-351`) — it returns here only *after* a first-pass failure, which is a different trade than in the main list. |
-| Downscale | For large noisy photos, where sensor noise is the thing destroying module edges. |
-| Sharpening | Unsharp mask. |
-| Perspective correction | Needs 3 finder patterns → a homography. Phase 1's bounding box is its input. |
-| Sliding-window grid scan, with overlap | The "tiling cascade" `hits.go:28` already warns about. |
+| Otsu binarization | **Written in Step C.** Global, one pass. The existing global-histogram binarizer turned out to be a peak-valley heuristic on a four-row sample, not Otsu — the difference is spelled out in Step C. |
+| Adaptive (Sauvola) | **Written in Step C.** Local threshold. The real win on uneven lighting and glare. |
+| Inversion | **Written in Step C**, on synthetic fixtures rather than a corpus number: the benchmark set holds no light-on-dark codes. |
+| 2× / 4× upscale | **4× dropped in Step C.** Nearest-neighbour cannot add detail a 256×256 render never had, and the 2× rungs already first-find only 2.6% and 0.2%. |
+| Downscale | **Waiting for the photo set.** Unmeasurable on a corpus of 256×256 renders. |
+| Sharpening | **Dropped in Step C**: no measurable target on this corpus. |
+| Perspective correction | **Waiting for the photo set.** The generator's warp is capped at ±8°, which is not a photographed receipt. |
+| Sliding-window grid scan, with overlap | **Waiting for the photo set.** Every image here is one code filling the frame, so there is nothing for a tiling strategy to find. |
 
 - The ladder runs after `decodeRaster`'s union has failed, before the user is
   ever told anything. It is not a user-visible feature; the user sees a higher
@@ -518,7 +691,13 @@ weeks for perspective correction and tiling.
    that triples the time on every code-less image is a regression the user
    feels on a folder of holiday photos.
 2. **Does the ladder run automatically, or only on the images Phase 1 flagged
-   as `QR_DETECTED_DECODE_FAILED`?** Gating on
+   as `QR_DETECTED_DECODE_FAILED`?** *Step C's answer is: automatically, for
+   everything.* The three rungs are appended to the one table and run on any
+   image the earlier stages did not finish, with no consultation of the
+   classification. That keeps the "metadata never filters" rule intact and
+   keeps the recall delta attributable. It also means a code-less photo pays
+   for three more attempts, which is the cost this question named and which the
+   measurement below prices. Gating on
    classification is exactly the "metadata as filter" that Phase 1 forbids —
    but running an expensive ladder on every landscape photo is the cost that
    made the caps necessary. This tension is real and unresolved. One defensible
