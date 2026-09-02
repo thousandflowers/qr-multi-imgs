@@ -387,7 +387,7 @@ li canvas.thumb { width:72px; height:72px; border-radius:9px; display:block;
 /* Clear air before the smaller ways in, so the two targets above read as the
    offer and these as the fallback. */
 .sourcesLabel { margin-top:24px; font-size:var(--fs-2); color:var(--dim); }
-.trustBadge { margin-top:8px; display:flex; align-items:center; justify-content:center;
+.trustBadge { margin-bottom:12px; display:flex; align-items:center; justify-content:center;
   gap:8px; font-size:var(--fs-2); font-weight:600; color:var(--ok);
   background:var(--ok-soft); border:1px solid var(--ok); border-radius:999px; padding:6px 12px; }
 .trustBadge svg { width:16px; height:16px; flex:none; }
@@ -476,6 +476,16 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
            one more way to hand over an image. It is a button beside the others
            now, and it opens the viewfinder in place. -->
       <div class="pbody" id="paneFiles">
+        <!-- Above everything, because it is a different kind of thing from the
+             ways in below it: not an option to pick, a condition that holds for
+             all of them. And it is read before the first file is dropped, not
+             after. -->
+        <div class="trustBadge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M12 3l7 3v6c0 4.2-2.9 7.6-7 9-4.1-1.4-7-4.8-7-9V6z"/><path d="M9 12l2 2 4-4"/>
+          </svg>
+          <span data-t="trust.badge"></span>
+        </div>
         <div id="drop" class="roomy">
           <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
             <path d="M12 16V4"/><path d="M7.5 8.5L12 4l4.5 4.5"/>
@@ -484,15 +494,6 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
           <strong data-t="drop.title"></strong>
           <small data-t="drop.sub"></small>
           <div class="formats">PNG JPG WEBP GIF BMP AVIF HEIC ZIP</div>
-        </div>
-        <!-- Where the decision to trust actually gets made: next to the thing
-             the user is about to drop their photographs onto, not in a hero
-             line they scrolled past. -->
-        <div class="trustBadge">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path d="M12 3l7 3v6c0 4.2-2.9 7.6-7 9-4.1-1.4-7-4.8-7-9V6z"/><path d="M9 12l2 2 4-4"/>
-          </svg>
-          <span data-t="trust.badge"></span>
         </div>
         <!-- The camera is a target, like the drop zone above it, not a button
              in a list. It is one of the two ways in that a person arrives
