@@ -286,6 +286,17 @@ it was.
 | build | recall | wall clock | throughput |
 |---|---|---|---|
 | pure Go, no Vision, no `zbarimg` | **58.43%** (1947/3332) | 97.4 s | 34.2 img/s |
+| macOS CLI as shipped, + Vision + `zbarimg` | 75.36% (2511/3332) | 57m27s | 1.0 img/s |
+
+The second row is the same corpus through the whole cascade. Apple Vision was
+offered the 1385 images the raster path missed and read **564 of them (40.7%)**.
+`zbarimg` was then offered the remaining 821 and read **none** — zero, on this
+corpus — while costing a process spawn per image. That is not an argument to
+remove it (it exists for photographs, and this corpus has none), but it is the
+reason the 57-minute wall clock buys 17 points of recall: the time is Vision's.
+
+That Vision, a detector rather than a binarizer, recovers 40% of what the raster
+path cannot is the single most useful signal in this table for choosing rungs.
 
 0 partial, 0 false positives, 1385 missed. This is the regression baseline: a
 ladder rung is worth having when it moves 58.43% and does not move 97 s more
@@ -293,8 +304,21 @@ than it is worth. The figure is consistent with the README's independently
 measured "~57% on pixels alone", which is the cross-check that the harness is
 measuring what it claims to.
 
-Per-stage hit rates from the same run, in cascade order — the table the ladder
-will be reordered from, and the reason `StrategyAttempt` exists:
+Per-stage hit rates from the same run, in cascade order.
+
+> **This is a regression baseline on synthetic data. It is NOT the ladder
+> ordering, and it must not be used as one.**
+>
+> Every image in it is a generated render — a `qrcode` library QR put through a
+> random albumentations pipeline and resized to 256×256. Nothing here was
+> photographed. A stage's hit rate on that distribution says what happens to
+> *these renders*, and the failure mode this tool actually exists for is a
+> small code in a large photograph, which the corpus contains none of.
+>
+> Its use is to catch a regression: if `lum/hybrid/1x` stops finding 1414 of
+> 3332, something broke. Reordering the cascade from these numbers would be
+> tuning against the wrong distribution, and the ordering data does not exist
+> yet — it arrives with the HEIC photo set.
 
 | stage | ran | found | hit rate |
 |---|---|---|---|
@@ -310,9 +334,91 @@ will be reordered from, and the reason `StrategyAttempt` exists:
 | `r/hybrid/2x` | 1512 | 105 | 6.9% |
 
 Read "ran" as the early exit working: only the images the previous stages could
-not finish reach the next one. Read the two 0.5% rows as the first candidates
-for removal — but not in Step A, because removing them and adding rungs in the
-same change makes both unattributable.
+not finish reach the next one. The two 0.5% rows are the obvious thing to point
+at, and pointing at them is exactly the mistake the box above warns against:
+a colour-channel strategy earning nothing on synthetic renders says nothing
+about what it earns on a photograph of a coloured code on a coloured background,
+which is the case it was added for.
+
+## Step B — what the misses are (SHIPPED, characterisation only)
+
+Still no strategy code. `-corpus.dump` writes one row per image — outcome,
+classification, the metadata, and the *true* QR version read out of the
+dataset's own `.npy` — and this is what those rows say about the 1385 misses.
+
+**The generator records no degradation type.** `write_sample` writes three
+files: the PNG, the payload as `.txt`, and the matrix as `.npy`. The
+augmentation is `Compose(p=0.9)` of blur, noise, dropout, distortion, contrast
+and JPEG damage with per-transform probabilities, and the realised parameters
+are discarded. Filenames are a zero-padded index. So a cross-tab of misses by
+blur-versus-occlusion **cannot be produced from this dataset**, and guessing the
+degradation from the pixels would be inventing the labels the experiment needs.
+What *is* exact and recoverable is the QR version, from the matrix shape.
+
+**The split, and it is not lopsided:**
+
+| bucket | count | share of misses |
+|---|---|---|
+| `QR_DETECTED_DECODE_FAILED` | 850 | 61.4% |
+| `NO_QR_FOUND` | 535 | 38.6% |
+
+Both halves of the planned ladder have a real target. Neither is dead weight on
+the evidence of the split alone.
+
+**But the split moves with density, which is the finding that matters:**
+
+| | n | recall | detected-but-unread | nothing found |
+|---|---|---|---|---|
+| version 1–4 | 1939 | 72.3% | 72% of its misses | 28% |
+| version 15+ | 572 | 22.0% | 43% of its misses | 57% |
+
+Recall falls monotonically with version — 77% at v1, 54% at v5, 34.6% at v16,
+7% at v20, 3.4% at v21 — and the failure mode changes on the way down. A sparse
+code that fails, fails at *reading*; a dense one fails at *finding*.
+
+**Why: every image is 256×256, and the generator resizes after rendering.** The
+quiet zone is 9 modules a side, so the pixels available per module are fixed by
+version alone — 6.6 px at v1, 3.4 px at v10, 2.2 px at v20, 1.4 px at v36.
+Measured on the detected-but-unread misses, the estimated module size has median
+4.6 px and a p10 of 2.1 px, with 25% under 3 px.
+
+**Distributions across hits and misses** (no threshold, no classifier — the
+question was what the misses look like):
+
+| measure | hits | misses | reads as |
+|---|---|---|---|
+| true version | med 2, p90 12 | med 8, p90 24 | the only clean separation |
+| payload length | med 13, p90 224 | med 109, p90 731 | the same fact, upstream |
+| Laplacian variance | med 1340, mean 3118 | med 1806, mean 5857 | **inverted, and a trap** |
+| local edge density | med 0.1310, mean 0.133 | med 0.1279, mean 0.143 | no signal at all |
+| source dimensions | 256×256 | 256×256 | dead axis on this corpus |
+
+Two negative results worth keeping:
+
+- **Laplacian variance is behaving as a density proxy here, not a blur proxy.**
+  The misses score *higher*, because a dense code has more edges than a sparse
+  one and that swamps whatever the blur took away. It is not wrong — it is
+  measuring what it says it measures — but anyone reaching for it as "how
+  blurred is this image" on this corpus will get the sign backwards. On a
+  photograph, where code density and image sharpness are independent, it may
+  yet behave as intended. Unverified until the photo set exists.
+- **Local edge density separates nothing.** Hits and misses overlap almost
+  exactly. It was added to gather evidence for or against a
+  `HIGH_EDGE_DENSITY_REGION` bucket; on this corpus the evidence is against.
+
+**One positive result:** on the 850 detected-but-unread misses the estimated
+version matches the true version exactly 572 times and within ±1 774 times, and
+exactly one image produced no plausible geometry. The box Phase 3 wants to
+pre-draw is derived from the same triple, so its geometry is trustworthy enough
+to hand to a user.
+
+**What this corpus cannot decide.** Every image is one code, filling a 256×256
+frame. There is no small-code-in-a-big-photo case anywhere in it, so tiling,
+downscale and the sliding window have *nothing to be measured against here* —
+they are not disproved, they are unmeasurable, and running them against this set
+would produce a number that means nothing. Same for perspective correction: the
+generator's `ShiftScaleRotate` is limited to ±8°, which is not the warp a
+photograph of a receipt on a table has.
 
 **A second corpus, for real photographs.** `QR_CORPUS_DIR` takes any directory
 with a manifest, HEIC included: paths are opened by name and nothing filters by

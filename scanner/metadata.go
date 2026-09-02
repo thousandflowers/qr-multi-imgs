@@ -17,6 +17,7 @@ package scanner
 import (
 	"image"
 	"math"
+	"strconv"
 )
 
 // StrategyAttempt is one decode stage that ran, and how many codes came out of
@@ -92,17 +93,7 @@ func (s decodeStrategy) name() string {
 	if s.global {
 		bin = "global"
 	}
-	return s.channel + "/" + bin + "/" + itoa(s.scale) + "x"
-}
-
-// itoa avoids pulling strconv in for one digit. Scales are 1 and 2 today and a
-// ladder rung will not plausibly exceed 9; anything larger falls back to a
-// marker rather than lying about the number.
-func itoa(n int) string {
-	if n < 0 || n > 9 {
-		return "?"
-	}
-	return string(rune('0' + n))
+	return s.channel + "/" + bin + "/" + strconv.Itoa(s.scale) + "x"
 }
 
 // edgeWindow is the block size, in pixels, over which edge density is measured.

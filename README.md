@@ -58,18 +58,29 @@ Plenty of CLI QR scanners exist. None ship a TUI built for batch work.
 
 Dataset: [lovasoa/qrcode-dataset](https://github.com/lovasoa/qrcode-dataset) - **3332 damaged & distorted QR images** built to stress-test scanners. Each sample ships three files: the distorted `NNN.png`, the decoded `NNN.txt`, and `NNN.npy` - the generator's **source bit-matrix**.
 
-| | image pixels only | with the companion `.npy` |
-|---|---|---|
-| **Detection** | ~57% | **3332/3332 (100%)** |
-| **Time** | ~7m30s (v1.0, serial) | **~7s** |
-| **Throughput** | ~7 img/s | **~475 img/s** |
+**The headline is the image-only number**, because it is the only one that
+describes decoding:
 
-**Read that 100% honestly.** It is not image decoding. It is decoding the answer
-key this dataset happens to ship beside every image: when a `.npy` sits next to
-the file, qr-multi-imgs decodes that bit-matrix first, in pure Go. That is
-exactly what you want on this dataset and it never happens on your own photos.
+| | |
+|---|---|
+| **Recall, image pixels only** | **58.4%** (1947 / 3332) |
+| **Time** | 97 s |
+| **Throughput** | 34 img/s |
 
-**On pixels alone the same dataset scores ~57%**, and that number splits hard:
+Pure Go, no Apple Vision, no `zbarimg`, companion masks ignored. Reproduce with
+`go test -tags corpus ./scanner -run TestCorpus` after building the manifest
+with `corpusgen -truth .txt`; the harness ignores the masks by default and says
+so in its output.
+
+The other number this dataset can produce is **3332/3332 (100%) at ~475 img/s**,
+and it is not a decoding result. It is the speed of reading the answer key the
+dataset ships beside every image: when a `.npy` sits next to the file,
+qr-multi-imgs decodes that bit-matrix first, in pure Go. That is exactly what
+you want on this dataset and it never happens on your own photos, so it is not
+the headline. Run it with `-corpus.masks` when you want to check that path has
+not regressed.
+
+**On pixels alone the dataset splits hard:**
 
 | subset | what it holds | image-only |
 |---|---|---|
@@ -88,6 +99,13 @@ well under two) decodes fine straight from the pixels. What destroys it is the
 dataset's *distortion*; density only decides how little of it is enough. Under a
 box blur, 61 modules survives radius 2 and fails at 3, 97 and 125 fail at 2, and
 153 fails already at 1. In every one of those failures the `.npy` still decodes.
+
+**Known limits.** `zbarimg`, the last-resort fallback, **segfaults** on some
+real photographs - exit 139 on a 3024x4032 iPhone JPEG here, with no output.
+The scan survives it: the exit status is treated as "found nothing" and the
+other decoders still run. It does mean `zbarimg` cannot be relied on as an
+independent second opinion on exactly the files where a second opinion would be
+worth most.
 
 **Since v1.5.0 a scan is slower on purpose.** Earlier versions stopped at the
 first code in an image; v1.5.0 returns every code in it. On 40 real photos that

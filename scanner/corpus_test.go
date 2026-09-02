@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -41,6 +42,20 @@ import (
 // regression in it should be catchable - it is simply not the decoder's score.
 var corpusMasks = flag.Bool("corpus.masks", false,
 	"benchmark with the companion .npy masks enabled (default: ignore them and force every image through the raster loop)")
+
+// corpusDump writes one row per image to a CSV, for characterising failures
+// rather than counting them.
+//
+//	go test -tags corpus ./scanner -run TestCorpus -corpus.dump=/tmp/rows.csv
+//
+// The summary the harness logs says how many images missed. It cannot say what
+// the misses have in common, and "what do they have in common" is the question
+// that decides which retry strategies are worth writing: an image whose finder
+// patterns were located and whose payload would not come out is a binarization
+// and contrast problem, and an image where nothing was detected at all is a
+// detection problem. Those want different code.
+var corpusDump = flag.String("corpus.dump", "",
+	"write a per-image CSV of outcome, classification and metadata to this path")
 
 // expectedFail marks a manifest row whose image contains no QR at all, so the
 // correct outcome is "decoded nothing".
@@ -187,12 +202,15 @@ func runCorpus(t *testing.T, dir string) {
 	// here as the only stage that found anything has bought nothing.
 	wins := map[string]int{}
 	ran := map[string]int{}
+	dump := newDumpWriter(t, *corpusDump)
+	defer dump.close(t)
 	start := time.Now()
 
 	for _, e := range entries {
 		detail, derr := ScanImageDetail(e.path, ScanFast)
 		decoded := detail.Codes
 		codesExpected += len(e.expected)
+		dump.row(t, e, detail, derr)
 		if m := detail.Metadata; m != nil {
 			for _, a := range m.Strategies {
 				ran[a.Name]++
@@ -354,4 +372,120 @@ func requireReadableFormats(t *testing.T, entries []corpusEntry) {
 		"rebuild with -tags heic, or run on macOS with cgo where Apple Vision reads them. "+
 		"Scoring them now would report 0%% recall for the decoder when the cause is the build.",
 		heic, len(entries))
+}
+
+// dumpWriter writes the per-image characterisation CSV. A nil path makes every
+// method a no-op, so the scoring loop does not branch.
+type dumpWriter struct {
+	f *os.File
+	w *csv.Writer
+}
+
+func newDumpWriter(t *testing.T, path string) *dumpWriter {
+	t.Helper()
+	if path == "" {
+		return &dumpWriter{}
+	}
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatalf("create dump %s: %v", path, err)
+	}
+	w := csv.NewWriter(f)
+	if err := w.Write([]string{
+		"name", "outcome", "classification",
+		"expected_codes", "decoded_codes", "matched", "spurious",
+		"width", "height", "laplacian_variance", "edge_density",
+		"true_version", "true_modules", "payload_len",
+		"detections", "est_version", "est_module_size",
+		"stages",
+	}); err != nil {
+		t.Fatalf("write dump header: %v", err)
+	}
+	return &dumpWriter{f: f, w: w}
+}
+
+func (d *dumpWriter) row(t *testing.T, e corpusEntry, detail Detail, derr error) {
+	t.Helper()
+	if d.w == nil {
+		return
+	}
+
+	outcome := "missed"
+	matched, spurious := 0, 0
+	switch {
+	case derr != nil:
+		outcome = "error"
+	default:
+		matched, spurious = score(e.expected, detail.Codes)
+		switch {
+		case len(e.expected) == 0 && len(detail.Codes) == 0:
+			outcome = "correct_negative"
+		case len(e.expected) == 0 || spurious > 0:
+			outcome = "false_positive"
+		case matched == len(e.expected):
+			outcome = "exact"
+		case matched > 0:
+			outcome = "partial"
+		}
+	}
+
+	// Ground truth from the dataset's own bit-matrix, not from any decode: a
+	// version-N QR is 17+4N modules across, and the companion .npy is written
+	// with the quiet zone stripped. Absent for a corpus that ships no masks,
+	// which is every corpus of real photographs.
+	trueVersion, trueModules := 0, 0
+	if mask, err := readBoolNPY(strings.TrimSuffix(e.path, filepath.Ext(e.path)) + ".npy"); err == nil && len(mask) > 0 {
+		trueModules = len(mask)
+		if v := (trueModules - 17) / 4; v >= 1 && v <= 40 && 17+4*v == trueModules {
+			trueVersion = v
+		}
+	}
+
+	payloadLen := 0
+	for _, p := range e.expected {
+		payloadLen += len(p)
+	}
+
+	var m Metadata
+	if detail.Metadata != nil {
+		m = *detail.Metadata
+	}
+	estVersion, estModule := 0, 0.0
+	if len(detail.Detections) > 0 {
+		estVersion = detail.Detections[0].Version
+		estModule = detail.Detections[0].ModuleSize
+	}
+
+	stages := make([]string, 0, len(m.Strategies))
+	for _, a := range m.Strategies {
+		stages = append(stages, fmt.Sprintf("%s:%d", a.Name, a.Found))
+	}
+
+	if err := d.w.Write([]string{
+		e.name, outcome, string(detail.Classification),
+		strconv.Itoa(len(e.expected)), strconv.Itoa(len(detail.Codes)), strconv.Itoa(matched), strconv.Itoa(spurious),
+		strconv.Itoa(m.Width), strconv.Itoa(m.Height),
+		strconv.FormatFloat(m.LaplacianVariance, 'f', 4, 64),
+		strconv.FormatFloat(m.EdgeDensity, 'f', 6, 64),
+		strconv.Itoa(trueVersion), strconv.Itoa(trueModules), strconv.Itoa(payloadLen),
+		strconv.Itoa(len(detail.Detections)), strconv.Itoa(estVersion),
+		strconv.FormatFloat(estModule, 'f', 3, 64),
+		strings.Join(stages, ";"),
+	}); err != nil {
+		t.Fatalf("write dump row: %v", err)
+	}
+}
+
+func (d *dumpWriter) close(t *testing.T) {
+	t.Helper()
+	if d.w == nil {
+		return
+	}
+	d.w.Flush()
+	if err := d.w.Error(); err != nil {
+		t.Errorf("flush dump: %v", err)
+	}
+	if err := d.f.Close(); err != nil {
+		t.Errorf("close dump: %v", err)
+	}
 }
