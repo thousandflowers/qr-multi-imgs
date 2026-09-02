@@ -429,6 +429,7 @@ li .shim { width:48px; height:48px; border-radius:7px; background:var(--soft);
 </footer>
 <script src="strings.js"></script>
 <script src="i18n.js"></script>
+<script src="result.js"></script>
 <script src="order.js"></script>
 <script src="payload.js"></script>
 <script src="zip.js"></script>
@@ -520,13 +521,18 @@ function finish(msg) {
   const r = byId.get(msg.id);
   if (!r) return; // its run was cleared
   r.pending = false;
-  r.codes = msg.codes || [];
   r.error = msg.error || "";
   // The worker cannot reach the string table, so it names the sentence instead
   // of writing it. See err.unopenable.
   r.errorKey = msg.errorKey || "";
-  // Why this image has no code, when it has none.
-  r.reason = msg.reason || "";
+  // Payloads, the reason there are none, and the geometry of any code that was
+  // located and could not be read — plus the pixel frame that geometry is
+  // measured in. Result.adopt rather than three assignments because the
+  // geometry was silently dropped on this hop once already; see result.js.
+  //
+  // Nothing draws r.detections yet. It is here so that the thing that will
+  // draw it has something to draw.
+  Result.adopt(r, msg);
   r.thumbURL = msg.thumb ? URL.createObjectURL(msg.thumb) : "";
   r.at = new Date();
   for (const c of r.codes) seenCount.set(c, (seenCount.get(c) || 0) + 1);
@@ -638,7 +644,8 @@ function enqueue(items, label) {
   for (const it of items) {
     const id = nextId++;
     const r = { id, name: it.file.name, path: it.path, file: it.file, batch,
-                codes: [], error: "", reason: "", thumbURL: "", pending: true,
+                codes: [], error: "", reason: "", detections: [], frame: null,
+                thumbURL: "", pending: true,
                 seq: rows.length + 1 };
     rows.push(r);
     byId.set(id, r);
@@ -719,10 +726,13 @@ function onCameraResult(msg) {
   if (!fresh.length) return;
   for (const c of fresh) seenLive.add(c);
   for (const c of fresh) seenCount.set(c, (seenCount.get(c) || 0) + 1);
-  const r = { id: nextId++, name: t("tab.camera"), path: "", file: null, codes: fresh,
-              error: "", reason: msg.reason || "",
+  const r = Result.adopt({ id: nextId++, name: t("tab.camera"), path: "", file: null,
+              error: "",
               thumbURL: msg.thumb ? URL.createObjectURL(msg.thumb) : "",
-              pending: false, seq: rows.length + 1, at: new Date() };
+              pending: false, seq: rows.length + 1, at: new Date() }, msg);
+  // A live frame reports only the codes nobody has seen yet, so the payload
+  // list is the filtered one rather than everything the frame held.
+  r.codes = fresh;
   rows.push(r);
   byId.set(r.id, r);
   $("empty").classList.add("hide");

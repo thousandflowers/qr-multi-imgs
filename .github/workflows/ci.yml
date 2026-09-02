@@ -50,6 +50,7 @@ jobs:
           node web/unzip.js --test
           node web/i18n.js --test
           node web/order.js --test
+          node web/result.js --test
 
       - name: Test
         run: go test -v -count=1 -coverprofile=${{ runner.temp }}/coverage.txt . ./exporter ./scanner ./cmd/...

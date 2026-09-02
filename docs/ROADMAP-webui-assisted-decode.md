@@ -15,11 +15,10 @@ built and then removed, because an overlay is the first step of the retry flow
 in Phase 2 and shipping it alone put a picture on screen with no action behind
 it. Phase 3 is where it earns its place.
 
-**And it does not reach the page at all.** `wasm/main.go` marshals `detections`,
-`web/worker.js` copies only `res.classification` into `out.reason` and drops the
-rest on the floor (`web/worker.js:102-104`). The seam is one field short of
-complete, and re-opening it is the *first task of Phase 3*, before any canvas
-work — a pre-drawn box cannot be pre-drawn from data the page never receives.
+~~**And it does not reach the page at all.**~~ **Fixed in Phase 3 Step A.** The
+worker used to copy only `res.classification` into `out.reason` and drop
+`res.detections` on the floor. The geometry now reaches the row. Nothing draws
+it yet — see Phase 3 Step A below for exactly what the page has in hand.
 
 **Phase 4 is not going to be built as written.** Contribution stays out of
 scope: no upload endpoint, no hosted backend. A failing case reaches the project
@@ -774,6 +773,58 @@ Let the user resolve what the machine could not, for a batch of ~100 images.
 - No queue/workflow/assignment features. This is one person, one batch, one
   sitting.
 
+## Step A — re-open the seam (SHIPPED, no UI)
+
+The bug this step existed for: the Go side located codes it could not read,
+computed a box for each and marshalled them across the wasm boundary, and the
+worker copied `res.classification` into `out.reason` and dropped
+`res.detections`. Nothing errored. The page simply never had the geometry, and
+the pre-drawn box — the highest-leverage detail in this whole phase — was
+unbuildable from data that never arrived.
+
+What changed:
+
+- **One shape on every surface.** `wasm/main.go` was flattening `x/y/w/h` into
+  the detection while its own docstring claimed the shape matched the CLI export
+  and the local API, which marshal a nested `box`. It now emits the nested box,
+  so `scanner.Detection` looks the same wherever it is read.
+- **`web/result.js`**, a named mapping with a self-test, wired into CI beside
+  `order.js`. The hop is a function rather than three assignments in a worker
+  because a worker cannot be loaded by node — no `importScripts`, no `self` —
+  which is precisely why the original drop was never caught.
+- **The frame travels with the boxes.** The page decodes at a 1600 px cap and
+  retries at 3000, so a box can be expressed in a shrunk image's coordinates.
+  Every row now carries `frame: {w, h, naturalW, naturalH}` — the pixel buffer
+  the decode actually ran on, and the file's own size. Geometry without its
+  coordinate space cannot be drawn on anything, and only the worker still knows
+  the factor.
+- **Malformed geometry is dropped, never repaired.** A half-read box would be
+  drawn somewhere wrong, and a box in the wrong place is worse than no box: it
+  tells the user the tool found something where it did not.
+
+**There is one ingest path, not two.** The `--serve` page and the hosted demo
+are the same file: `/api/scan` drives the local disk actions and updates
+counters, and it creates no rows. Every row on both surfaces comes from the
+worker, so fixing the worker fixed both.
+
+**The CSP was not touched**, and nothing here came near it. `result.js` is
+same-origin, so `script-src 'self'` covers the page's `<script>` and
+`worker-src 'self'` covers the worker's `importScripts`. No `connect-src`
+change was needed or made.
+
+**Verified against the real engine, not just the mapping.** The Go wasm build
+was driven under node with the raw pixels of a corpus image that classifies
+`QR_DETECTED_DECODE_FAILED`, and the row came back holding
+`box {x:54, y:25, w:200, h:185}`, `moduleSize 8.93`, `version 1`, in a 256×256
+frame.
+
+**What the page now has in hand, per row:** `detections[]` — each a `box` in the
+decoded frame's pixels, a `moduleSize`, and an estimated `version` — plus the
+`frame` those pixels belong to. Nothing renders any of it. The next step is the
+canvas, and it starts with three coordinate spaces to reconcile: the frame the
+decode ran on, the file's own pixels, and whatever size the canvas is displayed
+at. EXIF orientation is a fourth and is not yet accounted for anywhere.
+
 ## Cheap vs. project
 
 **Cheap** (1–2 days each):
@@ -818,12 +869,8 @@ accessibility are held to the standard of the rest of the page.
 
 ## Open questions
 
-0. **Before either: the box does not reach the page.** `wasm/main.go` marshals
-   `detections`; `web/worker.js:102-104` reads `res.classification` into
-   `out.reason` and discards the rest. Forwarding it is the first task of this
-   phase and it is small — but nothing else here can be started without it, and
-   it is not visible from the roadmap's own claim that the box "reaches the
-   wasm result", which is true one layer below where the page can use it.
+0. ~~**Before either: the box does not reach the page.**~~ **Done, Step A.** The
+   row now carries `detections` and the `frame` they are measured in.
 1. **Does the pre-drawn box come from Phase 1's detection, or from a fresh
    detection at full resolution when the row is opened?** The first is free and
    possibly wrong by the shrink factor; the second is right and costs a second.

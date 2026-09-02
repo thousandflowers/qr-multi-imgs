@@ -7,7 +7,7 @@
 //
 // Nothing here uploads anything. The file never leaves the tab.
 
-importScripts("wasm_exec.js");
+importScripts("wasm_exec.js", "result.js");
 
 // A photo straight off a phone can be 12 megapixels, and the cost is almost
 // entirely in the pixels: measured on a 3024x4032 photo, decoding at a 3000 px
@@ -52,6 +52,10 @@ async function pixelsOf(blob, cap) {
   // Ask for the decode at a bounded size in one step where possible: the
   // browser scales during decode, which is cheaper than decoding then resizing.
   let bmp = await createImageBitmap(blob);
+  // The file's own size, before any cap. Kept because the geometry the decoder
+  // returns is in the coordinates of whatever it was handed, and only this
+  // function still knows what that was relative to the file.
+  const natural = { w: bmp.width, h: bmp.height };
   const limit = cap || MAX_SIDE;
   let shrunk = false;
   if (Math.max(bmp.width, bmp.height) > limit) {
@@ -69,7 +73,7 @@ async function pixelsOf(blob, cap) {
   const canvas = new OffscreenCanvas(bmp.width, bmp.height);
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   ctx.drawImage(bmp, 0, 0);
-  return { data: ctx.getImageData(0, 0, bmp.width, bmp.height), bmp, shrunk };
+  return { data: ctx.getImageData(0, 0, bmp.width, bmp.height), bmp, shrunk, natural };
 }
 
 async function thumbnailOf(bmp) {
@@ -85,24 +89,33 @@ async function run(job) {
   const out = { type: "result", id: job.id, name: job.name, path: job.path, codes: [] };
   let bmp = null;
   try {
-    const fast = await pixelsOf(job.blob, job.cap || MAX_FAST);
-    bmp = fast.bmp;
-    let res = qrDecode(fast.data.width, fast.data.height, fast.data.data);
+    let pass = await pixelsOf(job.blob, job.cap || MAX_FAST);
+    bmp = pass.bmp;
+    let res = qrDecode(pass.data.width, pass.data.height, pass.data.data);
 
     // Only a picture that was actually shrunk can have lost something worth
     // looking at again.
-    if (!job.cap && !(res.codes || []).length && fast.shrunk) {
+    if (!job.cap && !(res.codes || []).length && pass.shrunk) {
       const full = await pixelsOf(job.blob, MAX_SIDE);
       bmp.close();
+      pass = full;
       bmp = full.bmp;
       res = qrDecode(full.data.width, full.data.height, full.data.data);
     }
 
     if (res.error) out.error = res.error;
-    out.codes = res.codes || [];
-    // Why this image ended up where it did. The page turns it into a sentence;
-    // the worker only carries it.
-    out.reason = res.classification || "";
+    // Everything the engine found, including the geometry of the codes it
+    // located and could not read. The mapping is a named function with a test
+    // because this is exactly where the boxes used to be dropped - see
+    // result.js. The frame goes with them: a box means nothing without the
+    // pixel dimensions it was measured in, and after a retry those are the
+    // second pass's, not the first's.
+    Object.assign(out, Result.carry(res, {
+      w: pass.data.width,
+      h: pass.data.height,
+      naturalW: pass.natural.w,
+      naturalH: pass.natural.h,
+    }));
 
     out.thumb = await thumbnailOf(bmp);
   } catch (e) {

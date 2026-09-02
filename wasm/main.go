@@ -74,10 +74,17 @@ func result(d scanner.Detail) any {
 	for i, c := range d.Codes {
 		codes[i] = c
 	}
+	// The box is nested, exactly as scanner.Detection marshals it for the JSON
+	// export and the local API. This used to flatten x/y/w/h into the detection
+	// while the docstring above claimed the shape matched the other surfaces;
+	// it did not, and a page consuming both would have had to know which one it
+	// was talking to.
 	dets := make([]any, len(d.Detections))
 	for i, det := range d.Detections {
 		dets[i] = map[string]any{
-			"x": det.Box.X, "y": det.Box.Y, "w": det.Box.W, "h": det.Box.H,
+			"box": map[string]any{
+				"x": det.Box.X, "y": det.Box.Y, "w": det.Box.W, "h": det.Box.H,
+			},
 			"module_size": det.ModuleSize,
 			"version":     det.Version,
 		}
