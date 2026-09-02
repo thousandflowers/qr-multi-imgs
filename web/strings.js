@@ -20,6 +20,9 @@
   };
 
   S.en = {
+    "cam.last": "Last read",
+    "cam.showAll": "Show all {n}",
+    "cam.hideAll": "Hide the list",
     "cam.settings": "Settings",
     "cam.found": "{n} found",
     "res.compact": "Compact",
@@ -204,6 +207,9 @@
   };
 
   S.it = {
+    "cam.last": "Ultimo letto",
+    "cam.showAll": "Mostrali tutti ({n})",
+    "cam.hideAll": "Nascondi l'elenco",
     "cam.settings": "Impostazioni",
     "cam.found": "{n} trovati",
     "res.compact": "Compatta",
@@ -388,6 +394,9 @@
   };
 
   S.es = {
+    "cam.last": "Último leído",
+    "cam.showAll": "Mostrar los {n}",
+    "cam.hideAll": "Ocultar la lista",
     "cam.settings": "Ajustes",
     "cam.found": "{n} encontrados",
     "res.compact": "Compacta",
@@ -572,6 +581,9 @@
   };
 
   S.fr = {
+    "cam.last": "Dernier lu",
+    "cam.showAll": "Afficher les {n}",
+    "cam.hideAll": "Masquer la liste",
     "cam.settings": "Réglages",
     "cam.found": "{n} trouvés",
     "res.compact": "Compacte",
@@ -756,6 +768,9 @@
   };
 
   S.de = {
+    "cam.last": "Zuletzt gelesen",
+    "cam.showAll": "Alle {n} anzeigen",
+    "cam.hideAll": "Liste ausblenden",
     "cam.settings": "Einstellungen",
     "cam.found": "{n} gefunden",
     "res.compact": "Kompakt",
@@ -940,6 +955,9 @@
   };
 
   S.pt = {
+    "cam.last": "Último lido",
+    "cam.showAll": "Mostrar os {n}",
+    "cam.hideAll": "Esconder a lista",
     "cam.settings": "Definições",
     "cam.found": "{n} encontrados",
     "res.compact": "Compacta",

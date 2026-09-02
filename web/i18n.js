@@ -90,6 +90,9 @@
     for (const el of document.querySelectorAll("[data-t-html]")) el.innerHTML = t(el.dataset.tHtml);
     for (const el of document.querySelectorAll("[data-t-ph]")) el.placeholder = t(el.dataset.tPh);
     for (const el of document.querySelectorAll("[data-t-title]")) el.title = t(el.dataset.tTitle);
+    // An icon-only control has no text to read, so its name has to come from
+    // somewhere. This is that somewhere, and it translates like everything else.
+    for (const el of document.querySelectorAll("[data-t-aria]")) el.setAttribute("aria-label", t(el.dataset.tAria));
   }
 
   const languages = () => Object.keys(STRINGS).map((code) => ({ code, name: NAMES[code] || code }));
@@ -102,7 +105,7 @@
   // happened. This is the check that catches it.
   function keysUsedIn(html) {
     const out = new Set();
-    const re = /data-t(?:-html|-ph|-title)?\s*=\s*"([^"]+)"/g;
+    const re = /data-t(?:-html|-ph|-title|-aria)?\s*=\s*"([^"]+)"/g;
     let m;
     while ((m = re.exec(html))) out.add(m[1]);
     return [...out];

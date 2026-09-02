@@ -243,6 +243,9 @@ input[type=file] { display:none; }
 .bar2 { display:flex; align-items:center; gap:8px; flex-wrap:wrap;
   padding:12px 16px; border-bottom:1px solid var(--line); }
 .bar2 .barLabel { font-size:var(--fs-2); color:var(--dim); min-width:4.5rem; }
+.chips { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.chips.hide { display:none; }
+#search { flex:1; min-width:12rem; }
 .exports { background:var(--soft); }
 /* Secondary actions look like their labels: one primary act per bar. */
 button.quiet { background:none; border-color:transparent; color:var(--dim); }
@@ -478,9 +481,23 @@ li canvas.thumb { width:72px; height:72px; border-radius:9px; display:block;
   padding:12px; box-shadow:0 12px 32px rgba(0,0,0,.18); }
 #camSet label { display:flex; align-items:center; gap:6px; font-size:var(--fs-2); color:var(--dim); }
 #scanCount { font-size:var(--fs-2); color:var(--ok); font-weight:600; }
-/* At most three, so the viewfinder never becomes a wall of payloads. */
-#scanFound { display:flex; flex-direction:column; gap:4px; }
-#scanFound div:nth-child(n+4) { display:none; }
+#lastFound { display:flex; align-items:center; gap:8px; padding:8px 10px;
+  background:var(--ok-soft); border:1px solid var(--ok); border-radius:10px; }
+#lastFound.hide { display:none; }
+#lastFound .lbl { font-size:var(--fs-1); color:var(--ok); font-weight:600;
+  text-transform:uppercase; letter-spacing:.04em; white-space:nowrap; }
+#lastCode { font-family:var(--mono); font-size:var(--fs-2); color:var(--fg);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; flex:1; }
+/* The full history, on request. Scrolls rather than growing the dialog. */
+#scanFound { display:none; flex-direction:column; gap:4px; max-height:22vh;
+  overflow:auto; margin-top:8px; }
+#scanFound.open { display:flex; }
+.iconBtn, .iconSum { display:inline-flex; align-items:center; justify-content:center;
+  width:34px; height:34px; padding:0; border-radius:8px; cursor:pointer;
+  border:1px solid transparent; background:none; color:var(--dim); list-style:none; }
+.iconBtn:hover, .iconSum:hover { background:var(--soft); color:var(--fg); border-color:var(--line); }
+.iconSum::-webkit-details-marker { display:none; }
+#camSet[open] > .iconSum { border-color:var(--brand); color:var(--brand); }
 #scanFound div { font-family:var(--mono); font-size:var(--fs-2); color:var(--ok);
   background:var(--ok-soft); border-radius:8px; padding:4px 8px;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -508,7 +525,8 @@ li canvas.thumb { width:72px; height:72px; border-radius:9px; display:block;
 #inspBox { background:var(--panel); border-radius:14px; padding:16px;
   max-width:min(96vw,760px); width:100%; max-height:94vh; overflow:auto;
   box-shadow:0 20px 60px rgba(0,0,0,.35); }
-#inspBox h3 { margin:0 0 4px; font-size:var(--fs-4); }
+.dlgHead { display:flex; align-items:center; gap:8px; }
+#inspBox h3 { margin:0; font-size:var(--fs-4); }
 #inspName { color:var(--dim); font-size:var(--fs-3); word-break:break-all; }
 #inspHint, #inspKeys { color:var(--dim); font-size:var(--fs-3); margin:8px 0 0; }
 #inspKeys { color:var(--dim); }
@@ -701,18 +719,23 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
         <!-- Filters on their own line, exports on another. They were mixed
              into one bar, so narrowing the list and taking it away looked like
              the same kind of act. -->
-        <!-- Filters only when there is enough to filter. With four rows on
-             screen a search box and three filters are four controls to read
-             and nothing to do with them. -->
-        <div class="bar2 hide" id="filterBar">
+        <!-- Search is always here. Hiding it with the rest of the filters was
+             a mistake: it is the one control that is useful at any list size,
+             and a search box that disappears reads as a search that is broken.
+             The chips and the kind menu still wait until there is enough to
+             filter - below eight rows they are three controls to read with
+             nothing to do about them. -->
+        <div class="bar2" id="filterBar">
           <span class="barLabel" data-t="res.filters"></span>
           <input type="search" id="search" data-t-ph="res.search">
-          <button id="fUniq" class="chip" role="button" aria-pressed="false"
-                  data-t="stat.unique" data-t-title="stat.uniqueHelp"></button>
-          <button id="fFlag" class="chip" role="button" aria-pressed="false" data-t="filter.flagged"></button>
-          <button id="fCompact" class="chip" role="button" aria-pressed="true" data-t="res.compact"></button>
-          <label class="sr" for="kind" data-t="filter.kind"></label>
-          <select id="kind"><option value="" data-t="filter.kindAll"></option></select>
+          <span id="filterChips" class="chips hide">
+            <button id="fUniq" class="chip" role="button" aria-pressed="false"
+                    data-t="stat.unique" data-t-title="stat.uniqueHelp"></button>
+            <button id="fFlag" class="chip" role="button" aria-pressed="false" data-t="filter.flagged"></button>
+            <button id="fCompact" class="chip" role="button" aria-pressed="true" data-t="res.compact"></button>
+            <label class="sr" for="kind" data-t="filter.kind"></label>
+            <select id="kind"><option value="" data-t="filter.kindAll"></option></select>
+          </span>
         </div>
 
         <!-- Two acts a person actually came for, and a drawer for the rest.
@@ -814,7 +837,10 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
       <h3 id="scanTitle" data-t="cam.title"></h3>
       <span id="scanCount"></span>
       <span class="grow"></span>
-      <button id="scanClose" class="quiet" data-t="insp.close"></button>
+      <!-- An X, not the word. A dialog's way out is the one control that needs
+           no reading, in any of six languages. The name is still there for
+           anyone who cannot see it. -->
+      <button id="scanClose" class="iconBtn" data-t-title="insp.close" data-t-aria="insp.close"><svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>
     <div id="scanStage">
       <video id="cam" playsinline muted></video>
@@ -826,7 +852,7 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
       <button id="scanFreeze" class="primary" data-t="cam.freeze"></button>
       <span class="grow"></span>
       <details id="camSet">
-        <summary data-t="cam.settings"></summary>
+        <summary class="iconSum" data-t-title="cam.settings" data-t-aria="cam.settings"><svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 3.5v2M12 18.5v2M3.5 12h2M18.5 12h2M6 6l1.4 1.4M16.6 16.6L18 18M18 6l-1.4 1.4M7.4 16.6L6 18"/></svg></summary>
         <div class="drawer">
           <label data-t-title="cam.autoHelp"><input type="checkbox" id="camAuto" checked>
             <span data-t="cam.auto"></span></label>
@@ -842,6 +868,16 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
       </details>
     </div>
     <p id="camMsg" role="status" aria-live="polite"></p>
+    <!-- The one just read, large enough to check at a glance, with the rest
+         behind a count. A viewfinder answers one question - did that work -
+         and the whole history belongs in the list this dialog sits on top of. -->
+    <div id="lastFound" class="hide">
+      <span class="lbl" data-t="cam.last"></span>
+      <code id="lastCode"></code>
+      <button id="lastCopy" class="quiet" data-t="act.copy"></button>
+      <span class="grow"></span>
+      <button id="allToggle" class="quiet hide"></button>
+    </div>
     <!-- Only the most recent few: every code found is already becoming a row
          in the list behind this dialog, and a growing pile of payloads inside
          a viewfinder is a wall to read rather than a confirmation to glance
@@ -855,7 +891,11 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
      budget this page has. -->
 <div id="insp" hidden role="dialog" aria-modal="true" aria-labelledby="inspTitle">
   <div id="inspBox">
-    <h3 id="inspTitle" data-t="insp.title"></h3>
+    <div class="dlgHead">
+      <h3 id="inspTitle" data-t="insp.title"></h3>
+      <span class="grow"></span>
+      <button id="inspClose" class="iconBtn" data-t-title="insp.close" data-t-aria="insp.close"><svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
     <div id="inspName"></div>
     <p id="inspHint" data-t="insp.hint"></p>
     <div id="inspStage">
@@ -870,7 +910,6 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
     <p id="inspMsg" role="status" aria-live="polite"></p>
     <div id="inspBtns">
       <button id="inspRescan" class="primary" data-t="insp.rescan"></button>
-      <button id="inspClose" data-t="insp.close"></button>
     </div>
   </div>
 </div>
@@ -1223,6 +1262,7 @@ const live = {
   natDets: [],    // boxes from the browser's own decoder, at full resolution
   natFrame: null,
   natBusy: false,
+  lastCode: "",   // the one just read, shown in front of the rest
   auto: true,     // hold the picture by itself when a code turns up
   mirror: false,  // this page never mirrors; the switch is for cameras that do
   busy: false,    // a careful pass is running; do not start another
@@ -1292,6 +1332,9 @@ async function openScanner() {
   $("camMsg").textContent = "";
   $("scanFound").replaceChildren();
   live.found.clear();
+  live.lastCode = "";
+  $("scanFound").classList.remove("open");
+  $("lastFound").classList.add("hide");
   $("scanCount").textContent = "";
   live.dets = [];
   live.frozen = null;
@@ -1323,10 +1366,31 @@ function closeScanner() {
   $("cam").srcObject = null;
 }
 
-// The list shows the last few; the count answers for the rest.
+// One code in front, the rest a click away.
+//
+// The strip used to show three and silently swallow the fourth, which is a
+// list that lies. A viewfinder answers one question - did that one work - and
+// the full history belongs to the list this dialog sits on top of, where it
+// can be searched, copied and exported like everything else.
 function paintFound() {
-  $("scanCount").textContent = live.found.size ? t("cam.found", { n: live.found.size }) : "";
-  $("camMsg").textContent = t("cam.read", { n: live.found.size });
+  const n = live.found.size;
+  $("scanCount").textContent = n ? t("cam.found", { n }) : "";
+  $("camMsg").textContent = t("cam.read", { n });
+  const last = live.lastCode;
+  $("lastFound").classList.toggle("hide", !last);
+  if (last) $("lastCode").textContent = last;
+  const all = $("allToggle");
+  all.classList.toggle("hide", n < 2);
+  all.textContent = $("scanFound").classList.contains("open")
+    ? t("cam.hideAll") : t("cam.showAll", { n });
+}
+
+function rememberFound(code) {
+  live.lastCode = code;
+  const row = document.createElement("div");
+  row.textContent = code;
+  $("scanFound").prepend(row);
+  paintFound();
 }
 
 function setFreezeLabel(frozen) {
@@ -1399,12 +1463,9 @@ function sendNative(v) {
     for (const c of res.codes) {
       if (live.found.has(c)) continue;
       live.found.set(c, true);
-      const row = document.createElement("div");
-      row.textContent = c;
-      $("scanFound").prepend(row);
+      rememberFound(c);
       enqueueDecodedFromCamera(c);
     }
-    if (res.codes.length) paintFound();
   }).catch(() => { live.natBusy = false; });
 }
 
@@ -1440,13 +1501,10 @@ function adoptFrameResult(msg) {
   for (const c of msg.codes || []) {
     if (live.found.has(c)) continue;
     live.found.set(c, true);
-    const row = document.createElement("div");
-    row.textContent = c;
-    $("scanFound").prepend(row);
+    rememberFound(c);
     // A code seen live is a result like any other, so it joins the list.
     enqueueDecodedFromCamera(c);
   }
-  if (msg.codes && msg.codes.length) paintFound();
   if (live.auto) considerAuto();
 }
 
@@ -1516,9 +1574,7 @@ async function autoPass(unread) {
         if (live.found.has(c)) continue;
         live.found.set(c, true);
         fresh++;
-        const row = document.createElement("div");
-        row.textContent = c;
-        $("scanFound").prepend(row);
+        rememberFound(c);
         enqueueDecodedFromCamera(c);
       }
     }
@@ -1986,7 +2042,7 @@ function applyFilters() {
   // button would wipe the icon sitting beside it.
   $("pickFolder").querySelector("span").textContent = t(rows.length ? "drop.folderMore" : "drop.folder");
   // Eight is where a list stops being something the eye can scan whole.
-  $("filterBar").classList.toggle("hide", rows.length < 8);
+  $("filterChips").classList.toggle("hide", rows.length < 8);
   // Same threshold as the filters, and for the same reason: eight rows is
   // where scanning replaces reading.
   $("list").classList.toggle("compact", rows.length >= 8 && !compactOff);
@@ -2736,6 +2792,14 @@ $("scanFreeze").onclick = toggleFreeze;
 $("camPick").onchange = (e) => switchCamera(e.target.value);
 $("camAuto").onchange = (e) => { live.auto = e.target.checked; };
 $("camFlip").onchange = (e) => { live.mirror = e.target.checked; paintScanner(); };
+$("allToggle").onclick = () => { $("scanFound").classList.toggle("open"); paintFound(); };
+$("lastCopy").onclick = async (e) => {
+  try {
+    await navigator.clipboard.writeText(live.lastCode || "");
+    e.target.textContent = t("act.copied");
+    setTimeout(() => { e.target.textContent = t("act.copy"); }, 1200);
+  } catch { /* denied; the code is on screen to select by hand */ }
+};
 
 // On a frozen frame the overlay behaves like the area picker: drag a box, and
 // reading it goes through the same crop path.
@@ -2784,7 +2848,7 @@ for (const ev of ["pointerup", "pointercancel"]) {
     cropWaiting.set(id, (msg) => {
       const fresh = (msg.codes || []).filter((x) => !live.found.has(x));
       if (!fresh.length) { $("camMsg").textContent = t("insp.none"); return; }
-      for (const x of fresh) { live.found.set(x, true); enqueueDecodedFromCamera(x); const d = document.createElement("div"); d.textContent = x; $("scanFound").prepend(d); }
+      for (const x of fresh) { live.found.set(x, true); enqueueDecodedFromCamera(x); rememberFound(x); }
       $("camMsg").textContent = t("insp.found", { n: fresh.length });
     });
     queue.push({ type: "crop", id, blob, rect: live.selNat });
