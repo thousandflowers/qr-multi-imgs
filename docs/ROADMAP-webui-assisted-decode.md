@@ -592,6 +592,42 @@ threshold failures, but no stack of preprocessing rungs reaches what a learned
 detector reaches. The zero-cgo path tops out below Vision, deliberately, and
 the roadmap should stop implying otherwise.
 
+## The first real photographs, and what they said
+
+Five phone photographs of business cards, of the kind the whole project is
+for: stylised codes with rounded modules, one with a logo dropped into it, two
+cards upside down, indoor light. Five images decide nothing on their own, but
+every number below comes from a real photograph rather than a generated
+render, and they contradict what the synthetic corpus implied.
+
+**The zero-cgo ceiling, in the wild.** Apple Vision read 5 of 5. The pure-Go
+cascade read 2 of 5 at full resolution. The same gap the corpus measured -
+Vision recovering 40.7% of the raster misses - arriving in a form nobody has
+to interpret.
+
+**The viewfinder was capped below where these codes exist.** At 720px on the
+long side **not one of the five decoded, with any strategy at all** - not the
+short live cascade, not all thirteen. A code on a card held at arm's length is
+small in the frame, and shrinking it takes its modules below a pixel. The cap
+is 1080 now, about 40ms a frame instead of 17.
+
+**The crop margin decides the outcome, and no single value is right:**
+
+| margin | what decoded |
+|---|---|
+| 10% | card A instagram, card B **both codes**, card C |
+| 25% | card A facebook, card C |
+| 50% | card A facebook, card C |
+| 100% | card A facebook, card B facebook |
+
+A QR needs its quiet zone, so a tight box has none; too much margin shrinks the
+code inside its own crop until the modules go sub-pixel again. The crop tries
+three margins and unions what they find - a crop is small, so three decodes
+cost almost nothing.
+
+**With that in place all five photographs yield a code through the page**:
+three from the ordinary scan, two from the box the scanner itself proposes.
+
 **A second corpus, for real photographs.** `QR_CORPUS_DIR` takes any directory
 with a manifest, HEIC included: paths are opened by name and nothing filters by
 extension. What Step A added is a guard — a build that cannot read HEIC (no

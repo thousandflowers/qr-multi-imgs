@@ -170,17 +170,41 @@ async function crop(job) {
     const w = Math.max(1, Math.min(Math.round(r.w), bmp.width - x));
     const h = Math.max(1, Math.min(Math.round(r.h), bmp.height - y));
 
-    cut = await createImageBitmap(bmp, x, y, w, h);
-    const canvas = new OffscreenCanvas(cut.width, cut.height);
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    ctx.drawImage(cut, 0, 0);
-    const data = ctx.getImageData(0, 0, cut.width, cut.height);
+    // Several margins, not one.
+    //
+    // Measured on real photographs of business cards: how much room is left
+    // around a code decides whether it reads, and no single amount wins. On one
+    // card a 10% margin read both codes and 25% read neither; on another 100%
+    // read one that 10% missed, while 100% lost a third card entirely. A QR
+    // needs its quiet zone, and a tight box has none - but too much margin
+    // shrinks the code within the frame until its modules go sub-pixel.
+    //
+    // A crop is small, so trying three costs almost nothing, and the union is
+    // what the user asked for: everything readable in the area they pointed at.
+    const MARGINS = [0.1, 0, 0.35];
+    const seen = new Set();
+    let last = null;
+    for (const m of MARGINS) {
+      const pad = Math.round(Math.max(w, h) * m);
+      const cx = Math.max(0, x - pad), cy = Math.max(0, y - pad);
+      const cw = Math.min(bmp.width - cx, w + pad * 2);
+      const ch = Math.min(bmp.height - cy, h + pad * 2);
+      if (cw < 8 || ch < 8) continue;
 
-    const res = qrDecode(data.width, data.height, data.data);
-    if (res.error) out.error = res.error;
-    Object.assign(out, Result.carry(res, {
-      w: data.width, h: data.height, naturalW: data.width, naturalH: data.height,
-    }));
+      if (cut) cut.close();
+      cut = await createImageBitmap(bmp, cx, cy, cw, ch);
+      const canvas = new OffscreenCanvas(cut.width, cut.height);
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      ctx.drawImage(cut, 0, 0);
+      const data = ctx.getImageData(0, 0, cut.width, cut.height);
+
+      const res = qrDecode(data.width, data.height, data.data);
+      last = Result.carry(res, { w: data.width, h: data.height, naturalW: data.width, naturalH: data.height });
+      for (const c of last.codes) seen.add(c);
+      if (res.error) out.error = res.error;
+    }
+    if (last) Object.assign(out, last);
+    out.codes = [...seen];
     // Where the crop sat in the source, so a caller can put its geometry back
     // where it came from without remembering what it asked for.
     out.origin = { x, y, w, h };

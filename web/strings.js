@@ -20,6 +20,9 @@
   };
 
   S.en = {
+    "cam.device": "Camera",
+    "cam.deviceHelp": "An iPhone connected through Continuity Camera appears here like any other camera",
+    "cam.switch": "Switch camera",
     "act.details": "Details",
     "stat.toRead": "to read",
     "res.filters": "Filter",
@@ -186,6 +189,9 @@
   };
 
   S.it = {
+    "cam.device": "Fotocamera",
+    "cam.deviceHelp": "Un iPhone collegato con Fotocamera Continuity compare qui come una fotocamera qualsiasi",
+    "cam.switch": "Cambia fotocamera",
     "act.details": "Dettagli",
     "stat.toRead": "da leggere",
     "res.filters": "Filtra",
@@ -352,6 +358,9 @@
   };
 
   S.es = {
+    "cam.device": "Cámara",
+    "cam.deviceHelp": "Un iPhone conectado por Cámara de Continuidad aparece aquí como cualquier otra cámara",
+    "cam.switch": "Cambiar cámara",
     "act.details": "Detalles",
     "stat.toRead": "por leer",
     "res.filters": "Filtrar",
@@ -518,6 +527,9 @@
   };
 
   S.fr = {
+    "cam.device": "Caméra",
+    "cam.deviceHelp": "Un iPhone connecté via Caméra Continuité apparaît ici comme n'importe quelle caméra",
+    "cam.switch": "Changer de caméra",
     "act.details": "Détails",
     "stat.toRead": "à lire",
     "res.filters": "Filtrer",
@@ -684,6 +696,9 @@
   };
 
   S.de = {
+    "cam.device": "Kamera",
+    "cam.deviceHelp": "Ein über Integrationskamera verbundenes iPhone erscheint hier wie jede andere Kamera",
+    "cam.switch": "Kamera wechseln",
     "act.details": "Details",
     "stat.toRead": "zu lesen",
     "res.filters": "Filtern",
@@ -850,6 +865,9 @@
   };
 
   S.pt = {
+    "cam.device": "Câmara",
+    "cam.deviceHelp": "Um iPhone ligado por Câmara de Continuidade aparece aqui como qualquer outra câmara",
+    "cam.switch": "Mudar de câmara",
     "act.details": "Detalhes",
     "stat.toRead": "por ler",
     "res.filters": "Filtrar",

@@ -743,6 +743,13 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
     <div id="scanHead">
       <h3 id="scanTitle" data-t="cam.title"></h3>
       <span class="grow"></span>
+      <!-- Every camera the machine has. On macOS an iPhone joined through
+           Continuity Camera is simply one of them, which is the whole answer
+           to "use my phone as the camera": no pairing, no network, no second
+           app - the operating system already did it, and a page only has to
+           stop assuming there is exactly one camera. -->
+      <label class="sr" for="camPick" data-t="cam.device"></label>
+      <select id="camPick" class="hide" data-t-title="cam.deviceHelp"></select>
       <button id="scanFreeze" data-t="cam.freeze"></button>
       <button id="scanClose" data-t="insp.close"></button>
     </div>
@@ -1129,7 +1136,61 @@ const live = {
 // The long side the live decode runs at. Smaller than the capture on purpose:
 // a code big enough to aim at is big enough to read at 720, and the frame rate
 // is what makes aiming possible.
-const LIVE_CAP = 720;
+// Measured on photographs of real business cards: at 720 not one of five
+// codes decoded, with any strategy. They are small in the frame, and shrinking
+// takes their modules below a pixel. 1080 costs about 40ms a frame instead of
+// 17 and is still faster than the eye.
+const LIVE_CAP = 1080;
+
+// The camera the user picked, remembered for next time. A phone joined through
+// Continuity is not the default device and choosing it every session would be
+// the sort of small tax that stops people using it.
+let camDeviceId = null;
+try { camDeviceId = localStorage.getItem("qr.cam") || null; } catch { /* private mode */ }
+
+function camConstraints() {
+  const base = { width: { ideal: 1920 }, height: { ideal: 1080 } };
+  // A specific camera when one was chosen, the rear one otherwise.
+  return camDeviceId
+    ? { ...base, deviceId: { exact: camDeviceId } }
+    : { ...base, facingMode: { ideal: "environment" } };
+}
+
+// listCameras fills the picker. Labels are empty until permission has been
+// granted at least once - that is the browser refusing to enumerate hardware
+// to a page that has not been trusted with it - so this runs after the stream
+// starts, when the names are real.
+async function listCameras() {
+  const sel = $("camPick");
+  try {
+    const devices = (await navigator.mediaDevices.enumerateDevices())
+      .filter((d) => d.kind === "videoinput");
+    sel.classList.toggle("hide", devices.length < 2);
+    if (devices.length < 2) return;
+    const current = (stream && stream.getVideoTracks()[0] &&
+      stream.getVideoTracks()[0].getSettings().deviceId) || camDeviceId || "";
+    sel.replaceChildren();
+    devices.forEach((d, i) => {
+      const o = document.createElement("option");
+      o.value = d.deviceId;
+      o.textContent = d.label || t("cam.device") + " " + (i + 1);
+      sel.appendChild(o);
+    });
+    sel.value = current;
+  } catch {
+    sel.classList.add("hide");
+  }
+}
+
+async function switchCamera(id) {
+  camDeviceId = id;
+  try { localStorage.setItem("qr.cam", id); } catch { /* private mode */ }
+  if (stream) for (const tr of stream.getTracks()) tr.stop();
+  stream = await navigator.mediaDevices.getUserMedia({ video: camConstraints(), audio: false });
+  const v = $("cam");
+  v.srcObject = stream;
+  await v.play();
+}
 
 async function openScanner() {
   $("scan").hidden = false;
@@ -1142,7 +1203,7 @@ async function openScanner() {
   setFreezeLabel(false);
   try {
     stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } }, audio: false,
+      video: camConstraints(), audio: false,
     });
   } catch (e) {
     $("camMsg").textContent = e && e.name === "NotAllowedError" ? t("cam.denied") : t("cam.none");
@@ -1152,6 +1213,7 @@ async function openScanner() {
   v.srcObject = stream;
   await v.play();
   $("camMsg").textContent = t("cam.looking");
+  listCameras();
   live.raf = requestAnimationFrame(liveTick);
 }
 
@@ -2405,6 +2467,7 @@ $("pasteBtn").onclick = async () => {
 $("camZone").onclick = openScanner;
 $("scanClose").onclick = closeScanner;
 $("scanFreeze").onclick = toggleFreeze;
+$("camPick").onchange = (e) => switchCamera(e.target.value);
 
 // On a frozen frame the overlay behaves like the area picker: drag a box, and
 // reading it goes through the same crop path.
