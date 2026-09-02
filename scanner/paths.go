@@ -95,6 +95,7 @@ func runJobs(jobs []scanJob, onResult func(ScanResult)) []ScanResult {
 				} else {
 					r.Classification = d.Classification
 					r.Detections = d.Detections
+					r.Metadata = d.Metadata
 					if len(d.Codes) > 0 {
 						r.HasQR = true
 						r.Contents = d.Codes

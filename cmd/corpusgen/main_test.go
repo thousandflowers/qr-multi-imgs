@@ -161,7 +161,7 @@ func TestGenerateManifest(t *testing.T) {
 	}
 
 	out := filepath.Join(t.TempDir(), "corpus.csv")
-	if err := run(root, out, false, 4); err != nil {
+	if err := run(root, out, false, 4, ""); err != nil {
 		t.Fatalf("run: %v", err)
 	}
 
@@ -240,7 +240,7 @@ func TestGenerateIsDeterministic(t *testing.T) {
 	var first string
 	for i, jobs := range []int{1, 3, 8} {
 		out := filepath.Join(t.TempDir(), "corpus.csv")
-		if err := run(root, out, false, jobs); err != nil {
+		if err := run(root, out, false, jobs, ""); err != nil {
 			t.Fatalf("run(jobs=%d): %v", jobs, err)
 		}
 		raw, err := os.ReadFile(out)
@@ -268,7 +268,7 @@ func TestRefusesToOverwrite(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err := run(root, out, false, 1)
+	err := run(root, out, false, 1, "")
 	if err == nil {
 		t.Fatal("run overwrote an existing manifest without -f")
 	}
@@ -283,7 +283,7 @@ func TestRefusesToOverwrite(t *testing.T) {
 		t.Error("existing manifest was modified")
 	}
 
-	if err := run(root, out, true, 1); err != nil {
+	if err := run(root, out, true, 1, ""); err != nil {
 		t.Fatalf("run with force: %v", err)
 	}
 	raw, rerr = os.ReadFile(out)
@@ -301,10 +301,82 @@ func TestEmptyDirectory(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := filepath.Join(t.TempDir(), "corpus.csv")
-	if err := run(root, out, false, 1); err == nil {
+	if err := run(root, out, false, 1, ""); err == nil {
 		t.Fatal("expected an error when the directory holds no images")
 	}
 	if _, err := os.Stat(out); err == nil {
 		t.Error("an empty run should not create a manifest")
+	}
+}
+
+// TestTruthSidecarsAreNotDecoded is the whole point of -truth: the payloads
+// must come from the sidecar files and not from this decoder, so a manifest
+// built this way measures accuracy rather than self-consistency.
+//
+// The image here is a QR whose real payload is "real", and its sidecar says
+// "from-the-sidecar". If the manifest comes back saying "real", something
+// decoded the image and the flag is not doing its job.
+func TestTruthSidecarsAreNotDecoded(t *testing.T) {
+	root := t.TempDir()
+	writeQR(t, filepath.Join(root, "a.png"), "real")
+	if err := os.WriteFile(filepath.Join(root, "a.txt"), []byte("from-the-sidecar"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	out := filepath.Join(root, "corpus.csv")
+	if err := run(root, out, false, 1, ".txt"); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	body, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(body)
+	if !strings.Contains(got, "from-the-sidecar") {
+		t.Errorf("manifest does not carry the sidecar payload:\n%s", got)
+	}
+	if strings.Contains(got, ",real") {
+		t.Errorf("manifest carries a decoded payload; -truth decoded the image:\n%s", got)
+	}
+	if !strings.Contains(got, "GROUND TRUTH") {
+		t.Errorf("manifest still claims to be a bootstrap:\n%s", got)
+	}
+}
+
+// TestTruthSkipsImagesWithNoSidecar: an image whose answer is unknown is left
+// out, never labelled EXPECTED_FAIL. EXPECTED_FAIL is a claim that the image
+// holds no QR, and a missing file makes no such claim.
+func TestTruthSkipsImagesWithNoSidecar(t *testing.T) {
+	root := t.TempDir()
+	writeQR(t, filepath.Join(root, "known.png"), "known")
+	writeQR(t, filepath.Join(root, "unknown.png"), "unknown")
+	if err := os.WriteFile(filepath.Join(root, "known.txt"), []byte("answer"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	out := filepath.Join(root, "corpus.csv")
+	if err := run(root, out, false, 1, ".txt"); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	body, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(body)
+	if !strings.Contains(got, "known.png") {
+		t.Errorf("manifest lost the image that had a sidecar:\n%s", got)
+	}
+	if strings.Contains(got, "unknown.png") {
+		t.Errorf("an image with no sidecar reached the manifest:\n%s", got)
+	}
+}
+
+// TestTruthWithNoSidecarsAtAll fails loudly rather than writing an empty
+// manifest, which would benchmark as a perfect score over nothing.
+func TestTruthWithNoSidecarsAtAll(t *testing.T) {
+	root := t.TempDir()
+	writeQR(t, filepath.Join(root, "a.png"), "x")
+	if err := run(root, filepath.Join(root, "corpus.csv"), false, 1, ".txt"); err == nil {
+		t.Fatal("run with no sidecars anywhere succeeded; want an error")
 	}
 }

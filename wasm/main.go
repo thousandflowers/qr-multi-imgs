@@ -23,7 +23,7 @@ import (
 // JS signature:
 //
 //	qrDecode(width, height, Uint8ClampedArray)
-//	  -> {codes, classification, detections, error}
+//	  -> {codes, classification, detections, metadata, error}
 //
 // It is synchronous and CPU-bound, which is why the page runs it inside a
 // worker rather than on the thread that has to keep the UI moving.
@@ -38,6 +38,12 @@ import (
 // original file's when the caller shrank it first. Any consumer that wants
 // them in file coordinates has to scale them itself, and only the caller still
 // knows by how much.
+//
+// metadata carries the same caveat and one more: its dimensions and image
+// measures describe the frame as handed over, so a page that decodes at a cap
+// is measuring the shrunk image. Laplacian variance in particular is
+// scale-dependent and comparing it across differently-capped runs is
+// meaningless. The dimensions travel with the numbers so that is checkable.
 func decode(_ js.Value, args []js.Value) any {
 	if len(args) < 3 {
 		return errResult("decode(width, height, pixels) takes three arguments")
@@ -76,11 +82,25 @@ func result(d scanner.Detail) any {
 			"version":     det.Version,
 		}
 	}
-	return map[string]any{
+	out := map[string]any{
 		"codes":          codes,
 		"classification": string(d.Classification),
 		"detections":     dets,
 	}
+	if m := d.Metadata; m != nil {
+		strategies := make([]any, len(m.Strategies))
+		for i, s := range m.Strategies {
+			strategies[i] = map[string]any{"name": s.Name, "found": s.Found}
+		}
+		out["metadata"] = map[string]any{
+			"width":              m.Width,
+			"height":             m.Height,
+			"laplacian_variance": m.LaplacianVariance,
+			"edge_density":       m.EdgeDensity,
+			"strategies":         strategies,
+		}
+	}
+	return out
 }
 
 func errResult(msg string) any {

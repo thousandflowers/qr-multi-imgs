@@ -100,6 +100,9 @@ type Detail struct {
 	// image the payload is the answer and a box adds nothing; on NoQRFound
 	// there is nothing to box.
 	Detections []Detection `json:"detections,omitempty"`
+	// Metadata is what the image looked like and what was tried on it. It is
+	// annotation and never a filter - see metadata.go.
+	Metadata *Metadata `json:"metadata,omitempty"`
 }
 
 // classify picks the bucket. Order matters: any payload at all wins, because

@@ -10,6 +10,23 @@
 go test -tags corpus ./scanner -run TestCorpus -v
 ```
 
+### Companion masks are ignored by default
+
+Some datasets ship the generator's own bit-matrix beside each image as a `.npy`
+file. `ScanImageDetail` reads that first and short-circuits, which is the right
+behaviour for a user and the wrong one for a benchmark: it measures the speed of
+parsing an answer key, on a path where no QR decoding happens at all.
+
+So the harness forces every image through the raster loop. The mask path is
+still reachable, and the run says which mode it was in:
+
+```sh
+go test -tags corpus ./scanner -run TestCorpus -v -corpus.masks
+```
+
+Use it to check the mask path has not regressed. Do not quote its recall or its
+throughput as a decoder number.
+
 It scores each image as exact, partial, missed, false positive, or correct
 negative, and separately counts codes so per-code recall is visible next to the
 per-image rate - an image with three codes where two decode is neither a pass
@@ -71,6 +88,41 @@ photos/duplicate-receipts.jpg,https://example.com/r/ccc
 Extracting ground truth is manual by design: decoding the image with this tool
 to fill in `expected` would make the benchmark measure nothing. Read the payload
 with a phone camera, another decoder, or from whatever generated the code.
+
+### When the dataset ships its own answers
+
+A generated dataset often writes the string it encoded beside the image. That
+is real ground truth and it can be read directly:
+
+```sh
+go run ./cmd/corpusgen -truth .txt /path/to/dataset
+```
+
+Nothing is decoded on this path. Each payload is the sidecar's bytes verbatim,
+no trimming, so a generator that terminates its answers with a newline needs
+handling before the manifest is trusted. An image with no sidecar is left out of
+the manifest rather than labelled `EXPECTED_FAIL` - a missing answer is an
+unknown, not a claim that the image holds no QR.
+
+The reference set is
+[lovasoa/qrcode-dataset](https://github.com/lovasoa/qrcode-dataset) v0.1: 3332
+images, each with a `.txt` payload and a `.npy` bit-matrix.
+
+### A corpus of real photographs
+
+`QR_CORPUS_DIR` takes any directory with a manifest, whatever the formats in it.
+HEIC needs a build that can read it - either `-tags heic`, or macOS with cgo
+where Apple Vision reads it from the path. A build with neither **skips** such a
+corpus rather than scoring it, because 0% recall caused by the build reads
+exactly like 0% recall caused by the decoder.
+
+```sh
+QR_CORPUS_DIR=~/Pictures/heic-set go test -tags corpus,heic ./scanner \
+  -run TestCorpus -v -timeout 0 -count=1
+```
+
+The manifest for a photo set is hand-written. There is no sidecar to read and no
+generator to ask, so the payloads come off the codes by hand.
 
 ## Do not commit real photos
 

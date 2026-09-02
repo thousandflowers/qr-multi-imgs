@@ -18,12 +18,29 @@ package scanner
 
 import (
 	"encoding/csv"
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
+	"time"
 )
+
+// corpusMasks re-enables the companion .npy short circuit, which the harness
+// ignores by default.
+//
+//	go test -tags corpus ./scanner -run TestCorpus -corpus.masks
+//
+// Masks are off by default because a mask is the generator's own answer key
+// lying beside the image: reading it measures a path on which no decoding
+// happens. The dataset this project benchmarks against ships one beside all
+// 3332 images, so with masks on the headline number is the speed of parsing
+// answers. The flag is kept because that path is real code that ships and a
+// regression in it should be catchable - it is simply not the decoder's score.
+var corpusMasks = flag.Bool("corpus.masks", false,
+	"benchmark with the companion .npy masks enabled (default: ignore them and force every image through the raster loop)")
 
 // expectedFail marks a manifest row whose image contains no QR at all, so the
 // correct outcome is "decoded nothing".
@@ -120,6 +137,22 @@ func TestCorpus(t *testing.T) {
 	if dir == "" {
 		dir = defaultCorpusDir
 	}
+	runCorpus(t, dir)
+}
+
+// runCorpus scores one corpus directory. It is separate from TestCorpus so a
+// second corpus - a HEIC photo set, see corpus_heic_test.go - is scored by the
+// same code rather than by a copy of it that can drift.
+func runCorpus(t *testing.T, dir string) {
+	t.Helper()
+
+	// The mask short circuit is process-wide state. The harness is sequential
+	// and this is the only writer, but restoring it keeps a second test in the
+	// same binary honest.
+	prevMasks := npyMaskEnabled
+	npyMaskEnabled = *corpusMasks
+	defer func() { npyMaskEnabled = prevMasks }()
+
 	abs, err := filepath.Abs(dir)
 	if err != nil {
 		t.Fatalf("resolve corpus dir %q: %v", dir, err)
@@ -132,6 +165,7 @@ func TestCorpus(t *testing.T) {
 	if len(entries) == 0 {
 		t.Fatalf("manifest %s lists no images", filepath.Join(abs, manifestName))
 	}
+	requireReadableFormats(t, entries)
 
 	// Per-image outcomes.
 	var exact, partial, missed, falsePositive, correctNegative, errored int
@@ -148,9 +182,25 @@ func TestCorpus(t *testing.T) {
 	//
 	// ponytail: sequential. Thousands of photos will take minutes — parallelise
 	// with the scanWorkers pool from scanner.go if that becomes the bottleneck.
+	// Which stage read each image, counted across the corpus. This is the
+	// baseline a retry ladder is measured against: a rung that never appears
+	// here as the only stage that found anything has bought nothing.
+	wins := map[string]int{}
+	ran := map[string]int{}
+	start := time.Now()
+
 	for _, e := range entries {
-		decoded, derr := ScanImage(e.path)
+		detail, derr := ScanImageDetail(e.path, ScanFast)
+		decoded := detail.Codes
 		codesExpected += len(e.expected)
+		if m := detail.Metadata; m != nil {
+			for _, a := range m.Strategies {
+				ran[a.Name]++
+				if a.Found > 0 {
+					wins[a.Name]++
+				}
+			}
+		}
 
 		if derr != nil {
 			errored++
@@ -189,8 +239,16 @@ func TestCorpus(t *testing.T) {
 		t.Log(line)
 	}
 
+	elapsed := time.Since(start)
+
 	images := len(entries)
 	t.Logf("corpus: %s", abs)
+	if *corpusMasks {
+		t.Logf("masks:  USED - a .npy beside an image is decoded instead of its pixels,")
+		t.Logf("        so these numbers are not a measure of image decoding")
+	} else {
+		t.Logf("masks:  ignored - every image forced through the raster loop")
+	}
 	t.Logf("images:  %d total", images)
 	t.Logf("  exact:            %d", exact)
 	t.Logf("  partial:          %d", partial)
@@ -203,6 +261,38 @@ func TestCorpus(t *testing.T) {
 	t.Logf("codes:   %d expected, %d decoded, %d spurious", codesExpected, codesMatched, codesSpurious)
 	t.Logf("per-image exact rate: %.2f%%", pct(exact+correctNegative, images))
 	t.Logf("per-code recall:      %.2f%%", pct(codesMatched, codesExpected))
+	t.Logf("wall clock: %s total, %s per image, %.1f img/s",
+		elapsed.Round(time.Millisecond),
+		(elapsed / time.Duration(images)).Round(time.Microsecond),
+		float64(images)/elapsed.Seconds())
+
+	// Stages in the order they run, so the table reads as the cascade does.
+	t.Logf("stages (ran -> found something):")
+	for _, name := range stageOrder(ran) {
+		t.Logf("  %-16s %6d ran  %6d found  %6.2f%%", name, ran[name], wins[name], pct(wins[name], ran[name]))
+	}
+}
+
+// stageOrder lists the raster strategies in cascade order first, then any
+// other stage that ran, so the log matches the order work actually happened in
+// rather than map iteration order.
+func stageOrder(ran map[string]int) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, s := range strategies {
+		if n := s.name(); ran[n] > 0 {
+			out = append(out, n)
+			seen[n] = true
+		}
+	}
+	var rest []string
+	for n := range ran {
+		if !seen[n] {
+			rest = append(rest, n)
+		}
+	}
+	sort.Strings(rest)
+	return append(out, rest...)
 }
 
 func pct(n, total int) float64 {
@@ -228,4 +318,40 @@ func missingFrom(expected, decoded []string) []string {
 		out = append(out, e)
 	}
 	return out
+}
+
+// requireReadableFormats stops a run that this build physically cannot read
+// before it produces a number.
+//
+// QR_CORPUS_DIR takes any directory with a manifest, and a manifest may name
+// HEIC photos - that is the second corpus this harness is for, a set of real
+// iPhone pictures rather than generated PNGs. Nothing in the loader or the
+// scoring needs to change for it: paths are opened by name and ScanImageDetail
+// does not filter by extension.
+//
+// What does change is whether the binary can open them at all. HEIC needs
+// either -tags heic (a pure-Go decoder, off by default for the licensing
+// reason in heic_enabled.go) or macOS with cgo, where Apple Vision reads them
+// from the path. A build with neither decodes nothing and would report 0%
+// recall - a number that describes the build and reads like a verdict on the
+// decoder. Skipping says which it is.
+func requireReadableFormats(t *testing.T, entries []corpusEntry) {
+	t.Helper()
+	if heicRaster || visionAvailable {
+		return
+	}
+	var heic int
+	for _, e := range entries {
+		switch strings.ToLower(filepath.Ext(e.path)) {
+		case ".heic", ".heif":
+			heic++
+		}
+	}
+	if heic == 0 {
+		return
+	}
+	t.Skipf("%d of %d images are HEIC and this build cannot read them: "+
+		"rebuild with -tags heic, or run on macOS with cgo where Apple Vision reads them. "+
+		"Scoring them now would report 0%% recall for the decoder when the cause is the build.",
+		heic, len(entries))
 }

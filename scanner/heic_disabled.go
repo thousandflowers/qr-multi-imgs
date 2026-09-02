@@ -7,3 +7,6 @@ package scanner
 // the failure and the path-based decoders still run, which is why HEIC works
 // on macOS regardless — Apple Vision reads it from the path. See
 // heic_enabled.go for why this is the default.
+
+// heicRaster reports whether image.Decode in this build can read HEIC/HEIF.
+const heicRaster = false

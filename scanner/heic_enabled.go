@@ -31,3 +31,6 @@ package scanner
 // path, so HEIC works in the default build.
 
 import _ "github.com/gen2brain/heic"
+
+// heicRaster reports whether image.Decode in this build can read HEIC/HEIF.
+const heicRaster = true

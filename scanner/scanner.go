@@ -42,6 +42,10 @@ type ScanResult struct {
 	Classification Classification `json:"classification,omitempty"`
 	// Detections is populated only for QRDetectedDecodeFailed.
 	Detections []Detection `json:"detections,omitempty"`
+	// Metadata describes the image and what was tried on it. It is annotation
+	// and never a filter - see metadata.go. Absent for a file that could not be
+	// read at all.
+	Metadata *Metadata `json:"metadata,omitempty"`
 }
 
 // Summary aggregates scan results across all files in a folder.
@@ -458,7 +462,7 @@ func detectFinders(img image.Image) []*detector.FinderPatternInfo {
 // It is strictly better than stopping at the first success, and it is what
 // makes the union affordable.
 func decodeRaster(img image.Image) ([]hit, error) {
-	hits, _, err := decodeRasterDetail(img)
+	hits, _, _, err := decodeRasterDetail(img)
 	return hits, err
 }
 
@@ -466,29 +470,54 @@ func decodeRaster(img image.Image) ([]hit, error) {
 // already located. Two entry points rather than one because decodeRaster's
 // shape is load-bearing across the package and its tests, and a caller that
 // only wants payloads should not have to name a value it will discard.
-func decodeRasterDetail(img image.Image) ([]hit, []*detector.FinderPatternInfo, error) {
+func decodeRasterDetail(img image.Image) ([]hit, []*detector.FinderPatternInfo, []StrategyAttempt, error) {
 	infos := detectFinders(img)
 	target := len(infos)
 	var hits []hit
+	// Attempts are recorded whether or not they found anything: a rung that ran
+	// and found nothing is the measurement that gets it removed later, and it
+	// is unrecoverable after the fact. Early exit means the list is also a
+	// record of where the loop stopped.
+	attempts := make([]StrategyAttempt, 0, len(strategies))
 	for _, s := range strategies {
-		hits = mergeHits(hits, decodeAttempt(img, s))
+		found := decodeAttempt(img, s)
+		attempts = append(attempts, StrategyAttempt{Name: s.name(), Found: len(found)})
+		hits = mergeHits(hits, found)
 		if target > 0 && len(hits) >= target {
 			break
 		}
 	}
 	sortHits(hits)
-	return hits, infos, nil
+	return hits, infos, attempts, nil
 }
 
 // maskRenderScale upscales each QR module to this many pixels before decoding.
 // 10px/module gives gozxing's PURE_BARCODE extractor crisp, unambiguous cells.
 const maskRenderScale = 10
 
+// npyMaskEnabled gates the companion-mask short circuit below.
+//
+// It exists for one caller: the corpus harness, which defaults to ignoring
+// masks. A mask is the generator's own answer key sitting beside the image, so
+// a benchmark that reads it measures a path on which no decoding happens - the
+// dataset this project quotes ships one beside all 3332 images, and the
+// headline throughput taken over them is the speed of parsing answers, not of
+// reading codes. Ignoring masks is what makes that number a decoder number.
+//
+// It is a package variable rather than a parameter because the alternative is a
+// third ScanMode or a changed public signature, for a switch only an in-package
+// test ever flips. Not safe to change while a scan is running; the harness is
+// sequential and sets it once.
+var npyMaskEnabled = true
+
 // decodeNPYMask decodes the companion .npy module bitmap — a pristine,
 // pixel-exact QR shipped alongside each image — purely in Go. It recovers the
 // dense codes whose modules are sub-pixel in the source raster. Returns "" when
 // no mask is present or it cannot be decoded.
 func decodeNPYMask(path string) string {
+	if !npyMaskEnabled {
+		return ""
+	}
 	npyPath := strings.TrimSuffix(path, filepath.Ext(path)) + ".npy"
 	mask, err := readBoolNPY(npyPath)
 	if err != nil {
@@ -585,12 +614,13 @@ func ScanDecodedImage(img image.Image) ([]string, error) {
 // being computed and discarded. This is the entry point a UI wants; the plain
 // one stays for callers that only need payloads.
 func ScanDecodedImageDetail(img image.Image) (Detail, error) {
-	hits, infos, err := decodeRasterDetail(img)
+	hits, infos, attempts, err := decodeRasterDetail(img)
 	codes := hitTexts(hits)
 	d := Detail{Codes: codes, Classification: classify(codes, infos)}
 	if d.Classification == QRDetectedDecodeFailed {
 		d.Detections = detectionsFrom(infos, img.Bounds())
 	}
+	d.Metadata = metadataOf(img, attempts)
 	return d, err
 }
 
@@ -647,10 +677,15 @@ func ScanImageDetail(path string, mode ScanMode) (Detail, error) {
 	// circuits — that is what keeps dense-code scans quick. ScanExhaustive
 	// folds it into the union instead and keeps going.
 	var hits []hit
+	meta := &Metadata{}
 	if text := decodeNPYMask(path); text != "" {
 		hits = append(hits, hit{text: text})
+		meta.record(strategyNPYMask, 1)
 		if !exhaustive {
-			return Detail{Codes: hitTexts(hits), Classification: Decoded}, nil
+			// No raster was ever decoded on this path, so the image measures
+			// stay zero. They are reported beside dimensions of zero, which is
+			// what says "not measured" rather than "measured as flat".
+			return Detail{Codes: hitTexts(hits), Classification: Decoded, Metadata: meta}, nil
 		}
 	}
 
@@ -683,8 +718,13 @@ func ScanImageDetail(path string, mode ScanMode) (Detail, error) {
 		rasterErr = fmt.Errorf("decode: %w", decodeErr)
 	} else {
 		var rasterHits []hit
-		rasterHits, infos, rasterErr = decodeRasterDetail(img)
+		var attempts []StrategyAttempt
+		rasterHits, infos, attempts, rasterErr = decodeRasterDetail(img)
 		hits = mergeHits(hits, rasterHits)
+		b := img.Bounds()
+		meta.Width, meta.Height = b.Dx(), b.Dy()
+		meta.LaplacianVariance, meta.EdgeDensity = measure(img)
+		meta.Strategies = append(meta.Strategies, attempts...)
 	}
 
 	// Real photos (warped/low-contrast/small-module QRs) defeat gozxing. On
@@ -702,13 +742,23 @@ func ScanImageDetail(path string, mode ScanMode) (Detail, error) {
 	if exhaustive || len(hits) == 0 {
 		var visionHits []hit
 		visionHits, visionReadable = decodeWithVision(path)
+		// Only recorded where it exists. A stage logged as "ran, found 0" on a
+		// build that compiled it out reads as a stage that was tried and
+		// failed, which is a different and false claim.
+		if visionAvailable {
+			meta.record(strategyVision, len(visionHits))
+		}
 		hits = mergeHits(hits, visionHits)
 	}
 
 	// Last resort for real photos with no mask: zbarimg, if installed. It
 	// reports no geometry, so it can only be merged by payload.
 	if exhaustive || len(hits) == 0 {
-		hits = mergeHits(hits, decodeWithZbarimg(path))
+		zbarHits := decodeWithZbarimg(path)
+		if zbarimgPath != "" {
+			meta.record(strategyZbarimg, len(zbarHits))
+		}
+		hits = mergeHits(hits, zbarHits)
 	}
 
 	// Report the raster failure only if nothing decoded AND no other decoder
@@ -721,7 +771,7 @@ func ScanImageDetail(path string, mode ScanMode) (Detail, error) {
 	sortHits(hits)
 
 	codes := hitTexts(hits)
-	d := Detail{Codes: codes, Classification: classify(codes, infos)}
+	d := Detail{Codes: codes, Classification: classify(codes, infos), Metadata: meta}
 	// Vision and zbarimg report no finder patterns, so an image they read has
 	// no geometry to box even when it decoded. Boxes are only drawn for the
 	// bucket that has nothing else to show.

@@ -132,3 +132,6 @@ func parseVisionBuffer(b []byte) []hit {
 	}
 	return hits
 }
+
+// visionAvailable reports whether Apple Vision can read files in this build.
+const visionAvailable = true

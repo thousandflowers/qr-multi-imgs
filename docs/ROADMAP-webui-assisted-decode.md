@@ -3,14 +3,23 @@
 **Scope:** what happens to an image the decoder cannot read.
 
 **Status:** the *smallest useful slice* is implemented — three buckets, the
-bounding box, and the reason surfaced in the CLI and the web app. Phases 2 and 3
-are still design only.
+bounding box, and the reason surfaced in the CLI and the web app. **Phase 2 Step
+A is implemented**: the corpus harness, the mask-ignoring benchmark default and
+the per-image metadata the ladder will be measured with. No retry strategy has
+been written yet, on purpose — the baseline exists first. Phase 3 is still
+design only.
 
 **The box is computed and returned, not drawn.** It reaches the JSON export, the
 local API and the wasm result, and nothing renders it: the thumbnail overlay was
 built and then removed, because an overlay is the first step of the retry flow
 in Phase 2 and shipping it alone put a picture on screen with no action behind
-it. Phase 2 is where it earns its place.
+it. Phase 3 is where it earns its place.
+
+**And it does not reach the page at all.** `wasm/main.go` marshals `detections`,
+`web/worker.js` copies only `res.classification` into `out.reason` and drops the
+rest on the floor (`web/worker.js:102-104`). The seam is one field short of
+complete, and re-opening it is the *first task of Phase 3*, before any canvas
+work — a pre-drawn box cannot be pre-drawn from data the page never receives.
 
 **Phase 4 is not going to be built as written.** Contribution stays out of
 scope: no upload endpoint, no hosted backend. A failing case reaches the project
@@ -46,9 +55,9 @@ opened by someone who chose to. See the decision note in Phase 4.
   by its own test (`web/order.js --test`, `TestSortResultsPutsDecodedFirst`) so a
   change to one cannot quietly move the other.
 
-## The problem
+## The problem (as it was, and what is left of it)
 
-`scanner.ScanResult` (`scanner/scanner.go:29`) is binary:
+`scanner.ScanResult` used to be binary:
 
 ```go
 type ScanResult struct {
@@ -61,13 +70,17 @@ type ScanResult struct {
 ```
 
 `Error` means *the file could not be read* — an unsupported format, a damaged
-file. It does not mean *there is a code here and I failed*. Those two collapse
-into `HasQR: false`, and so does *this is a photo of a cat*. The web UI inherits
-the collapse: its stat tiles are `with / without / unreadable`
-(`web/index.html:363-368`), and "without" is the bucket where a receipt whose QR
-is glare-blown and a landscape photo sit together.
+file. It did not mean *there is a code here and I failed*. Those two collapsed
+into `HasQR: false`, and so did *this is a photo of a cat*.
 
-That is the whole gap. On the hard subset of the benchmark dataset ~70% of
+**That part is fixed.** `ScanResult` (`scanner/scanner.go:34`) now carries
+`Classification`, `Detections` and `Metadata` as additive `omitempty` fields,
+and the web UI has a fourth stat tile and filter for the actionable bucket
+(`fUnread`, `web/index.html:369`) beside images / with / codes / unique /
+without / unopened. A receipt whose QR is glare-blown and a landscape photo no
+longer sit in the same tile.
+
+What is *not* fixed is the recall behind it. On the hard subset of the benchmark dataset ~70% of
 images fail image-only decoding (README, *Benchmark*), and every one of them
 tells the user the same nothing. The user has no recourse: no reason, no
 retry, no way to point at the code they can see with their own eyes.
@@ -77,69 +90,95 @@ retry, no way to point at the code they can see with their own eyes.
 Read this before estimating anything — a good part of Phase 1 is *not deleting
 data the code already computes*.
 
+Line numbers below are as of the Phase 2 Step A commit. They go stale; the
+symbol names do not, so grep for those first.
+
 | Thing | Where | State |
 |---|---|---|
-| Finder-pattern pre-pass across every colour projection | `scanner/scanner.go:339` `countCandidates` | **Runs today.** Returns `len(infos)` and throws the geometry away. |
-| `FinderPatternInfo` → 3 × `FinderPattern`, each a `ResultPoint` + `GetEstimatedModuleSize()` | gozxing `qrcode/detector` | Bounding box and module size are one struct read away. |
-| Partial centres (1–2 finders, no triple) | `FinderPatternFinder.GetPossibleCenters()`, exported, embedded in `MultiFinderPatternFinder` | Reachable. Needs verifying that `FindMulti` populates centres before returning NotFound. |
+| Finder-pattern pre-pass across every colour projection | `detectFinders`, `scanner/scanner.go:405` | **Runs today**, and returns `[]*FinderPatternInfo` — the geometry is kept, not counted and dropped. Was `countCandidates`. |
+| `FinderPatternInfo` → 3 × `FinderPattern`, each a `ResultPoint` + `GetEstimatedModuleSize()` | gozxing `qrcode/detector` | Read by `detectionOf` (`scanner/classify.go:140`) into a box, module size and estimated version. |
+| Partial centres (1–2 finders, no triple) | `FinderPatternFinder.GetPossibleCenters()` | Verified reachable and **deliberately unused** — see the note in `detectFinders`, `scanner/scanner.go:426-435`. They fire on images holding nothing. |
 | Per-hit geometry, dedup by centroid, reading order | `scanner/hits.go` — `hit{text, points}`, `sameCode`, `sortHits` | **Already a geometry layer**, with a written coordinate contract (`hits.go:16-32`). New strategies must map points back to original-image space. |
-| Strategy list (10: channel × binarizer × upscale) | `scanner/scanner.go:296` | Greedy cover, ordered, with measured recall notes. Phase 2 extends this list. |
-| Evidence-based early exit | `decodeRaster`, `scanner/scanner.go:390` | Stops when decoded count reaches detected count. Phase 2's ladder plugs in after it, not instead of it. |
-| Path-free decode seam for wasm | `ScanDecodedImage`, `scanner/scanner.go:481` | The browser hands over RGBA, Go finds codes. Returns `[]string` — **no geometry crosses to JS today**. |
-| Browser worker pool, thumbnails, filters, search, i18n | `web/worker.js`, `web/index.html`, `web/strings.js` | 6 languages, key-parity self-test (`web/i18n.js:63`). Every new string is 6 strings. |
-| Bootstrap manifest with `EXPECTED_FAIL` rows for undecoded images | `cmd/corpusgen/main.go`, `scanner/corpus_test.go` | The labelling format Phase 4's contributions would land in already exists. |
+| Strategy list (10: channel × binarizer × upscale) | `strategies`, `scanner/scanner.go:352` | Greedy cover, ordered, with measured recall notes. Phase 2 extends this list. |
+| Evidence-based early exit | `decodeRasterDetail`, `scanner/scanner.go:473` | Stops when decoded count reaches detected count. Phase 2's ladder plugs in after it, not instead of it. |
+| Path-free decode seam for wasm | `ScanDecodedImage`, `scanner/scanner.go:603`; `ScanDecodedImageDetail`, `:616` | The browser hands over RGBA, Go finds codes. The `Detail` variant carries classification, boxes and metadata, and `wasm/main.go` marshals all three — **but `web/worker.js:102-104` keeps only `classification`**. |
+| Per-image annotation: dimensions, Laplacian variance, local edge density, strategies attempted | `scanner/metadata.go`; `Metadata`, `:45` | **New in Step A.** Recorded for every image, on every outcome. Annotation, never a filter. |
+| Companion-mask short circuit, and the switch that ignores it | `npyMaskEnabled`, `scanner/scanner.go:511` | **New in Step A.** The benchmark ignores masks by default; see Phase 2 Step A below for why the headline throughput was never a decoder number. |
+| Browser worker pool, thumbnails, filters, search, i18n | `web/worker.js`, `web/index.html`, `web/strings.js` | 6 languages, key-parity self-test (`web/i18n.js:63`). Every new string is 6 strings. Thumbnail object URLs **are** revoked (`web/index.html:1260`). |
+| Ground-truth manifest, from a decode or from sidecar files | `cmd/corpusgen/main.go` (`-truth .ext`), `scanner/corpus_test.go` | Without `-truth` it is a bootstrap and says so; with it the payloads come from the dataset's own answers and the manifest is real ground truth. |
 | CSP that makes upload structurally impossible | `web/index.html:10-19` | `connect-src 'self' http://127.0.0.1:* http://localhost:*`. See Phase 4 — this is the load-bearing constraint of the whole document. |
 
 There is one more thing worth naming: the codebase already knows this work is
-coming. `scanner/scanner.go:582` carries a `TODO(cascade)` saying the
+coming. `scanner/scanner.go:734` carries a `TODO(cascade)` saying the
 Vision/zbarimg gate is where recall is traded for speed and that finder-pattern
 accounting is how to close it provably. `hits.go:28` anticipates "the upcoming
 tiling cascade". Phases 1 and 2 are the cash-out of comments already written.
 
 ---
 
-# Phase 1 — Failure classification (headless, no UI)
+# Phase 1 — Failure classification (headless, no UI) — SHIPPED
 
 Give every image a reason, not a boolean.
 
 ```
-DECODED
-FINDERS_FOUND_DECODE_FAILED   3 finder patterns in a plausible configuration
-PARTIAL_FINDERS               1–2 finders: cropped, or an extreme angle
-HIGH_EDGE_DENSITY_REGION      no finders, but a dense-transition region
-NO_QR_LIKELY                  clean image, nothing found
+DECODED                       at least one payload came out
+QR_DETECTED_DECODE_FAILED     3 finder patterns located, nothing readable
+NO_QR_FOUND                   no finder pattern in any colour projection
 ```
+
+**Three buckets, not the five this section originally proposed.**
+`PARTIAL_FINDERS` and `HIGH_EDGE_DENSITY_REGION` were measured and dropped;
+`NO_QR_LIKELY` was renamed `NO_QR_FOUND`, since *found* is already a claim about
+the search rather than about the image and the `_LIKELY` hedge was doing the
+same job twice. The reasons are in "Decisions taken during implementation"
+above, and the two dropped buckets are not deferred work — they are rejected
+work, and re-proposing either needs new evidence, not a new sprint.
+
+The enum lives in `scanner/classify.go:38-53`. The scope below is the shipped
+scope, with the parts that did not ship marked.
 
 ## Scope
 
-- A classification enum on the per-image result, alongside the existing
-  `HasQR`/`Contents`/`Error`. `Error` keeps its current meaning (unreadable
-  file) and does **not** become a classification; an unreadable file has no
-  classification at all.
-- Expose the bounding box whenever finder patterns are located — for
-  `FINDERS_FOUND_DECODE_FAILED` from the triple, for `PARTIAL_FINDERS` from
-  whatever centres exist. Coordinates in original-image space, per the
-  contract in `hits.go:16-32`. This is the field Phase 3 pre-draws.
-- Per-image metadata, recorded for every image regardless of outcome:
-  dimensions, strategies attempted, Laplacian variance (global blur proxy),
-  local edge density, estimated QR version.
+- **Shipped.** A classification enum on the per-image result, alongside the
+  existing `HasQR`/`Contents`/`Error`. `Error` keeps its current meaning
+  (unreadable file) and does **not** become a classification; an unreadable
+  file has no classification at all.
+- **Shipped.** Expose the bounding box whenever a finder-pattern triple is
+  located. Coordinates in original-image space, per the contract in
+  `hits.go:16-32`. This is the field Phase 3 pre-draws — once `worker.js`
+  forwards it. The `PARTIAL_FINDERS` half of this bullet died with its bucket.
+- **Shipped in Phase 2 Step A, not in Phase 1.** Per-image metadata, recorded
+  for every image regardless of outcome: dimensions, strategies attempted,
+  Laplacian variance (global blur proxy), local edge density. It was cut from
+  the first slice because the sentence on the row was the whole felt value and
+  the numbers had no reader; it came back the moment there was one, which is
+  the benchmark. Estimated QR version shipped in Phase 1 with the box, since
+  the triple yields it for free.
 - **Metadata is annotation, never a filter.** Nothing is skipped, downranked
   or discarded because a number looks bad. A blurry image still runs every
   strategy. This is a hard rule: the moment a threshold gates work, the
   metadata stops describing the scan and starts causing it, and every recall
   number afterwards measures the threshold instead of the decoder.
-- A classification must be derivable *without* re-running detection. The
-  finder pass already happens inside `countCandidates`; the change is to
-  return a record instead of an `int`.
+- **Shipped.** A classification must be derivable *without* re-running
+  detection. The finder pass already happens inside `detectFinders` (then
+  called `countCandidates`); the change was to return the record instead of an
+  `int`.
 - Estimated QR version comes free from the triple: modules across ≈
   `distance(topLeft, topRight) / estimatedModuleSize + 7`, version =
   `(modules − 17) / 4`, clamped to 1–40 and reported as an estimate.
-- Surfaces: CLI JSON/CSV export, and the Go API. Both are public output
-  formats — adding a field is fine, changing `has_qr` is not.
+- **Shipped, with one change.** Surfaces: CLI JSON export, TXT export, the Go
+  API, the local HTTP API and the wasm result. **CSV was deliberately left
+  alone** — a new column breaks existing scripts that read by position, and the
+  JSON export already carries the field. Adding a field is fine, changing
+  `has_qr` is not, and nothing changed it.
 
 ## Non-goals
 
-- No UI. Nothing in `web/` changes in this phase.
+- ~~No UI. Nothing in `web/` changes in this phase.~~ **This non-goal was not
+  kept.** The reason string, its stat tile, its filter tab and the row order
+  shipped with Phase 1, because a classification nobody can see is not a
+  classification anybody has. What stayed out of `web/` is everything with a
+  canvas in it.
 - No new decode attempts. Classification observes the existing cascade; it
   does not add a strategy. (That is Phase 2, deliberately separated so the
   first recall change can be measured against a classifier that already
@@ -149,42 +188,49 @@ NO_QR_LIKELY                  clean image, nothing found
 - No per-code classification. One image, one classification, plus zero or more
   decoded codes. An image with one decoded code and one undecodable one is a
   real case and is **an open question below**, not a solved one.
-- No promise that `NO_QR_LIKELY` means there is no QR. It means nothing was
+- No promise that `NO_QR_FOUND` means there is no QR. It means nothing was
   detected by anything we ran. The naming (`_LIKELY`) carries that.
 
 ## Cheap vs. project
 
-**Cheap** (a day or two):
-- `FINDERS_FOUND_DECODE_FAILED`, the bounding box, estimated version. The
-  detector already runs; `countCandidates` currently discards
-  `[]*FinderPatternInfo` and returns a count. Keep the slice.
-- Dimensions, strategies attempted. Both are already in hand at the call site.
+**Cheap** (a day or two) — *done*:
+- `QR_DETECTED_DECODE_FAILED`, the bounding box, estimated version. The
+  detector already ran; `countCandidates` discarded `[]*FinderPatternInfo` and
+  returned a count. It keeps the slice now, as `detectFinders`.
+- Dimensions, strategies attempted. Both were already in hand at the call site.
+  Landed in Step A.
 - Laplacian variance: a 3×3 convolution over the grayscale projection and a
-  variance. ~30 lines, no dependency.
+  variance. It came out at about that size, no dependency, and it shares its
+  single pass with the edge measure (`measure`, `scanner/metadata.go:119`).
 
-**Cheap but needs a check** (half a day):
-- `PARTIAL_FINDERS` via `GetPossibleCenters()` on the embedded finder. The
-  method is exported. What must be verified is that `FindMulti` populates the
-  centre list before it fails — if it does not, this becomes an own
-  implementation of the finder scan, which is not cheap, and the honest
-  fallback is to fold 1–2 centres into `NO_QR_LIKELY` and say so.
+**Cheap but needs a check** (half a day) — *checked, then dropped*:
+- `PARTIAL_FINDERS` via `GetPossibleCenters()`. `FindMulti` does populate the
+  centre list before failing, so the cheap route was open. The bucket died on
+  the next question instead: those centres fire on images holding no code at
+  all — uniform noise yields one — so the bucket would promise a code that is
+  not there. Not folded into `NO_QR_FOUND` "and said so" either; there was
+  nothing to fold, because the count was never used.
 
-**A project in itself** (a week, mostly measurement):
+**A project in itself** (a week, mostly measurement) — *not built, and the
+measurement it needed now has an instrument*:
 - `HIGH_EDGE_DENSITY_REGION`. "A dense-transition region" is not a definition.
   It needs: a window size, a transition-density measure, a threshold, and — the
   expensive part — evidence that the bucket is *useful*, i.e. that images
-  landing in it are meaningfully more likely to hold a code than
-  `NO_QR_LIKELY` ones. Without that evidence it is a bucket that sends users
-  to draw boxes around textured carpet. Measure it on the benchmark's
-  `without_qr` subset before shipping the label.
+  landing in it are meaningfully more likely to hold a code than `NO_QR_FOUND`
+  ones. Without that evidence it is a bucket that sends users to draw boxes
+  around textured carpet.
+  Step A shipped the first two — `edgeWindow` and the measure — as a **number
+  on every image and no bucket at all**. That is the ordering this section
+  asked for: gather the evidence, then decide whether a label is defensible.
 
-**Estimate:** 3–5 days for everything except edge density; +1 week if edge
-density is to be defensible rather than plausible.
+**Estimate:** 3–5 days for everything except edge density. *Actual: the
+classification slice landed in one pass; the metadata followed in Step A once
+the benchmark gave it a reader.*
 
 ## Open questions
 
 1. **Mixed images.** Two codes, one decoded, one not. Is that `DECODED`, or a
-   sixth state? The `countCandidates` machinery can already see the gap
+   sixth state? The `detectFinders` machinery can already see the gap
    (detected 2, decoded 1) — that is exactly what its early-exit uses. A
    `DECODED_PARTIAL` bucket is arguably the single most actionable state in the
    whole taxonomy, and it is not in the list above.
@@ -197,9 +243,12 @@ density is to be defensible rather than plausible.
    image `DECODED` with no bounding box, or does the finder pass run anyway to
    populate geometry? The second costs time on the success path.
 4. **Which image does the metadata describe?** The browser decodes at a 1600px
-   cap first and retries at 3000px (`web/worker.js:25-27`). Laplacian variance
-   at 1600 and at native resolution are different numbers. Native, or
-   as-scanned, or both?
+   cap first and retries at 3000px (`MAX_FAST`/`MAX_SIDE`,
+   `web/worker.js:24-25`). Laplacian variance at 1600 and at native resolution
+   are different numbers. **Step A answered this for the metadata it records:
+   as-scanned**, with the dimensions carried alongside so the two are never
+   compared by accident. Whether the page should also report native remains
+   open.
 5. **Does classification run in the wasm build?** It has to for Phase 3 to
    exist, which means the seam returning it must be `GOOS=js`-safe and the
    extra work must be cheap enough not to undo the caps in `worker.js`.
@@ -210,6 +259,69 @@ density is to be defensible rather than plausible.
 
 Exhaust the machine before spending the user's attention.
 
+## Step A — the harness and the baseline (SHIPPED)
+
+No strategy was written in Step A, deliberately. A ladder without a
+before/after on a fixed corpus is a guess, and the corpus, the instrument and
+the baseline all had to exist before the first rung could be judged.
+
+**The corpus.** `lovasoa/qrcode-dataset` v0.1, 3332 images, each shipping the
+distorted PNG, the payload as `NNN.txt`, and the generator's bit-matrix as
+`NNN.npy`. The manifest is built with `corpusgen -truth .txt`, which reads the
+dataset's own answers and decodes nothing — a manifest built by decoding would
+make the benchmark measure the decoder against itself, which is exactly what
+the BOOTSTRAP header warns about.
+
+**Masks are ignored by default, and that is the point of Step A.** A `.npy`
+beside an image is the generator's answer key. `ScanImageDetail` reads it first
+and short-circuits, so a benchmark over this dataset with masks on measures the
+speed of *parsing answers* — the README's ~475 img/s headline is a number from
+a path on which no QR decoding happens, and it says so, but a benchmark should
+not need the caveat. `npyMaskEnabled` (`scanner/scanner.go:511`) is off in the
+harness by default and back on behind `-corpus.masks`, and the run labels which
+it was.
+
+**The baseline, masks ignored** (`go test -tags corpus ./scanner -run TestCorpus`):
+
+| build | recall | wall clock | throughput |
+|---|---|---|---|
+| pure Go, no Vision, no `zbarimg` | **58.43%** (1947/3332) | 97.4 s | 34.2 img/s |
+
+0 partial, 0 false positives, 1385 missed. This is the regression baseline: a
+ladder rung is worth having when it moves 58.43% and does not move 97 s more
+than it is worth. The figure is consistent with the README's independently
+measured "~57% on pixels alone", which is the cross-check that the harness is
+measuring what it claims to.
+
+Per-stage hit rates from the same run, in cascade order — the table the ladder
+will be reordered from, and the reason `StrategyAttempt` exists:
+
+| stage | ran | found | hit rate |
+|---|---|---|---|
+| `lum/hybrid/1x` | 3332 | 1414 | 42.4% |
+| `lum/global/1x` | 2009 | 427 | 21.3% |
+| `lum/hybrid/2x` | 1587 | 123 | 7.8% |
+| `lum/global/2x` | 1568 | 8 | 0.5% |
+| `r/global/1x` | 1567 | 29 | 1.9% |
+| `g/global/1x` | 1543 | 12 | 0.8% |
+| `b/global/1x` | 1536 | 22 | 1.4% |
+| `min/global/1x` | 1519 | 8 | 0.5% |
+| `max/global/1x` | 1516 | 9 | 0.6% |
+| `r/hybrid/2x` | 1512 | 105 | 6.9% |
+
+Read "ran" as the early exit working: only the images the previous stages could
+not finish reach the next one. Read the two 0.5% rows as the first candidates
+for removal — but not in Step A, because removing them and adding rungs in the
+same change makes both unattributable.
+
+**A second corpus, for real photographs.** `QR_CORPUS_DIR` takes any directory
+with a manifest, HEIC included: paths are opened by name and nothing filters by
+extension. What Step A added is a guard — a build that cannot read HEIC (no
+`-tags heic`, and not macOS-with-cgo) now *skips* such a corpus instead of
+scoring it 0%, because a number that describes the build reads like a verdict
+on the decoder. The manifest for a photo set is hand-written: the payloads are
+read off the codes by a person or another decoder, never by this one.
+
 ## Scope
 
 Extend the strategy set with, roughly in the order they are worth trying:
@@ -219,7 +331,7 @@ Extend the strategy set with, roughly in the order they are worth trying:
 | Otsu binarization | Global, one pass. The existing global-histogram binarizer is close but not the same. |
 | Adaptive (Sauvola) | Local threshold. The real win on uneven lighting and glare. |
 | Inversion | Light-on-dark codes. Nearly free. |
-| 2× / 4× upscale | 2× is already in the list; 4× was measured as not paying (`scanner.go:294`) — it returns here only *after* a first-pass failure, which is a different trade than in the main list. |
+| 2× / 4× upscale | 2× is already in the list; 4× was measured as not paying (see the note above `strategies`, `scanner/scanner.go:346-351`) — it returns here only *after* a first-pass failure, which is a different trade than in the main list. |
 | Downscale | For large noisy photos, where sensor noise is the thing destroying module edges. |
 | Sharpening | Unsharp mask. |
 | Perspective correction | Needs 3 finder patterns → a homography. Phase 1's bounding box is its input. |
@@ -237,8 +349,8 @@ Extend the strategy set with, roughly in the order they are worth trying:
   `hits.go:16-32` explains that violating it silently reports one code twice
   and no payload-only test catches it. Overlapping tiles find the same code
   repeatedly **by design**.
-- Allocation failures must cost recall, not the scan. `scanner.go:566` already
-  states this as the contract these stages land into.
+- Allocation failures must cost recall, not the scan. `scanner/scanner.go:712`
+  already states this as the contract these stages land into.
 
 ## Non-goals
 
@@ -262,7 +374,8 @@ Extend the strategy set with, roughly in the order they are worth trying:
 **Cheap** (a day or two each): Otsu, inversion, sharpening, up/downscale. Each
 is a `decodeStrategy` variant plus a pixel transform; the harness for "run a
 transform, decode, map points back" exists in `decodeAttempt`
-(`scanner.go:180`).
+(`scanner/scanner.go:236`), and every attempt is now recorded by name in the
+per-image metadata, so a new rung is measurable the day it lands.
 
 **Moderate** (3–5 days): Sauvola. An integral-image implementation is standard
 and pure Go, but window size and the *k* parameter need tuning against the
@@ -281,9 +394,13 @@ corpus or it will lose to the existing hybrid binarizer.
   which is the actual failure mode of a camera roll.
 
 **The measurement is not optional and is not free.** A ladder without a
-before/after on a fixed corpus is a guess. `-tags corpus` plus `corpusgen`
-exists; a private photo corpus with ground truth does not, and building one is
-a week of dull work that must be budgeted.
+before/after on a fixed corpus is a guess. *Step A settled half of this*: the
+generated corpus, the mask-free default and the per-stage instrumentation are
+in, with a baseline of 58.43% / 97.4 s. The other half stands — a corpus of
+real photographs with ground truth still does not exist, and hand-labelling one
+is a week of dull work that must be budgeted. The generated set is adversarial
+renders, not camera rolls, and a rung tuned only against it is tuned against
+the wrong distribution.
 
 **Estimate:** 2 weeks for the cheap and moderate rungs with measurement; +3–4
 weeks for perspective correction and tiling.
@@ -295,7 +412,7 @@ weeks for perspective correction and tiling.
    that triples the time on every code-less image is a regression the user
    feels on a folder of holiday photos.
 2. **Does the ladder run automatically, or only on the images Phase 1 flagged
-   as `FINDERS_FOUND_DECODE_FAILED` / `PARTIAL_FINDERS`?** Gating on
+   as `QR_DETECTED_DECODE_FAILED`?** Gating on
    classification is exactly the "metadata as filter" that Phase 1 forbids —
    but running an expensive ladder on every landscape photo is the cost that
    made the caps necessary. This tension is real and unresolved. One defensible
@@ -304,9 +421,14 @@ weeks for perspective correction and tiling.
    extend `ScanExhaustive`? Its docstring already says exhaustive is "for
    building ground truth, where being right matters more than being quick" —
    which is precisely the ladder's job description.
-4. **How is the strategy log surfaced?** A field in the JSON export, a separate
-   `--stats` output, or a log file? It is diagnostic data, and diagnostic data
-   in a user-facing export tends to become an accidental API.
+4. ~~**How is the strategy log surfaced?**~~ **Answered in Step A: a field in
+   the JSON export**, `metadata.strategies`, additive and `omitempty`, mirrored
+   in the local API and the wasm result. The risk this question named is real
+   and now live: diagnostic data in a user-facing export tends to become an
+   accidental API, and an image that decodes on the first strategy carries one
+   entry while one that fails carries ten. If that becomes a problem it is a
+   size problem in the export, not a reason to stop recording — the recording
+   is what makes the ladder falsifiable.
 5. **Does a rung that only ever wins in combination get to stay?** The existing
    list is a greedy cover chosen by measured marginal recall. New rungs need
    the same bar, or the list becomes folklore.
@@ -320,22 +442,24 @@ Let the user resolve what the machine could not, for a batch of ~100 images.
 ## Scope
 
 - **Batch view**, sized for ~100 images. The list already exists
-  (`web/index.html:390`); this is a change to how it is ordered and what each
+  (`<ul id="list">`, `web/index.html:393`); this is a change to how it is
+  ordered and what each
   row says.
-- **Default sort is by classification, most-actionable first — not upload
-  order.** Roughly:
-  `PARTIAL_FINDERS` → `FINDERS_FOUND_DECODE_FAILED` → `HIGH_EDGE_DENSITY_REGION`
-  → `NO_QR_LIKELY` → `DECODED`. The reasoning: a user with 100 images and 20
-  minutes should spend them on the images where their attention actually
-  converts, and the ones where a box is nearly drawn already convert best. This
-  is a behavioural change to the current UI, which appends rows in arrival
-  order and only toggles `.hide` (`applyFilters`, `web/index.html:835`) — rows
-  are never reordered. Sorting means either reordering DOM nodes or rendering
-  from a sorted model.
-- **One-line reason per row**, in the user's words, not the enum's: "QR
-  detected, couldn't decode" vs "no QR found" vs "part of a QR — it may be cut
-  off". Six languages, every key in all of them, enforced by
-  `I18N.selfTest()` (`web/i18n.js:63`).
+- ~~**Default sort is by classification, most-actionable first**~~ — **shipped
+  with Phase 1**, and with the buckets that exist rather than the five this
+  section was written against. The order is
+  `QR_DETECTED_DECODE_FAILED` → `NO_QR_FOUND` → decoded → unopenable →
+  still-scanning (`rowRank`, `web/order.js:38-43`), it is implemented as a CSS
+  `order` on the row rather than by reordering DOM nodes
+  (`web/index.html:1025`), and it is pinned by `web/order.js --test` against
+  the terminal's deliberately different order. The reasoning stands: a user
+  with 100 images and 20 minutes should spend them where their attention
+  converts. Nothing in Phase 3 should change this order; a sort *control* is
+  still open (question 4).
+- ~~**One-line reason per row**~~ — **shipped with Phase 1**, in six languages,
+  enforced by `I18N.selfTest()` (`web/i18n.js:63`). "part of a QR — it may be
+  cut off" was never written, because the bucket behind it was dropped. Only
+  the actionable state carries a second line; `No code found` stands alone.
 - **Manual region selection on a canvas**: the user drags a rectangle over the
   image.
 - **When Phase 1 produced a bounding box, pre-draw it.** The user adjusts an
@@ -369,7 +493,7 @@ Let the user resolve what the machine could not, for a batch of ~100 images.
 
 **Cheap** (1–2 days each):
 - Sorting by classification. The model is a plain array (`rows`,
-  `web/index.html:447`); the render already exists.
+  `web/index.html:451`); the render already exists.
 - The one-line reason per row. A string per bucket, ×6 languages.
 
 **Moderate** (3–5 days):
@@ -377,7 +501,10 @@ Let the user resolve what the machine could not, for a batch of ~100 images.
   handles, touch. Well-trodden, but touch targets and mobile are where it eats
   the time.
 - Plumbing geometry from Go to JS. `ScanDecodedImage` returns `[]string`
-  (`scanner.go:481`) and `wasm/main.go` marshals exactly that. A structured
+  (`scanner/scanner.go:603`) and `wasm/main.go` marshals exactly that.
+  `ScanDecodedImageDetail` (`:616`) already returns the structured result and
+  wasm already marshals it — what is missing is the last hop, `worker.js`. A
+  structured
   result — codes plus classification plus box — means a new exported Go
   function, a new wasm signature, and a new message shape in `worker.js`. Not
   hard, but it touches every layer, and the existing seam's docstring warns
@@ -392,9 +519,11 @@ Let the user resolve what the machine could not, for a batch of ~100 images.
 - **~100 images in a batch view without the page dying** (1 week). 100 rows
   with 100 object-URL thumbnails is already the current design and it holds;
   100 rows *plus* a full-resolution canvas per opened image is not. Needs one
-  canvas, opened on demand, and disciplined `URL.revokeObjectURL`. The current
-  code creates thumb URLs and does not obviously revoke them
-  (`web/index.html:522`) — worth checking before adding full-size images.
+  canvas, opened on demand, and disciplined `URL.revokeObjectURL`. **The
+  thumbnail URLs are revoked** — `web/index.html:1260`, on clear; an earlier
+  draft of this line said they were not, and it was wrong. A full-resolution
+  canvas is still new lifetime to manage, and it is the part with no precedent
+  in the page.
 - **The interaction itself, done well** (1–2 weeks). Adjusting a box on a photo
   on a phone, with a keyboard alternative for accessibility, in six languages,
   on a page whose current interaction vocabulary is buttons and filters.
@@ -404,9 +533,17 @@ accessibility are held to the standard of the rest of the page.
 
 ## Open questions
 
+0. **Before either: the box does not reach the page.** `wasm/main.go` marshals
+   `detections`; `web/worker.js:102-104` reads `res.classification` into
+   `out.reason` and discards the rest. Forwarding it is the first task of this
+   phase and it is small — but nothing else here can be started without it, and
+   it is not visible from the roadmap's own claim that the box "reaches the
+   wasm result", which is true one layer below where the page can use it.
 1. **Does the pre-drawn box come from Phase 1's detection, or from a fresh
    detection at full resolution when the row is opened?** The first is free and
    possibly wrong by the shrink factor; the second is right and costs a second.
+   Note the metadata now carries the dimensions the decode actually ran at, so
+   the shrink factor is recoverable rather than guessed.
 2. **What happens when the user's region still fails?** A third state — "I
    looked where you told me and still could not read it" — needs its own copy,
    and it is the moment Phase 4's offer would most naturally appear. That
@@ -521,7 +658,7 @@ The hosted app's CSP is:
 ```
 connect-src 'self' http://127.0.0.1:* http://localhost:*;
 ```
-(`web/index.html:16`)
+(`web/index.html:16`, unchanged)
 
 and the README sells exactly that: *"Nothing is uploaded, and that is enforced
 rather than promised... it cannot send a filename or a payload anywhere else
@@ -562,7 +699,8 @@ someone who is not the person who wrote the feature.
 **A project in itself — this is the real cost of Phase 4:**
 - **Server infrastructure that does not exist.** There is no remote backend.
   `server.go` is a loopback server on the user's own machine with an
-  origin-and-token guard (`server.go:25-37`) — it is not a service. Phase 4
+  origin-and-token guard (`server.go:25-37`, `isAllowedOrigin` at `:111`) —
+  it is not a service. Phase 4
   introduces the project's first hosted component: an endpoint, storage, the
   deletion path keyed by token, a host configured not to log IPs, abuse
   handling without IPs, and someone on the hook when it breaks. Call it 2–4
@@ -635,13 +773,29 @@ the existing web UI list.** What landed:
 - The local API grew `detected` beside `without_qr`, so no client has to merge
   the two states back together to render a number.
 
+**Then Phase 2 Step A, which is measurement and not recall:**
+
+- `corpusgen -truth .ext` labels a manifest from the dataset's own answers
+  instead of from this decoder, so the benchmark measures accuracy rather than
+  self-consistency.
+- The harness ignores companion `.npy` masks by default (`npyMaskEnabled`), and
+  labels which mode a run was in. With masks on, the number is the speed of
+  parsing an answer key.
+- `Metadata` on every result: dimensions, Laplacian variance, local edge
+  density, and every decode stage that ran with what it found. Additive
+  `omitempty` JSON, in the CLI export, the local API and the wasm result.
+- A guard that skips a HEIC corpus on a build that cannot read HEIC, rather
+  than reporting the build's limitation as the decoder's score.
+- **Baseline: 58.43% per-code recall, 97.4 s over 3332 images**, pure Go, masks
+  ignored. Every Phase 2 rung is measured against that pair of numbers.
+
 The original argument, unchanged:
 
-1. `countCandidates` (`scanner/scanner.go:339`) returns the
-   `[]*FinderPatternInfo` it already computes instead of a count.
+1. `countCandidates`, now `detectFinders` (`scanner/scanner.go:405`), returns
+   the `[]*FinderPatternInfo` it already computes instead of a count.
 2. A classification is derived from what the cascade already did: finders found
-   but nothing decoded → `FINDERS_FOUND_DECODE_FAILED`; nothing found →
-   `NO_QR_LIKELY`. Two buckets, not five.
+   but nothing decoded → `QR_DETECTED_DECODE_FAILED`; nothing found →
+   `NO_QR_FOUND`. Two buckets beyond `DECODED`, not five.
 3. That reason crosses the wasm seam and appears as one line on the row.
 
 **Why this is the slice:**
