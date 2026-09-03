@@ -3,8 +3,11 @@
 **Scan a folder → decode QR → organize, export, recreate - from a clean TUI.**
 
 **Or read your codes with nothing installed: [open the web app](https://thousandflowers.github.io/qr-multi-imgs/)**
-and drop a photo or a folder on it. The decoder is a WebAssembly build of this
-same Go code running inside your tab - your images are never uploaded.
+and drop a photo, a folder or a zip on it, or scan live from the camera. The
+decoder is a WebAssembly build of this same Go code running inside your tab, so
+your images are never uploaded. It reads every code in every image, recreates
+them as PNG, JPEG, SVG or PDF, turns a CSV column into a batch of codes, and
+shows you where a link goes before it opens it. Seven languages.
 
 ![demo](demo.gif)
 
@@ -50,6 +53,12 @@ Plenty of CLI QR scanners exist. None ship a TUI built for batch work.
 | Export (JSON/CSV/TXT) | ✅ | ❌ | ✅ |
 | Drag & drop + clipboard | ✅ | ❌ | ❌ |
 | Photographed QRs (Apple Vision, macOS) | ✅ | ❌ | ❌ |
+| Every code in one image, not just the first | ✅ | ❌ | ❌ |
+| Browser app, nothing uploaded | ✅ | ❌ | ❌ |
+| Live camera, several codes at once | ✅ | ❌ | ❌ |
+| Point at a code the scan missed | ✅ | ❌ | ❌ |
+| CSV column to a batch of codes | ✅ | ❌ | ❌ |
+| Shows where a link goes before opening | ✅ | ❌ | ❌ |
 | Nothing to install (no runtime deps) | ✅ | ❌ (Node) | ✅ |
 
 ---
@@ -140,34 +149,94 @@ Measured on an Apple M2 Pro (10 cores, 16 GB).
 
 ---
 
-## Web app - nothing to install
+## Web app: nothing to install
 
 **<https://thousandflowers.github.io/qr-multi-imgs/>**
 
-Drop a single photo, a folder, or several folders - most scanners take one
-picture at a time, which is the point of this one. You can also paste a
-screenshot, or read codes live through the camera.
+Drop a single photo, a folder, several folders, or a zip. Most scanners take
+one picture at a time, which is the point of this one: every QR code in every
+image comes back with the file it came from, and every code in an image, not
+just the first.
 
-Every QR code in every image comes back with a thumbnail, a copy button, and a
-link when the payload is one. Filter to the images that had a code, or the ones
-that did not, and download the lot as JSON, CSV or plain text.
+### What it does in a browser
 
-**Nothing is uploaded, and that is enforced rather than promised.** The page
-carries a `Content-Security-Policy` whose `connect-src` allows only its own
-origin and the loopback, so it *cannot* send a filename or a payload anywhere
-else even if the page were tampered with. It loads no font, script or image from
-any third party. Your files never leave the tab.
+**Read**
 
-How the work is split matters. The browser turns each file into pixels - it
-already ships native decoders for everything it can display, JPEG through AVIF
-and HEIC on Safari - and a WebAssembly build of the same Go decoder does the
-part a browser has no answer for: finding and reading the codes. That is why the
-engine is 4.6 MB (1.4 MB over the wire) instead of carrying image decoders it
-would only duplicate. Decoding runs in a pool of Web Workers, one per core up to
-three, so a folder of photos does not freeze the page.
+- A folder, several folders, a zip, a single photo, a pasted screenshot, or a
+  live camera.
+- The camera reads several codes in the same frame at once and keeps counting
+  as you move. When it sees a code it cannot quite read it takes a copy of the
+  frame and looks at that properly, without freezing what you are looking at.
+- Codes it finds but cannot read are not a dead end. The thumbnail shows where
+  the code is; clicking the picture opens it with a box already drawn around
+  the code, which you adjust and read on its own. That crop goes back through
+  the full ladder of strategies, tried at three margins.
+- On a browser with `BarcodeDetector` (Chrome and Edge; on macOS it is backed
+  by Apple Vision) the page uses it alongside the WebAssembly decoder and takes
+  whatever either one finds.
+
+**Then do something with them**
+
+- Filter by what happened: has a code, still to read, no code at all. Or by
+  what the code *is*: link, Wi-Fi, contact, payment, event, and the rest.
+- Search inside the payloads and the filenames.
+- Count each distinct payload once, so ten photos of one poster are one row.
+- Flag a row to come back to.
+- Export as CSV, JSON or plain text.
+- Rename the files after the code they contain, with a live preview of the
+  resulting name, and download them as a zip.
+- Recreate any code as **PNG, JPEG, SVG or PDF**. The PDF and the SVG are
+  written by hand, so a printed code is vector, not a blown-up bitmap.
+- Turn a **column of a CSV** into a batch of codes: the separator is sniffed,
+  the header row is detected, and empty rows are counted rather than encoded.
+
+**Before you click a link**
+
+A QR code is the one place a phishing link can hide in plain sight, because
+nobody can read a QR code with their eyes. So the page never opens a link
+straight from a code. It shows the whole host first and names what is wrong
+with it when something is: an address that hides the real site before an `@`,
+a name written in a coded form that imitates another letter for letter, an
+unencrypted connection, a bare IP, a chain of labels, an address too long to
+see the ends of at once. `javascript:`, `data:` and `file:` are never openable
+at all.
+
+**In your language**
+
+English, Italian, Spanish, French, German, Portuguese and Simplified Chinese.
+The page picks one from the browser's own preference list, and when it speaks
+none of them it asks the machine's time zone, which is on the device and costs
+no permission and no request to anybody's server.
+
+### Nothing is uploaded, and that is enforced rather than promised
+
+The page carries a `Content-Security-Policy` whose `connect-src` allows only
+its own origin and the loopback, so it *cannot* send a filename or a payload
+anywhere else even if the page were tampered with. It loads no font, script or
+image from any third party. There is no account and no analytics. Your files
+never leave the tab.
+
+### How the work is split, and what it costs
+
+The browser turns each file into pixels: it already ships native decoders for
+everything it can display, JPEG through AVIF, and HEIC on Safari. A WebAssembly
+build of the same Go decoder does the part a browser has no answer for, which
+is finding and reading the codes. That is why the engine carries no image
+decoders of its own.
+
+Decoding runs in a pool of Web Workers, one per core up to six, so a folder of
+photos does not freeze the page. The module is compiled once and handed to
+every worker rather than fetched by each.
+
+The engine is 5.3 MB of WebAssembly, 1.9 MB over the wire, and it is not
+fetched while the page is still drawing: it starts after the page is usable, or
+the moment a pointer goes down or a file enters the window, whichever comes
+first. The page itself is 154 KB, 56 KB compressed. `--serve` compresses
+everything and serves the scripts and the engine from a fingerprinted path,
+cacheable for a year, so a reload after the first costs a single 304.
 
 What the browser cannot do is touch your disk. It reads the files you hand it
-and nothing else - no moving, no deleting. For that, run the program.
+and nothing else: no moving, no deleting. For that, run the program.
 
 ## Driving the local program from a browser
 

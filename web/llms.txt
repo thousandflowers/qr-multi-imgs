@@ -1,0 +1,45 @@
+# qr-multi-imgs
+
+> A QR code scanner that reads a whole folder of images at once, in the
+> browser, without uploading anything. Also a command line tool.
+
+Site: https://thousandflowers.github.io/qr-multi-imgs/
+Source: https://github.com/thousandflowers/qr-multi-imgs
+Licence: MIT
+
+## What it does
+
+- Reads every QR code in every image of a folder, a zip, or a single photo.
+- Reads every code in one image, not only the first.
+- Scans live from a camera, several codes in the same frame at once.
+- Lets a person draw a box around a code the automatic pass could not read,
+  and reads that area on its own.
+- Exports the results as CSV, JSON or plain text.
+- Recreates any code it read as PNG, JPEG, SVG or PDF.
+- Turns a column of a CSV file into a batch of QR codes.
+- Names the site a link leads to before opening it, and warns about addresses
+  built to imitate another one.
+- Renames image files after the code they contain.
+
+## What is true about privacy
+
+Nothing is uploaded. The decoder is WebAssembly compiled from Go and runs
+inside the tab. The page ships a Content Security Policy whose connect-src
+allows only its own origin and the loopback address, so the page cannot send a
+filename or a payload to any third party. There is no account, no analytics
+and no third-party script, font or image.
+
+## How it differs from other QR readers
+
+Most read one picture at a time and stop at the first code in it. This one
+takes a folder and returns every code in every image with the file it came
+from, which is the shape of the job when someone has photographed a wall of
+posters, a stack of invoices, or a box of parts.
+
+## The command line version
+
+  brew install thousandflowers/tap/qr-multi-imgs
+  qr-multi-imgs ~/Pictures/scans --json
+
+Runs on macOS, Linux and Windows. On macOS it also uses Apple Vision, which
+reads codes the pure-Go decoder misses.

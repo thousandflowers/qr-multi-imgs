@@ -17,8 +17,105 @@
   worker-src 'self';
   base-uri 'none';
   form-action 'none'">
-<title>QR Code Scanner</title>
-<meta name="description" content="Read, filter and export every QR code in a folder of images. Runs entirely in your browser - nothing is uploaded, nothing to install.">
+<title>Bulk QR Code Scanner for a Whole Folder of Images</title>
+<meta name="description" content="Read every QR code in a whole folder of images at once, or live from a camera. Runs entirely in your browser: nothing is uploaded, nothing to install. Free and open source.">
+<link rel="canonical" href="https://thousandflowers.github.io/qr-multi-imgs/">
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+<meta name="author" content="thousandflowers">
+<meta name="theme-color" content="#6180fa">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236180fa' stroke-width='2'%3E%3Crect x='3' y='3' width='7' height='7' rx='1'/%3E%3Crect x='14' y='3' width='7' height='7' rx='1'/%3E%3Crect x='3' y='14' width='7' height='7' rx='1'/%3E%3Cpath d='M14 14h3v3h-3zM18 18h3v3h-3z'/%3E%3C/svg%3E">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="qr-multi-imgs">
+<meta property="og:url" content="https://thousandflowers.github.io/qr-multi-imgs/">
+<meta property="og:title" content="Scan every QR code in a whole folder at once">
+<meta property="og:description" content="Read every QR code in a whole folder of images at once, or live from a camera. Runs entirely in your browser: nothing is uploaded, nothing to install. Free and open source.">
+<meta property="og:image" content="https://thousandflowers.github.io/qr-multi-imgs/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="qr-multi-imgs: a browser QR scanner that reads a whole folder at once">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Scan every QR code in a whole folder at once">
+<meta name="twitter:description" content="Read every QR code in a whole folder of images at once, or live from a camera. Runs entirely in your browser: nothing is uploaded, nothing to install. Free and open source.">
+<meta name="twitter:image" content="https://thousandflowers.github.io/qr-multi-imgs/og.png">
+
+<!-- Structured data. Two blocks with two jobs: the first tells a search engine
+     what this is, the second is written for the machines that answer questions
+     in prose rather than in links. A generative engine quotes what is already
+     phrased as an answer, so the answers are here, in the page, in the words
+     someone would ask them in. -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "qr-multi-imgs",
+  "alternateName": "Bulk QR code scanner",
+  "url": "https://thousandflowers.github.io/qr-multi-imgs/",
+  "applicationCategory": "UtilitiesApplication",
+  "applicationSubCategory": "QR code scanner",
+  "operatingSystem": "Any browser. Command line binaries for macOS, Linux and Windows.",
+  "browserRequirements": "Requires WebAssembly. No plugin, no account, no upload.",
+  "softwareVersion": "1.5.0",
+  "license": "https://opensource.org/licenses/MIT",
+  "isAccessibleForFree": true,
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "description": "Read every QR code in a whole folder of images at once, or live from a camera. Runs entirely in your browser: nothing is uploaded, nothing to install. Free and open source.",
+  "featureList": [
+    "Scans a whole folder, or a zip, in one go",
+    "Reads every QR code in an image, not just the first",
+    "Live camera scanning with several codes in frame at once",
+    "Point at a code by hand when the automatic pass misses it",
+    "Exports to CSV, JSON or plain text",
+    "Recreates codes as PNG, JPEG, SVG or PDF",
+    "Turns a CSV column into a batch of QR codes",
+    "Shows where a link leads before opening it",
+    "Renames files after the code they contain",
+    "Runs offline: no upload, no server, no account"
+  ],
+  "author": { "@type": "Person", "name": "thousandflowers", "url": "https://github.com/thousandflowers" },
+  "codeRepository": "https://github.com/thousandflowers/qr-multi-imgs",
+  "programmingLanguage": ["Go", "JavaScript", "WebAssembly"],
+  "inLanguage": ["en", "it", "es", "fr", "de", "pt", "zh"]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "How do I scan a whole folder of QR codes at once?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Drag the folder onto this page. Every image in it is read in the browser and each code appears with the file it came from. A zip works the same way, and several folders can be added one after another." }
+    },
+    {
+      "@type": "Question",
+      "name": "Are my images uploaded anywhere?",
+      "acceptedAnswer": { "@type": "Answer", "text": "No. The decoder is WebAssembly running in the tab, and the page's Content Security Policy allows no outbound connection at all, so it could not send a file even if it tried. The images never leave the device." }
+    },
+    {
+      "@type": "Question",
+      "name": "Can it read more than one QR code in the same photo?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Yes. Every code in an image is decoded, not only the first, and the live camera view reads several codes in the same frame at once." }
+    },
+    {
+      "@type": "Question",
+      "name": "What happens when a code cannot be read?",
+      "acceptedAnswer": { "@type": "Answer", "text": "The row says a code was found but not read, and the thumbnail shows where. Clicking the picture opens it with a box already drawn around the code, which can be adjusted and read again on its own." }
+    },
+    {
+      "@type": "Question",
+      "name": "Does it work without an internet connection?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Once the page has loaded, yes. There is also a command line version for macOS, Linux and Windows that scans folders on disk and needs no browser." }
+    },
+    {
+      "@type": "Question",
+      "name": "Can it create QR codes as well as read them?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Yes. Any code that was read can be recreated as PNG, JPEG, SVG or PDF, and a column of a CSV file can be turned into a batch of codes in one step." }
+    }
+  ]
+}
+</script>
 <style>
 :root {
   color-scheme: light;
@@ -124,13 +221,19 @@ header { position:sticky; top:0; z-index:20; background:var(--panel);
 /* The source link and the language picker are unrelated controls that happened
    to sit 12px apart, close enough to read as one group. Separated properly. */
 .bar nav { margin-left:auto; display:flex; align-items:center; gap:32px; font-size:var(--fs-3); }
-/* On a phone the name, the reader's state and the nav do not fit on one line,
-   and the row simply ran off the side: 422px of content in a 390px window,
-   which scrolls the whole page sideways. It wraps instead. */
-@media (max-width:640px) {
-  .bar { flex-wrap:wrap; gap:8px 12px; }
-  .bar nav { gap:16px; }
+/* The header shrinks before it wraps. Wrapping at 640px put a desktop window
+   at half-screen onto two lines, which is not a phone problem being solved.
+   Gaps close first, then type, and only a genuinely narrow window gets a
+   second row - without which 422px of content sat in a 390px viewport and
+   scrolled the whole page sideways. */
+@media (max-width:900px) { .bar { gap:12px; } .bar nav { gap:18px; } }
+@media (max-width:560px) {
+  .bar { padding:10px 12px; gap:8px; }
+  .bar nav { gap:12px; }
+  .brand { font-size:var(--fs-3); }
+  #engine { font-size:var(--fs-1); }
 }
+@media (max-width:430px) { .bar { flex-wrap:wrap; gap:8px 10px; } }
 .bar nav a { color:var(--dim); text-decoration:none; display:inline-flex; align-items:center; }
 .bar nav a:hover { color:var(--fg); }
 /* The mark, not the word: everyone recognises it, and it reads the same in
@@ -1004,27 +1107,49 @@ let done = 0, expected = 0, nextId = 0;
 // each fetch its own meant six downloads of the same file, which is most of
 // what made the page feel slow to wake up.
 const workers = [];
-for (let i = 0; i < POOL; i++) {
-  const w = new Worker("worker.js");
-  w.onmessage = (e) => onWorkerMessage(w, e.data);
-  w.onerror = () => engineDied("the decoder could not start");
-  workers.push(w);
-}
 
-(async () => {
-  try {
-    let module;
-    try {
-      module = await WebAssembly.compileStreaming(fetch("qr.wasm"));
-    } catch {
-      // A host serving .wasm with the wrong Content-Type rejects the stream.
-      module = await WebAssembly.compile(await (await fetch("qr.wasm")).arrayBuffer());
-    }
-    for (const w of workers) w.postMessage({ type: "module", module });
-  } catch (e) {
-    engineDied("decoder failed: " + String((e && e.message) || e));
+// STARTING THE ENGINE IS NOT THE FIRST THING THE PAGE OWES ANYONE
+//
+// Six workers and a 5 MB WebAssembly module used to be built while the
+// document was still parsing: 1.6 MB over the wire and a compile long enough
+// to be one of the long tasks, both of them in front of the first paint, for
+// a decoder that cannot be used until somebody has chosen a file.
+//
+// So it waits for the page to be usable, then for a quiet moment - but not
+// past the first sign that a file is coming. A pointer going down or a file
+// entering the window starts it immediately, which is still well before the
+// drop lands.
+let engineStarted = false;
+function startEngine() {
+  if (engineStarted) return;
+  engineStarted = true;
+  for (let i = 0; i < POOL; i++) {
+    const w = new Worker("worker.js");
+    w.onmessage = (e) => onWorkerMessage(w, e.data);
+    w.onerror = () => engineDied("the decoder could not start");
+    workers.push(w);
   }
-})();
+  (async () => {
+    try {
+      let module;
+      try {
+        module = await WebAssembly.compileStreaming(fetch("qr.wasm"));
+      } catch {
+        // A host serving .wasm with the wrong Content-Type rejects the stream.
+        module = await WebAssembly.compile(await (await fetch("qr.wasm")).arrayBuffer());
+      }
+      for (const w of workers) w.postMessage({ type: "module", module });
+    } catch (e) {
+      engineDied("decoder failed: " + String((e && e.message) || e));
+    }
+  })();
+}
+for (const ev of ["pointerdown", "dragover", "paste", "keydown"]) {
+  addEventListener(ev, startEngine, { once: true, capture: true, passive: true });
+}
+const whenIdle = (fn) => (window.requestIdleCallback || ((f) => setTimeout(f, 120)))(fn, { timeout: 2000 });
+if (document.readyState === "complete") whenIdle(startEngine);
+else addEventListener("load", () => whenIdle(startEngine), { once: true });
 
 function engineDied(why) {
   if (!engineFailed) { engineFailed = true; engineReason = why; }
@@ -1255,6 +1380,10 @@ function clearCodeList() {
 }
 
 function enqueue(items, label) {
+  // Files can arrive without a pointer ever going down: the local app, a
+  // paste handled elsewhere, a test. Whatever the route, work has arrived and
+  // the engine is needed now.
+  startEngine();
   if (!items.length) { $("emptyText").textContent = t("res.nothing"); return; }
   const batch = { label: label || "", total: items.length, done: 0 };
   batches.push(batch);
@@ -1378,6 +1507,7 @@ async function switchCamera(id) {
 }
 
 async function openScanner() {
+  startEngine();
   $("scan").hidden = false;
   $("camMsg").textContent = "";
   $("scanFound").replaceChildren();
@@ -3300,6 +3430,9 @@ function paintLang() { $("lang").value = I18N.lang; }
 $("lang").onchange = (e) => I18N.setLang(e.target.value);
 // apply() rewrites every data-t node, which would put the singular folder
 // label back. Re-derive the ones that depend on state after it runs.
+// A search engine and a screen reader both take the page's language from
+// here, and it said "en" no matter which of the seven was showing.
+I18N.onChange(() => { document.documentElement.lang = I18N.current(); });
 I18N.onChange(() => { if (typeof rows !== "undefined") applyFilters(); });
 I18N.onChange(() => {
   paintLang();

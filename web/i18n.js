@@ -149,6 +149,10 @@
 
   global.I18N = {
     t, setLang, apply, onChange, languages, selfTest, keysUsedIn, fromTimeZone, ZONE_LANG,
+    // Which language is showing. The page needs it for <html lang>, which is
+    // what a search engine and a screen reader both read to know what
+    // language the words are in.
+    current: () => lang,
     get lang() { return lang; },
   };
 

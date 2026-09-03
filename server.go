@@ -131,7 +131,8 @@ func (s *apiServer) handler() http.Handler {
 
 	sub, err := fs.Sub(webFS, "web")
 	if err == nil {
-		mux.Handle("/", http.FileServer(http.FS(sub)))
+		// Compressed, and cacheable under a fingerprinted path. See webassets.go.
+		mux.Handle("/", newWebAssets(sub))
 	}
 	return s.guard(mux)
 }
