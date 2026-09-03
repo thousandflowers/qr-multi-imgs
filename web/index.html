@@ -487,7 +487,10 @@ li canvas.thumb { width:72px; height:72px; border-radius:9px; display:block;
 #lastFound .lbl { font-size:var(--fs-1); color:var(--ok); font-weight:600;
   text-transform:uppercase; letter-spacing:.04em; white-space:nowrap; }
 #lastCode { font-family:var(--mono); font-size:var(--fs-2); color:var(--fg);
-  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; flex:1; }
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;
+  /* shrink-only: with flex:1 the code claimed the whole strip and left the
+     copy button floating in the middle, away from what it copies. */
+  flex:0 1 auto; }
 /* The full history, on request. Scrolls rather than growing the dialog. */
 #scanFound { display:none; flex-direction:column; gap:4px; max-height:22vh;
   overflow:auto; margin-top:8px; }
@@ -874,14 +877,13 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
     <div id="lastFound" class="hide">
       <span class="lbl" data-t="cam.last"></span>
       <code id="lastCode"></code>
-      <button id="lastCopy" class="quiet" data-t="act.copy"></button>
+      <button id="lastCopy" class="iconBtn" data-t-title="act.copy" data-t-aria="act.copy"><svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>
       <span class="grow"></span>
       <button id="allToggle" class="quiet hide"></button>
     </div>
-    <!-- Only the most recent few: every code found is already becoming a row
-         in the list behind this dialog, and a growing pile of payloads inside
-         a viewfinder is a wall to read rather than a confirmation to glance
-         at. -->
+    <!-- The whole history, hidden until asked for and scrolling rather than
+         growing the dialog. It used to be capped at three, which meant the
+         fourth code was found, counted, and silently not shown. -->
     <div id="scanFound"></div>
   </div>
 </div>
