@@ -234,6 +234,11 @@ header { position:sticky; top:0; z-index:20; background:var(--panel);
   #engine { font-size:var(--fs-1); }
 }
 @media (max-width:430px) { .bar { flex-wrap:wrap; gap:8px 10px; } }
+@media (max-width:560px) {
+  li { grid-template-columns:auto minmax(0,1fr); }
+  .rowActions { grid-column:2; justify-content:flex-start; min-width:0; }
+  ul.compact li .meta { grid-template-columns:minmax(0,1fr); gap:4px; }
+}
 .bar nav a { color:var(--dim); text-decoration:none; display:inline-flex; align-items:center; }
 .bar nav a:hover { color:var(--fg); }
 /* The mark, not the word: everyone recognises it, and it reads the same in
@@ -403,10 +408,14 @@ ul.compact .hitMore { display:none; }
 ul.compact .advice, ul.compact .renamed { display:none; }
 /* Name and payload on one line: they are two facts about the same row, and
    stacking them doubled a list that is long by definition. */
-ul.compact li .meta { display:flex; align-items:center; gap:16px; min-width:0; }
-ul.compact li .nameline { flex:0 0 auto; max-width:38%; overflow:hidden;
+ul.compact li { align-items:center; }
+ul.compact li .meta { display:grid; grid-template-columns:minmax(0,22rem) minmax(0,1fr);
+  align-items:center; gap:16px; min-width:0; }
+ul.compact li .nameline { flex-wrap:nowrap; overflow:hidden;
   text-overflow:ellipsis; white-space:nowrap; }
-ul.compact .hitbox { flex:1 1 auto; min-width:0; }
+ul.compact li .nameline .name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+ul.compact li .tagline { justify-self:start; margin-top:0; }
+ul.compact .hitbox { min-width:0; margin-top:0; }
 ul.compact .hitShort { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 #summary { padding:8px 12px 0; color:var(--dim); font-size:var(--fs-2); }
 /* A payload that is a link looks like one but is a button: see the note where
@@ -447,12 +456,21 @@ input[type=search] { flex:1; min-width:9rem; }
 
 ul { list-style:none; margin:0; padding:0; max-height:38rem; overflow-y:auto;
      display:flex; flex-direction:column; }
-li { display:flex; gap:12px; padding:12px 16px; border-bottom:1px solid var(--line); }
+/* Picture, what it says, what you can do about it. Three columns, so the same
+   thing sits at the same place on every row: as a flex line the buttons came
+   after the filename and moved with its length, which is why nothing lined up
+   with anything. */
+li { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:12px;
+  align-items:start; padding:12px 16px; border-bottom:1px solid var(--line); }
+.rowActions { display:flex; align-items:center; gap:6px; justify-content:flex-end;
+  /* wide enough for both buttons and the tick whether or not a given row has
+     them, so the column does not breathe from row to row */
+  min-width:5.5rem; }
 li img { width:72px; height:72px; object-fit:cover; border-radius:9px;
   background:var(--soft); flex:none; }
 li .noimg { width:72px; height:72px; border-radius:9px; background:var(--soft); flex:none; }
 .meta { min-width:0; flex:1; }
-.nameline { display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+.nameline { display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; min-width:0; }
 .name { font-size:var(--fs-3); font-weight:600; word-break:break-all; }
 .where { font-family:var(--mono); font-size:var(--fs-1); color:var(--dim); word-break:break-all; }
 .renamed { font-size:var(--fs-1); color:var(--dim); margin-top:4px; }
@@ -478,8 +496,8 @@ li .noimg { width:72px; height:72px; border-radius:9px; background:var(--soft); 
 .field.secret .v { letter-spacing:.08em; }
 .field button { padding:4px 8px; font-size:var(--fs-1); flex:none; }
 
-.tagline { display:inline-block; margin-top:4px; font-size:var(--fs-1);
-  padding:4px 8px; border-radius:5px; }
+.tagline { display:inline-block; width:fit-content; margin-top:4px;
+  font-size:var(--fs-1); padding:4px 8px; border-radius:5px; }
 .tagline.no { background:var(--soft); color:var(--dim); }
 .tagline.found { background:var(--warn-soft); color:var(--warn); }
 .tagline.err { background:var(--bad-soft); color:var(--bad); }
@@ -2903,9 +2921,21 @@ function renderRow(r) {
     r.pointBtn = point;
   }
   line.appendChild(name);
+  if (r.path && r.path !== r.name) {
+    const where = document.createElement("span");
+    where.className = "where";
+    where.textContent = r.path.slice(0, r.path.length - r.name.length - 1);
+    line.appendChild(where);
+  }
+  // The buttons and the state used to sit after the name, which meant a long
+  // filename pushed them right and a short one pulled them left: nothing on
+  // any row lined up with the same thing on the row above. They are a column
+  // of the row now, not a suffix of the name.
+  const acts = document.createElement("div");
+  acts.className = "rowActions";
   // Only once the row has settled: offering to point at a code while the
   // scanner is still reading the file invites the user to race it.
-  if (r.pointBtn && !r.pending) line.appendChild(r.pointBtn);
+  if (r.pointBtn && !r.pending) acts.appendChild(r.pointBtn);
   if (!r.pending) {
     // The one mark the machine does not set. Everything else on this row is
     // the scanner's opinion; this is the reader's.
@@ -2917,17 +2947,12 @@ function renderRow(r) {
     flag.setAttribute("aria-label", flag.title);
     flag.setAttribute("aria-pressed", String(!!r.flagged));
     flag.onclick = () => toggleFlag(r);
-    line.appendChild(flag);
+    acts.appendChild(flag);
   }
-  if (r.path && r.path !== r.name) {
-    const where = document.createElement("span");
-    where.className = "where";
-    where.textContent = r.path.slice(0, r.path.length - r.name.length - 1);
-    line.appendChild(where);
-  }
-  if (!r.pending && !r.error) line.appendChild(svgPath(ICONS.tick, "tick"));
-  else if (r.pending) { const sp = document.createElement("div"); sp.className = "spin"; line.appendChild(sp); }
+  if (!r.pending && !r.error) acts.appendChild(svgPath(ICONS.tick, "tick"));
+  else if (r.pending) { const sp = document.createElement("div"); sp.className = "spin"; acts.appendChild(sp); }
   meta.appendChild(line);
+  r.actsEl = acts;
 
   if (!r.pending) {
     // Only while renaming is open. With it closed the line is a preview of a
@@ -2981,7 +3006,7 @@ function renderRow(r) {
     }
   }
   li.appendChild(meta);
-
+  li.appendChild(r.actsEl);
 }
 
 function repaintAll() {
