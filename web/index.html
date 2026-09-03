@@ -124,6 +124,13 @@ header { position:sticky; top:0; z-index:20; background:var(--panel);
 /* The source link and the language picker are unrelated controls that happened
    to sit 12px apart, close enough to read as one group. Separated properly. */
 .bar nav { margin-left:auto; display:flex; align-items:center; gap:32px; font-size:var(--fs-3); }
+/* On a phone the name, the reader's state and the nav do not fit on one line,
+   and the row simply ran off the side: 422px of content in a 390px window,
+   which scrolls the whole page sideways. It wraps instead. */
+@media (max-width:640px) {
+  .bar { flex-wrap:wrap; gap:8px 12px; }
+  .bar nav { gap:16px; }
+}
 .bar nav a { color:var(--dim); text-decoration:none; display:inline-flex; align-items:center; }
 .bar nav a:hover { color:var(--fg); }
 /* The mark, not the word: everyone recognises it, and it reads the same in
