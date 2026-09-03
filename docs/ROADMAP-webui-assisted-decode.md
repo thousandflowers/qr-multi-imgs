@@ -1180,6 +1180,13 @@ accessibility are held to the standard of the rest of the page.
 > server to run, no retention policy to enforce, no deletion tokens, no lawful
 > basis to establish, no unlabelled bucket filling up. The section below is kept
 > as the record of what was considered and why it was not worth it.
+>
+> The backend it would have needed is drawn in full in
+> [PHASE5-supabase-proposal.md](PHASE5-supabase-proposal.md): schema, RLS,
+> the Edge Function and its validation order, rate limiting that keeps no
+> address, the hashed deletion token, and the direct-client-write design that
+> was rejected and why. Nothing in it has been run. It exists so that reversing
+> this decision costs an argument with a document rather than a fresh design.
 
 Let a user who wants to help send the crop that defeated the decoder.
 
