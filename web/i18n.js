@@ -52,6 +52,12 @@
     "Europe/Berlin": "de", "Europe/Vienna": "de", "Europe/Zurich": "de",
     "Europe/Lisbon": "pt", "Atlantic/Azores": "pt", "Atlantic/Madeira": "pt",
     "America/Sao_Paulo": "pt", "America/Bahia": "pt", "America/Fortaleza": "pt",
+    // Simplified Chinese is the only Chinese block here, so Hong Kong, Macau
+    // and Taipei map to it too: the wrong script beats a language the reader
+    // does not speak. Adding zh-Hant is what actually fixes those three.
+    "Asia/Shanghai": "zh", "Asia/Chongqing": "zh", "Asia/Harbin": "zh",
+    "Asia/Urumqi": "zh", "Asia/Hong_Kong": "zh", "Asia/Macau": "zh",
+    "Asia/Taipei": "zh", "Asia/Singapore": "zh",
   };
 
   function fromTimeZone() {

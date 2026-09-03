@@ -260,10 +260,17 @@ button.quiet:hover:not(:disabled) { background:var(--panel); border-color:var(--
 /* Only when open. A bare display:flex on the contents of a <details>
    overrides the browser's own hiding, and the drawer stands open forever. */
 #moreWrap[open] .drawer { position:absolute; right:0; top:calc(100% + 6px); z-index:5;
-  display:flex; align-items:center; gap:8px; flex-wrap:wrap; width:max-content;
+  display:grid; grid-template-columns:auto 1fr auto; align-items:center;
+  gap:10px; width:max-content;
   max-width:min(90vw,30rem); background:var(--panel); border:1px solid var(--line);
   border-radius:10px; padding:12px; box-shadow:0 12px 32px rgba(0,0,0,.18); }
-#moreWrap .sep { width:1px; align-self:stretch; background:var(--line); }
+/* One row per menu, and the three columns line the two rows up with each
+   other rather than letting the wider label push its own row out of step. */
+#moreWrap .drawer > .barLabel { grid-column:1; white-space:nowrap; }
+#moreWrap .drawer select { min-width:7rem; }
+#moreWrap .drawer #qrMsg { grid-column:1 / -1; font-size:var(--fs-1); color:var(--dim); }
+#moreWrap .drawer hr { grid-column:1 / -1; width:100%; height:1px; margin:2px 0;
+  border:0; background:var(--line); }
 
 #renameWrap { border-bottom:1px solid var(--line); }
 #renameWrap summary { padding:12px 16px; cursor:pointer; font-size:var(--fs-2); color:var(--dim); }
@@ -311,6 +318,7 @@ ul.compact .hitShort { white-space:nowrap; overflow:hidden; text-overflow:ellips
 .stats span { font-size:var(--fs-1); color:var(--dim); }
 .stats .hit b { color:var(--ok); }
 .stats .warn b { color:var(--warn); }
+.stats .mute b { color:var(--dim); }
 
 .toolbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center;
   padding:12px 16px; border-bottom:1px solid var(--line); }
@@ -460,6 +468,14 @@ li canvas.thumb { width:72px; height:72px; border-radius:9px; display:block;
 #scanHead h3 { margin:0; font-size:var(--fs-5); }
 #autoWrap, #scanHead label { display:flex; align-items:center; gap:6px; font-size:var(--fs-2);
   color:var(--dim); cursor:pointer; }
+.camCap { position:absolute; left:50%; transform:translateX(-50%); pointer-events:none;
+  padding:8px 14px; border-radius:999px; font-size:var(--fs-2); font-weight:600;
+  color:#fff; background:rgba(17,17,17,.55); backdrop-filter:blur(6px);
+  border:1px solid rgba(255,255,255,.22); white-space:nowrap; max-width:92%;
+  overflow:hidden; text-overflow:ellipsis; }
+#camAim { top:14px; }
+.camCap.bottom { bottom:14px; }
+.camCap.hide { display:none; }
 #scanStage { position:relative; flex:1; min-height:0; background:#000;
   border-radius:12px; overflow:hidden; display:flex; justify-content:center; }
 /* The video is a source, never a displayed element. It used to sit under the
@@ -481,24 +497,31 @@ li canvas.thumb { width:72px; height:72px; border-radius:9px; display:block;
   padding:12px; box-shadow:0 12px 32px rgba(0,0,0,.18); }
 #camSet label { display:flex; align-items:center; gap:6px; font-size:var(--fs-2); color:var(--dim); }
 #scanCount { font-size:var(--fs-2); color:var(--ok); font-weight:600; }
-#lastFound { display:flex; align-items:center; gap:8px; padding:8px 10px;
-  background:var(--ok-soft); border:1px solid var(--ok); border-radius:10px; }
-#lastFound.hide { display:none; }
-#lastFound .lbl { font-size:var(--fs-1); color:var(--ok); font-weight:600;
-  text-transform:uppercase; letter-spacing:.04em; white-space:nowrap; }
-#lastCode { font-family:var(--mono); font-size:var(--fs-2); color:var(--fg);
-  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;
-  /* shrink-only: with flex:1 the code claimed the whole strip and left the
-     copy button floating in the middle, away from what it copies. */
-  flex:0 1 auto; }
-/* The full history, on request. Scrolls rather than growing the dialog. */
-#scanFound { display:none; flex-direction:column; gap:4px; max-height:22vh;
+/* Always on screen once there is anything in it. Scrolls rather than growing
+   the dialog. */
+#scanFound { display:none; flex-direction:column; gap:4px; max-height:24vh;
   overflow:auto; margin-top:8px; }
 #scanFound.open { display:flex; }
+.foundRow { display:flex; align-items:center; gap:8px; padding:4px 6px 4px 4px;
+  background:var(--ok-soft); border:1px solid transparent; border-radius:8px; }
+.foundRow .num { flex:none; width:22px; height:22px; border-radius:6px;
+  display:inline-flex; align-items:center; justify-content:center;
+  background:var(--ok); color:#fff; font-size:var(--fs-1); font-weight:700;
+  font-variant-numeric:tabular-nums; }
+.foundRow code { font-family:var(--mono); font-size:var(--fs-2); color:var(--fg);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; }
+.foundRow .iconBtn { width:26px; height:26px; flex:none; }
+/* The newest one, so a second code reads as an addition and not as the first
+   line quietly changing. */
+.foundRow.fresh { border-color:var(--ok); }
+@keyframes foundIn { from { opacity:0; transform:translateY(-4px); } }
+.foundRow.fresh { animation:foundIn .18s ease-out; }
+@media (prefers-reduced-motion:reduce) { .foundRow.fresh { animation:none; } }
 .iconBtn, .iconSum { display:inline-flex; align-items:center; justify-content:center;
   width:34px; height:34px; padding:0; border-radius:8px; cursor:pointer;
   border:1px solid transparent; background:none; color:var(--dim); list-style:none; }
 .iconBtn:hover, .iconSum:hover { background:var(--soft); color:var(--fg); border-color:var(--line); }
+.iconBtn.ok { color:var(--ok); border-color:var(--ok); }
 .iconSum::-webkit-details-marker { display:none; }
 #camSet[open] > .iconSum { border-color:var(--brand); color:var(--brand); }
 #scanFound div { font-family:var(--mono); font-size:var(--fs-2); color:var(--ok);
@@ -717,6 +740,9 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
           <div id="fAll" role="button" aria-pressed="true"><b id="sTotal">0</b><span data-t="stat.images"></span></div>
           <div id="fWith" class="hit" role="button" aria-pressed="false"><b id="sWith">0</b><span data-t="stat.with"></span></div>
           <div id="fUnread" class="warn" role="button" aria-pressed="false"><b id="sUnread">0</b><span data-t="stat.toRead"></span></div>
+          <!-- The images that hold nothing. Without it the three tiles never
+               add up to the total and the missing ones look like a bug. -->
+          <div id="fWithout" class="mute" role="button" aria-pressed="false"><b id="sWithout">0</b><span data-t="stat.without"></span></div>
         </div>
 
         <!-- Filters on their own line, exports on another. They were mixed
@@ -754,7 +780,7 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
               <label class="barLabel" for="fmt" data-t="res.export"></label>
               <select id="fmt"><option>csv</option><option>json</option><option>txt</option></select>
               <button id="save" class="quiet" data-t="act.download"></button>
-              <span class="sep"></span>
+              <hr>
               <label class="barLabel" for="qrFmt" data-t="qrgen.label"></label>
               <select id="qrFmt">
                 <option value="png">PNG</option>
@@ -848,6 +874,12 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
     <div id="scanStage">
       <video id="cam" playsinline muted></video>
       <canvas id="scanCanvas"></canvas>
+      <!-- Two captions, over the picture rather than under it, because that is
+           where the person is looking. The first says what to do and leaves as
+           soon as the first code is read; the second is the only sign that the
+           careful pass is running, now that it no longer freezes the view. -->
+      <div id="camAim" class="camCap" data-t="cam.aim"></div>
+      <div id="camReading" class="camCap bottom hide" data-t="cam.reading"></div>
     </div>
     <!-- One act under the picture, and the settings out of the way. Freezing
          is the only thing a person does here that is not pointing the camera. -->
@@ -874,16 +906,12 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
     <!-- The one just read, large enough to check at a glance, with the rest
          behind a count. A viewfinder answers one question - did that work -
          and the whole history belongs in the list this dialog sits on top of. -->
-    <div id="lastFound" class="hide">
-      <span class="lbl" data-t="cam.last"></span>
-      <code id="lastCode"></code>
-      <button id="lastCopy" class="iconBtn" data-t-title="act.copy" data-t-aria="act.copy"><svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>
-      <span class="grow"></span>
-      <button id="allToggle" class="quiet hide"></button>
-    </div>
-    <!-- The whole history, hidden until asked for and scrolling rather than
-         growing the dialog. It used to be capped at three, which meant the
-         fourth code was found, counted, and silently not shown. -->
+
+    <!-- Every code, numbered, newest on top, growing while you scan.
+         It was a single "last read" line with the rest behind a toggle, and a
+         person scanning a second code saw the same one line change: it read as
+         a scanner that had found one thing, not as one that was counting. The
+         number is what makes the pile legible once it has scrolled. -->
     <div id="scanFound"></div>
   </div>
 </div>
@@ -1256,7 +1284,8 @@ const live = {
   inFlight: false,
   dets: [],        // last detections, in the decoded frame's pixels
   frame: null,     // the space those are measured in
-  frozen: null,    // an ImageBitmap of the held frame, when frozen
+  frozen: null,    // an ImageBitmap of the held frame, when frozen by hand
+  lastAuto: 0,     // when the last automatic pass started
   selNat: null,    // a hand-drawn box on the held frame, in frame pixels
   drag: null,
   raf: 0,
@@ -1264,7 +1293,6 @@ const live = {
   natDets: [],    // boxes from the browser's own decoder, at full resolution
   natFrame: null,
   natBusy: false,
-  lastCode: "",   // the one just read, shown in front of the rest
   auto: true,     // hold the picture by itself when a code turns up
   mirror: false,  // this page never mirrors; the switch is for cameras that do
   busy: false,    // a careful pass is running; do not start another
@@ -1334,9 +1362,9 @@ async function openScanner() {
   $("camMsg").textContent = "";
   $("scanFound").replaceChildren();
   live.found.clear();
-  live.lastCode = "";
   $("scanFound").classList.remove("open");
-  $("lastFound").classList.add("hide");
+  $("camAim").classList.remove("hide");
+  $("camReading").classList.add("hide");
   $("scanCount").textContent = "";
   live.dets = [];
   live.frozen = null;
@@ -1374,25 +1402,46 @@ function closeScanner() {
 // list that lies. A viewfinder answers one question - did that one work - and
 // the full history belongs to the list this dialog sits on top of, where it
 // can be searched, copied and exported like everything else.
+const COPY_ICON = '<svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+  + 'stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/>'
+  + '<path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
+
 function paintFound() {
   const n = live.found.size;
   $("scanCount").textContent = n ? t("cam.found", { n }) : "";
   $("camMsg").textContent = t("cam.read", { n });
-  const last = live.lastCode;
-  $("lastFound").classList.toggle("hide", !last);
-  if (last) $("lastCode").textContent = last;
-  const all = $("allToggle");
-  all.classList.toggle("hide", n < 2);
-  all.textContent = $("scanFound").classList.contains("open")
-    ? t("cam.hideAll") : t("cam.showAll", { n });
+  $("scanFound").classList.toggle("open", n > 0);
 }
 
 function rememberFound(code) {
-  live.lastCode = code;
+  const list = $("scanFound");
+  for (const el of list.querySelectorAll(".fresh")) el.classList.remove("fresh");
   const row = document.createElement("div");
-  row.textContent = code;
-  $("scanFound").prepend(row);
+  row.className = "foundRow fresh";
+  const num = document.createElement("span");
+  num.className = "num";
+  num.textContent = String(live.found.size);
+  const code_ = document.createElement("code");
+  code_.textContent = code;
+  const copy = document.createElement("button");
+  copy.className = "iconBtn";
+  copy.title = t("act.copy");
+  copy.setAttribute("aria-label", t("act.copy"));
+  copy.innerHTML = COPY_ICON;
+  copy.onclick = () => copyText(code, copy);
+  row.append(num, code_, copy);
+  list.prepend(row);
+  list.scrollTop = 0;
   paintFound();
+}
+
+// One clipboard write with the same feedback everywhere it is used.
+async function copyText(text, btn) {
+  try {
+    await navigator.clipboard.writeText(text);
+    btn.classList.add("ok");
+    setTimeout(() => btn.classList.remove("ok"), 900);
+  } catch { /* denied; the code is on screen to select by hand */ }
 }
 
 function setFreezeLabel(frozen) {
@@ -1486,6 +1535,8 @@ function liveCanvas(w, h) {
 // decode from a crop. So under two, the only useful thing to say is "closer",
 // and over two it is worth stopping to look properly.
 const MIN_MODULE_PX = 2.0;
+// How long to wait before looking properly at the same shot again.
+const AUTO_RETRY_MS = 1500;
 
 // naturalModule converts the module size the decoder reported - in the shrunk
 // frame it was given - into the size it would have in the source. That is the
@@ -1523,7 +1574,12 @@ function adoptFrameResult(msg) {
 // nothing. Found and big enough, hold the picture and look properly at every
 // one of them.
 function considerAuto() {
-  if (live.frozen || live.busy) return;
+  // Freezing used to end the loop by itself: the picture stopped, so the same
+  // boxes stopped arriving. Nothing stops now, and an unreadable code sitting
+  // in shot would start a full-resolution pass every frame. This is the floor
+  // between attempts - a code that stays unread is retried, just not 30 times
+  // a second.
+  if (live.frozen || live.busy || Date.now() - live.lastAuto < AUTO_RETRY_MS) return;
   const read = new Set((live.natDets || []).filter((d) => d.text).map((d) => d.text));
   const unread = live.dets.filter((d) => !d.text);
   // Nothing to hold the picture for if the other engine already read
@@ -1545,21 +1601,26 @@ function considerAuto() {
 // first has read half the card.
 async function autoPass(unread) {
   live.busy = true;
+  live.lastAuto = Date.now();
   const v = $("cam");
+  let bmp = null;
   try {
     if (!v.videoWidth) return;
-    live.frozen = await createImageBitmap(v);
-    setFreezeLabel(true);
+    // Grabbed, not frozen. Holding the picture still was how the careful pass
+    // used to buy a steady image, but it took the viewfinder away from the
+    // person holding the camera - and a copy of the frame is just as steady.
+    // The picture keeps moving; only this bitmap stands still.
+    bmp = await createImageBitmap(v);
+    $("camReading").classList.remove("hide");
     $("camMsg").textContent = t("cam.checking");
-    paintScanner();
 
     // The boxes are in the live frame's pixels; the careful pass runs on the
-    // held frame, which is the camera's own resolution.
-    const held = { w: live.frame.w, h: live.frame.h, naturalW: live.frozen.width, naturalH: live.frozen.height };
+    // grabbed frame, which is the camera's own resolution.
+    const held = { w: live.frame.w, h: live.frame.h, naturalW: bmp.width, naturalH: bmp.height };
     const canvas = document.createElement("canvas");
-    canvas.width = live.frozen.width;
-    canvas.height = live.frozen.height;
-    canvas.getContext("2d").drawImage(live.frozen, 0, 0);
+    canvas.width = bmp.width;
+    canvas.height = bmp.height;
+    canvas.getContext("2d").drawImage(bmp, 0, 0);
     const blob = await new Promise((res) => canvas.toBlob(res, "image/png"));
 
     let fresh = 0;
@@ -1583,20 +1644,18 @@ async function autoPass(unread) {
     $("camMsg").textContent = fresh
       ? t("cam.autoGot", { n: fresh, found: unread.length })
       : t("cam.autoNone");
-    // Nothing came of it: give the picture back rather than leaving the person
-    // staring at a frozen frame they did not ask for.
-    if (!fresh) {
-      live.frozen.close();
-      live.frozen = null;
-      setFreezeLabel(false);
-    }
   } finally {
+    if (bmp) bmp.close();
     live.busy = false;
+    $("camReading").classList.add("hide");
     paintScanner();
   }
 }
 
 function paintScanner(v) {
+  // The aiming caption has done its job the moment something is read, and it
+  // has no business over a frame someone froze to draw on.
+  $("camAim").classList.toggle("hide", live.found.size > 0 || !!live.frozen);
   const c = $("scanCanvas");
   const ctx = c.getContext("2d");
   const dpr = window.devicePixelRatio || 1;
@@ -1906,7 +1965,7 @@ function paintProgress() {
 const { rowRank, isUnread, settledEmpty } = Order;
 
 function paintStats() {
-  let withQR = 0, codes = 0, errs = 0, unread = 0, settled = 0;
+  let withQR = 0, codes = 0, errs = 0, unread = 0, settled = 0, without = 0;
   const uniq = new Set();
   for (const r of rows) {
     if (r.pending) continue;
@@ -1914,20 +1973,22 @@ function paintStats() {
     if (r.error) errs++;
     else if (r.codes.length) { withQR++; codes += r.codes.length; for (const c of r.codes) uniq.add(c); }
     else if (isUnread(r)) unread++;
+    else if (settledEmpty(r) && !isUnread(r)) without++;
   }
   $("sTotal").textContent = rows.length;
   $("sWith").textContent = withQR;
   $("sUnread").textContent = unread;
+  $("sWithout").textContent = without;
 
 }
 
 let activeTile = "fAll";
 // fCodes used to sit here mapping to "with" - the same rows as fWith, beside
 // it, with a different number on it. One filter, one control.
-// Three tiles now. "without" and "error" lost their tiles - a bucket nobody
-// acts on and a tile that read 0 forever - but the rows are still reachable:
-// everything is in "all", and an unopenable file says so on its own row.
-const FILTERS = { fAll: "all", fWith: "with", fUniq: "unique", fUnread: "unread" };
+// "error" has no tile: it read 0 forever, and an unopenable file already says
+// so on its own row.
+const FILTERS = { fAll: "all", fWith: "with", fUniq: "unique",
+  fUnread: "unread", fWithout: "without" };
 const filterOf = () => FILTERS[activeTile] || "all";
 
 // The kind filter is a second axis, not another tile: a row can be "with a
@@ -2794,14 +2855,6 @@ $("scanFreeze").onclick = toggleFreeze;
 $("camPick").onchange = (e) => switchCamera(e.target.value);
 $("camAuto").onchange = (e) => { live.auto = e.target.checked; };
 $("camFlip").onchange = (e) => { live.mirror = e.target.checked; paintScanner(); };
-$("allToggle").onclick = () => { $("scanFound").classList.toggle("open"); paintFound(); };
-$("lastCopy").onclick = async (e) => {
-  try {
-    await navigator.clipboard.writeText(live.lastCode || "");
-    e.target.textContent = t("act.copied");
-    setTimeout(() => { e.target.textContent = t("act.copy"); }, 1200);
-  } catch { /* denied; the code is on screen to select by hand */ }
-};
 
 // On a frozen frame the overlay behaves like the area picker: drag a box, and
 // reading it goes through the same crop path.
