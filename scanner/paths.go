@@ -17,7 +17,7 @@ type scanJob struct {
 
 // collectJobs turns a mixed list of files and directories into a work list.
 //
-// A directory contributes its supported image files, non-recursively — the rule
+// A directory contributes its supported image files, non-recursively, the rule
 // a folder scan has always used. A file contributes itself whatever its
 // extension: naming a file is an explicit request, and refusing it because the
 // extension is unfamiliar would be second-guessing the caller. If it turns out
@@ -126,8 +126,8 @@ func runJobs(jobs []scanJob, onResult func(ScanResult)) []ScanResult {
 	return list
 }
 
-// ScanPaths scans every file the given paths name — directories contribute
-// their supported images, files contribute themselves — and returns one Summary
+// ScanPaths scans every file the given paths name, directories contribute
+// their supported images, files contribute themselves, and returns one Summary
 // covering all of them together. Formats may be mixed freely.
 func ScanPaths(paths []string) (*Summary, error) {
 	start := time.Now()

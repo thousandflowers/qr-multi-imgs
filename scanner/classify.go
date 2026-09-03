@@ -2,7 +2,7 @@ package scanner
 
 // Why an image ended up where it did.
 //
-// Before this, a scan answered one question — did a code come out? — and three
+// Before this, a scan answered one question (did a code come out?)and three
 // different failures gave the same answer: a receipt whose QR is blown out by
 // glare, a photo of a cat, and an image whose finder patterns are plainly
 // visible but whose payload no strategy could recover. Telling a user "no QR
@@ -25,8 +25,8 @@ import (
 //
 // There are three, deliberately. A finer split built on partial finder
 // centres was measured first and did not survive contact with the detector:
-// those centres fire where there is no code at all — a uniform-noise image
-// yields one — so a bucket built on them would promise a code the image does
+// those centres fire where there is no code at all, a uniform-noise image
+// yields one, so a bucket built on them would promise a code the image does
 // not contain. Three buckets each say something the evidence supports.
 //
 // What the evidence does support is the full triple: FindMulti locating three
@@ -36,17 +36,17 @@ import (
 type Classification string
 
 const (
-	// Decoded — at least one payload came out. It says nothing about whether
+	// Decoded, at least one payload came out. It says nothing about whether
 	// every code in the image was read; an image holding one readable and one
 	// unreadable code is Decoded, because it did decode.
 	Decoded Classification = "DECODED"
 
-	// QRDetectedDecodeFailed — a full finder-pattern triple was located and no
+	// QRDetectedDecodeFailed, a full finder-pattern triple was located and no
 	// strategy could read a payload from it. This is the actionable one: the
 	// tool saw what the user sees.
 	QRDetectedDecodeFailed Classification = "QR_DETECTED_DECODE_FAILED"
 
-	// NoQRFound — nothing decoded and no finder pattern was located by any
+	// NoQRFound, nothing decoded and no finder pattern was located by any
 	// colour projection. It is not proof there is no code: a code invisible to
 	// every projection is invisible to the detector too.
 	NoQRFound Classification = "NO_QR_FOUND"
@@ -67,7 +67,7 @@ func (c Classification) Reason() string {
 	return ""
 }
 
-// Box is an axis-aligned bounding box in ORIGINAL-image pixel coordinates —
+// Box is an axis-aligned bounding box in ORIGINAL-image pixel coordinates,
 // the same space hit.points live in, for the same reason. See the coordinate
 // contract in hits.go. The detector that produces these runs on an unscaled,
 // uncropped projection, so no mapping back is needed today; a future detector
@@ -99,7 +99,7 @@ type Detection struct {
 	ModuleSize float64 `json:"module_size"`
 	// Version is the estimated QR version, 1-40, or 0 when the geometry does
 	// not yield a plausible one. It is an estimate from measured distances,
-	// not a value read out of the code — the code did not decode.
+	// not a value read out of the code, the code did not decode.
 	Version int `json:"version,omitempty"`
 }
 
@@ -162,7 +162,7 @@ func detectionOf(info *detector.FinderPatternInfo, bounds image.Rectangle) (Dete
 		return Detection{}, false
 	}
 
-	// The fourth corner is not detected — a QR has no finder pattern there —
+	// The fourth corner is not detected, a QR has no finder pattern there,
 	// so it is completed as a parallelogram. On a perspective-warped photo this
 	// is an approximation, and an approximation that errs outward is the right
 	// kind: the box is a hint about where to look, and a box slightly too big

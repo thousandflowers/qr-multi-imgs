@@ -189,13 +189,13 @@ func runCorpus(t *testing.T, dir string) {
 	var codesExpected, codesMatched, codesSpurious int
 	var failures []string
 
-	// The harness measures the CLI path — ScanImage, i.e. ScanFast — on
+	// The harness measures the CLI path (ScanImage, i.e. ScanFast)on
 	// purpose. Ground truth is built with ScanExhaustive by corpusgen, so the
 	// gap between the two numbers is exactly the set of codes the fast path
 	// misses and Vision recovers, and what a browser build can never reach.
 	// It cannot pass an expected count: ScanMode has no field for one.
 	//
-	// ponytail: sequential. Thousands of photos will take minutes — parallelise
+	// ponytail: sequential. Thousands of photos will take minutes, parallelise
 	// with the scanWorkers pool from scanner.go if that becomes the bottleneck.
 	// Which stage read each image, counted across the corpus. This is the
 	// baseline a retry ladder is measured against: a rung that never appears

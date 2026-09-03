@@ -24,19 +24,19 @@ phone at screen, type the code into a spreadsheet.
 
 Every CLI QR tool I found decodes one image and prints a string. None of
 them could take a folder, keep the results, and then do something with
-them — sort the images, delete the misfires, export a CSV. So I wrote one.
+them, sort the images, delete the misfires, export a CSV. So I wrote one.
 It's a Bubble Tea TUI: point it at a folder, watch the progress bar, then
 press a key to export JSON/CSV/TXT, split the folder into with_qr/ and
 without_qr/, delete the images that had no code, or regenerate the codes
 as PNG/JPG/SVG.
 
 The part I did not expect to be interesting was the benchmark. I ran it
-against lovasoa/qrcode-dataset — 3332 deliberately damaged and distorted
+against lovasoa/qrcode-dataset, 3332 deliberately damaged and distorted
 QR images. First version: 1863 decoded, 1469 missed. 56%, in seven and a
 half minutes.
 
 I assumed the misses were a decoder-quality problem and went looking for a
-better decoder. They weren't — but my first explanation was wrong too. I
+better decoder. They weren't, but my first explanation was wrong too. I
 thought density alone killed them: 100+ modules in a 256px image is under two
 pixels per module. So I measured it, and a clean 153x153-module QR at 256px
 decodes fine straight from the pixels. Density is not the killer. The dataset's
@@ -54,7 +54,7 @@ I want to be precise about that, because "100% detection" reads like a
 decoder claim and it isn't: ~56% of the dataset decodes from the image
 alone, and the rest decodes from metadata the dataset happens to publish.
 Real-world photos have no .npy next to them. For those, the honest number
-is the 56% path — plus, on macOS, an Apple Vision backend that handles
+is the 56% path, plus, on macOS, an Apple Vision backend that handles
 photographed and perspective-warped codes the pure-Go path misses.
 
 Pure Go otherwise: gozxing for decoding, no zbar, no ImageMagick, nothing

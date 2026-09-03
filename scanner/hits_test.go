@@ -286,7 +286,7 @@ func TestScanImageModeFindsEveryCode(t *testing.T) {
 	}
 }
 
-// unionAllStrategies decodes with every strategy and no early exit — what
+// unionAllStrategies decodes with every strategy and no early exit, what
 // decodeRaster did before finder-pattern accounting was added.
 func unionAllStrategies(img image.Image) []string {
 	var hits []hit
@@ -300,7 +300,7 @@ func unionAllStrategies(img image.Image) []string {
 // The invariant that makes the early exit safe: stopping once as many codes
 // have been decoded as the detector could see must return exactly what running
 // every strategy returns. This is what separates an evidence-based stop from
-// the guesswork it replaced — a heuristic would quietly return less on some
+// the guesswork it replaced, a heuristic would quietly return less on some
 // input, and only a comparison against the full union can show that it does
 // not.
 func TestEarlyExitMatchesFullUnion(t *testing.T) {

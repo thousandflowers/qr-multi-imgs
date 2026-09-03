@@ -101,7 +101,7 @@ func TestExport_unknownFormat_returnsError(t *testing.T) {
 
 	path, err := Export(sampleResults(), ExportFormat("xml"), dir)
 	if err == nil {
-		t.Fatalf("Export(xml) = %q, nil — want error for unsupported format", path)
+		t.Fatalf("Export(xml) = %q, nil, want error for unsupported format", path)
 	}
 }
 

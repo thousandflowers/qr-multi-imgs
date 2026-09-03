@@ -3,7 +3,7 @@
 //
 // This file exists because of a bug it now makes impossible. The Go side
 // located QR codes it could not read, computed a bounding box for each, and
-// marshalled them across the wasm boundary — and the worker copied
+// marshalled them across the wasm boundary, and the worker copied
 // `res.classification` into `out.reason` and dropped `res.detections` on the
 // floor. Nothing broke, nothing errored, and the page simply never had the
 // geometry. The web UI's whole reason for wanting it is to pre-draw a box the
@@ -11,8 +11,8 @@
 // unbuildable from data that never arrived.
 //
 // So the hop is a named function with a test rather than three assignments in
-// a worker. A worker cannot be loaded by node — importScripts and self do not
-// exist there — which is why the mapping lives here and the worker calls it.
+// a worker. A worker cannot be loaded by node, importScripts and self do not
+// exist there, which is why the mapping lives here and the worker calls it.
 //
 // It draws nothing. Mapping a box onto a canvas is the next step and belongs
 // with the canvas.

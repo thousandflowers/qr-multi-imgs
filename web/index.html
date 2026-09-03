@@ -23,37 +23,37 @@
 :root {
   color-scheme: light;
 
-  /* TYPE SCALE — seven steps, ratio 1.2 from a 16px base.
+  /* TYPE SCALE, seven steps, ratio 1.2 from a 16px base.
      Before this the page used 24 distinct font sizes, eleven of which differed
      from a neighbour by less than one pixel (.68 / .69 / .70 / .71 / .72 / .73
      rem). Distinctions the eye cannot resolve are not hierarchy, they are
      noise, and they make every new element a fresh decision. */
-  --fs-1: 0.75rem;    /* 12px — micro labels */
-  --fs-2: 0.8125rem;  /* 13px — captions, chips */
-  --fs-3: 0.875rem;   /* 14px — secondary text */
-  --fs-4: 1rem;       /* 16px — body */
-  --fs-5: 1.1875rem;  /* 19px — subheads */
-  --fs-6: 1.5rem;     /* 24px — section titles */
-  --fs-7: 2rem;       /* 32px — the one hero line */
+  --fs-1: 0.75rem;    /* 12px, micro labels */
+  --fs-2: 0.8125rem;  /* 13px, captions, chips */
+  --fs-3: 0.875rem;   /* 14px, secondary text */
+  --fs-4: 1rem;       /* 16px, body */
+  --fs-5: 1.1875rem;  /* 19px, subheads */
+  --fs-6: 1.5rem;     /* 24px, section titles */
+  --fs-7: 2rem;       /* 32px, the one hero line */
 
   /* Line heights land on a 4px grid so stacked text keeps a vertical rhythm
      and the eye returns reliably to the start of the next line. */
   --lh-1: 1rem; --lh-2: 1.25rem; --lh-3: 1.5rem; --lh-4: 1.75rem; --lh-5: 2.25rem;
 
-  /* SPACING — 4/8pt grid, the scale Apple and Google both build on. The page
+  /* SPACING, 4/8pt grid, the scale Apple and Google both build on. The page
      had twenty spacing values including .28rem and .45rem, which is not a
      system, it is an accumulation. */
   --s-1:4px; --s-2:8px; --s-3:12px; --s-4:16px; --s-5:20px;
   --s-6:24px; --s-7:32px; --s-8:48px;
 
-  /* MEASURE — prose stops at a comfortable line length instead of running the
+  /* MEASURE, prose stops at a comfortable line length instead of running the
      full width of a wide window. */
   --measure: 68ch;
 
   /* COLOUR. Every text pair below clears WCAG 2.2 AA (4.5:1) against the
      LIGHTEST surface it can sit on, not just against the panel. --faint failed
      that badly: 2.64:1 on white, 2.35:1 on the soft surface. Raising it to
-     pass put it within a hair of --dim, which is the honest answer — there was
+     pass put it within a hair of --dim, which is the honest answer, there was
      never room for three legible greys here. So there are two text greys now,
      and --faint is demoted to non-text use (icons, rules, dividers) where the
      3:1 rule for UI components applies. */
@@ -80,13 +80,13 @@
    whole. Nothing here is dead, it is just not the default. */
 :root[data-theme="dark"] {
     /* Material's advice for dark surfaces: a dark grey rather than pure black,
-       lighter overlays for elevation, and desaturated accents — a saturated
+       lighter overlays for elevation, and desaturated accents, a saturated
        hue that reads well on white glares on a dark ground. */
     --bg:#0f1216; --panel:#171b21; --fg:#e7eaef;
     --dim:#9aa3b0;      /* 6.78:1 on --panel */
-    --faint:#818996;    /* 4.53:1 on --soft — was 3.39:1 */
+    --faint:#818996;    /* 4.53:1 on --soft, was 3.39:1 */
     --line:#262c35; --soft:#1d222a;
-    --brand:#6180fa;    /* 4.52:1 on --brand-soft — was 4.32:1 */
+    --brand:#6180fa;    /* 4.52:1 on --brand-soft, was 4.32:1 */
     --brand-fg:#0f1216; --brand-soft:#1b2233;
     --ok:#69c48c; --ok-soft:#16281d; --bad:#e8776a; --bad-soft:#2a1b19;
     --warn:#e0b062; --warn-soft:#2a2314;
@@ -432,10 +432,13 @@ li.pending { opacity:.72; }
 .tick { width:16px; height:16px; color:var(--ok); flex:none; }
 .state { display:flex; align-items:center; padding-top:4px; }
 li .thumbwrap { position:relative; flex:none; }
+li .thumbwrap.clickable { cursor:zoom-in; border-radius:9px; }
+li .thumbwrap.clickable:hover { outline:2px solid var(--brand); outline-offset:2px; }
+li .thumbwrap.clickable:focus-visible { outline:2px solid var(--brand); outline-offset:2px; }
 /* The overlay canvas fills the same 48px slot an <img> thumbnail does, but it
    contains the picture instead of covering it: a code that failed to decode is
    often at an edge, and a cover crop would throw away the thing the box points
-   at. No border of its own — the drawn box is the signal, and a second
+   at. No border of its own, the drawn box is the signal, and a second
    rectangle around the tile competes with it. */
 li canvas.thumb { width:72px; height:72px; border-radius:9px; display:block;
   background:var(--soft); }
@@ -483,6 +486,9 @@ li canvas.thumb { width:72px; height:72px; border-radius:9px; display:block;
 #camAim { top:14px; }
 .camCap.bottom { bottom:14px; }
 .camCap.hide { display:none; }
+#camHelp { margin:0; font-size:var(--fs-1); color:var(--dim); }
+.iconBtn.big { width:44px; height:44px; border-color:var(--line); background:var(--panel); }
+.iconBtn.big:hover { border-color:var(--brand); color:var(--brand); }
 #scanStage { position:relative; flex:1; min-height:0; background:#000;
   border-radius:12px; overflow:hidden; display:flex; justify-content:center; }
 /* The video is a source, never a displayed element. It used to sit under the
@@ -582,9 +588,13 @@ li canvas.thumb { width:72px; height:72px; border-radius:9px; display:block;
 li .point.onHover { opacity:0; transition:opacity .12s; }
 li:hover .point.onHover, li .point.onHover:focus-visible { opacity:1; }
 @media (hover:none) { li .point.onHover { opacity:1; } }
-li .point { font:inherit; font-size:var(--fs-2); padding:4px 8px; cursor:pointer;
+/* Square now that it holds a crosshair rather than a word, and never below
+   the 24px a finger needs. */
+li .point { font:inherit; cursor:pointer; width:30px; height:30px; padding:0;
+  display:inline-flex; align-items:center; justify-content:center;
   border:1px solid var(--line); background:var(--panel); color:var(--dim);
-  border-radius:999px; white-space:nowrap; }
+  border-radius:999px; }
+li .point svg { width:17px; height:17px; }
 li .point:hover { border-color:var(--brand); color:var(--brand); }
 li .point.lead { background:var(--warn-soft); border-color:var(--warn); color:var(--warn);
   font-weight:600; }
@@ -628,7 +638,7 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
   <div class="hero">
     <h1 data-t="hero.title"></h1>
     <p data-t="hero.sub"></p>
-    
+
   </div>
 
   <div class="tool">
@@ -786,7 +796,7 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
             <div class="drawer">
               <label class="barLabel" for="fmt" data-t="res.export"></label>
               <select id="fmt"><option>csv</option><option>json</option><option>txt</option></select>
-              <button id="save" class="quiet" data-t="act.download"></button>
+              <button id="save" class="iconBtn" data-t-title="act.download" data-t-aria="act.download"></button>
               <hr>
               <label class="barLabel" for="qrFmt" data-t="qrgen.label"></label>
               <select id="qrFmt">
@@ -891,7 +901,7 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
     <!-- One act under the picture, and the settings out of the way. Freezing
          is the only thing a person does here that is not pointing the camera. -->
     <div id="scanBar">
-      <button id="scanFreeze" class="primary" data-t="cam.freeze"></button>
+      <button id="scanFreeze" class="iconBtn big" data-t-title="cam.freeze" data-t-aria="cam.freeze"></button>
       <span class="grow"></span>
       <details id="camSet">
         <summary class="iconSum" data-t-title="cam.settings" data-t-aria="cam.settings"><svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 3.5v2M12 18.5v2M3.5 12h2M18.5 12h2M6 6l1.4 1.4M16.6 16.6L18 18M18 6l-1.4 1.4M7.4 16.6L6 18"/></svg></summary>
@@ -910,6 +920,9 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
       </details>
     </div>
     <p id="camMsg" role="status" aria-live="polite"></p>
+    <!-- What the view does and what the one button is for. The controls were
+         here with nothing saying how any of it is used. -->
+    <p id="camHelp" data-t="cam.help"></p>
     <!-- The one just read, large enough to check at a glance, with the rest
          behind a count. A viewfinder answers one question - did that work -
          and the whole history belongs in the list this dialog sits on top of. -->
@@ -939,7 +952,7 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
       <canvas id="inspCanvas" tabindex="0"></canvas>
       <div id="inspZoom">
         <button id="inspZoomOut" data-t-title="insp.zoomOut" aria-label="-">&minus;</button>
-        <button id="inspFit" data-t-title="insp.fit" data-t="insp.fitShort"></button>
+        <button id="inspFit" data-t-title="insp.fit" data-t-aria="insp.fit"></button>
         <button id="inspZoomIn" data-t-title="insp.zoomIn" aria-label="+">+</button>
       </div>
     </div>
@@ -1041,7 +1054,7 @@ function onWorkerMessage(w, msg) {
   if (msg.type === "fatal") { engineDied("decoder failed: " + msg.error); return; }
   // An assisted decode of one region the user pointed at. Routed here rather
   // than into finish(), which would overwrite the row's own scan with the
-  // crop's — the crop is an addition to what the row knows, not a replacement.
+  // crop's, the crop is an addition to what the row knows, not a replacement.
   if (msg.type === "cropResult") {
     const waiting = cropWaiting.get(msg.id);
     if (waiting) { cropWaiting.delete(msg.id); waiting(msg); }
@@ -1099,7 +1112,7 @@ function finish(msg) {
   // of writing it. See err.unopenable.
   r.errorKey = msg.errorKey || "";
   // Payloads, the reason there are none, and the geometry of any code that was
-  // located and could not be read — plus the pixel frame that geometry is
+  // located and could not be read, plus the pixel frame that geometry is
   // measured in. Result.adopt rather than three assignments because the
   // geometry was silently dropped on this hop once already; see result.js.
   //
@@ -1409,9 +1422,31 @@ function closeScanner() {
 // list that lies. A viewfinder answers one question - did that one work - and
 // the full history belongs to the list this dialog sits on top of, where it
 // can be searched, copied and exported like everything else.
+const SVG = (d) => '<svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+  + 'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>';
+const ICON = {
+  copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
+  open: '<path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
+  eye: '<path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6z"/><circle cx="12" cy="12" r="2.6"/>',
+  eyeOff: '<path d="M4 4l16 16"/><path d="M10 5.3A8.9 8.9 0 0 1 12 5c6.4 0 10 6 10 6a17 17 0 0 1-3.3 3.9"/><path d="M6.4 7.6A17 17 0 0 0 2 11s3.6 6 10 6a9.7 9.7 0 0 0 3.7-.7"/>',
+  pause: '<rect x="7" y="5" width="3.5" height="14" rx="1"/><rect x="13.5" y="5" width="3.5" height="14" rx="1"/>',
+  play: '<path d="M7 4.8l12 7.2-12 7.2z"/>',
+  down: '<path d="M12 4v11"/><path d="M7.5 11L12 15.5 16.5 11"/><path d="M5 19h14"/>',
+  fit: '<path d="M9 4H5a1 1 0 0 0-1 1v4"/><path d="M15 4h4a1 1 0 0 1 1 1v4"/><path d="M15 20h4a1 1 0 0 0 1-1v-4"/><path d="M9 20H5a1 1 0 0 1-1-1v-4"/>',
+  target: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8.5"/>',
+};
 const COPY_ICON = '<svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
   + 'stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/>'
   + '<path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
+
+// Icons that the markup asks for by id, filled once at startup so the icon
+// vocabulary stays in one place instead of being pasted into the HTML.
+function paintIcons() {
+  for (const [id, icon] of [["save", ICON.down], ["inspFit", ICON.fit]]) {
+    const el = $(id);
+    if (el && !el.querySelector("svg")) el.insertAdjacentHTML("afterbegin", SVG(icon));
+  }
+}
 
 function paintFound() {
   const n = live.found.size;
@@ -1452,7 +1487,10 @@ async function copyText(text, btn) {
 }
 
 function setFreezeLabel(frozen) {
-  $("scanFreeze").textContent = t(frozen ? "cam.resume" : "cam.freeze");
+  const b = $("scanFreeze");
+  b.innerHTML = SVG(frozen ? ICON.play : ICON.pause);
+  b.title = t(frozen ? "cam.resume" : "cam.freeze");
+  b.setAttribute("aria-label", b.title);
 }
 
 // stageRect is where the picture actually sits inside the overlay canvas. The
@@ -1858,7 +1896,10 @@ function paintRenameExample() {
 
 function paintQrCount() {
   const n = recreatable().length;
-  $("qrSave").textContent = t("qrgen.download", { n });
+  // Arrow plus the count. textContent would take the icon with it.
+  $("qrSave").innerHTML = SVG(ICON.down) + "<span>" + n + "</span>";
+  $("qrSave").title = t("qrgen.download", { n });
+  $("qrSave").setAttribute("aria-label", $("qrSave").title);
   $("qrSave").disabled = n === 0;
 }
 
@@ -1968,7 +2009,7 @@ function paintProgress() {
 
 // The web's row order and the two questions behind it live in order.js, next
 // to the test that pins them. The terminal orders the same data differently on
-// purpose — see resultRank in scanner/scanner.go.
+// purpose, see resultRank in scanner/scanner.go.
 const { rowRank, isUnread, settledEmpty } = Order;
 
 function paintStats() {
@@ -2155,6 +2196,18 @@ function svgPath(d, cls) {
   return svg;
 }
 
+// Icon-only, and never nameless: the word moves to title and aria-label, so a
+// pointer gets a tooltip and a screen reader gets the same word it had before.
+function iconButton(icon, label, onClick) {
+  const b = document.createElement("button");
+  b.className = "iconBtn";
+  b.innerHTML = SVG(icon);
+  b.title = label;
+  b.setAttribute("aria-label", label);
+  b.onclick = onClick;
+  return b;
+}
+
 function smallButton(label, onClick) {
   const b = document.createElement("button");
   b.textContent = label;
@@ -2163,11 +2216,11 @@ function smallButton(label, onClick) {
 }
 
 function copyButton(text) {
-  return smallButton(t("act.copy"), async (e) => {
-    await navigator.clipboard.writeText(text);
+  return iconButton(ICON.copy, t("act.copy"), async (e) => {
     const b = e.currentTarget;
-    b.textContent = t("act.copied");
-    setTimeout(() => (b.textContent = t("act.copy")), 1200);
+    await navigator.clipboard.writeText(text);
+    b.classList.add("ok");
+    setTimeout(() => b.classList.remove("ok"), 900);
   });
 }
 
@@ -2203,11 +2256,14 @@ function fieldRow(f) {
     const paint = () => { v.textContent = shown ? f.v : "*".repeat(Math.min(f.v.length, 24)); };
     paint();
     row.appendChild(v);
-    row.appendChild(smallButton(t("act.reveal"), (e) => {
+    const eye = iconButton(ICON.eye, t("act.reveal"), () => {
       shown = !shown;
       paint();
-      e.currentTarget.textContent = shown ? t("act.hide") : t("act.reveal");
-    }));
+      eye.innerHTML = SVG(shown ? ICON.eyeOff : ICON.eye);
+      eye.title = shown ? t("act.hide") : t("act.reveal");
+      eye.setAttribute("aria-label", eye.title);
+    });
+    row.appendChild(eye);
     row.appendChild(copyButton(f.v));
     return row;
   }
@@ -2259,7 +2315,7 @@ function hitBox(raw) {
   grow.className = "grow";
   top.appendChild(grow);
 
-  if (d.href) top.appendChild(smallButton(t("act.open"), () => askBeforeOpening(d.href)));
+  if (d.href) top.appendChild(iconButton(ICON.open, t("act.open"), () => askBeforeOpening(d.href)));
   if (d.kind === "contact") top.appendChild(saveContactButton(raw));
   top.appendChild(copyButton(raw));
   box.appendChild(top);
@@ -2294,7 +2350,7 @@ function hitBox(raw) {
 // showsBox decides which rows get geometry drawn on them, and the answer is
 // one bucket: an image holding a code that was located and could not be read.
 //
-// A decoded row does not need a box — it has the payload, which is the answer
+// A decoded row does not need a box, it has the payload, which is the answer
 // the box was only ever a route to. A NO_QR_FOUND row has no geometry at all,
 // because nothing was found to have geometry. And a row whose detections came
 // back empty or malformed draws nothing rather than a fallback shape: an
@@ -2310,8 +2366,8 @@ function showsBox(r) {
 // The thumbnail is derived from the same ImageBitmap the decode ran on, which
 // is what makes this safe without a rotation term: whatever the browser decided
 // about EXIF orientation, both the pixels the decoder saw and the pixels drawn
-// here inherited that same decision. Mixing sources — decoding from a bitmap
-// and drawing from an <img> of the original file — is the bug this avoids, and
+// here inherited that same decision. Mixing sources, decoding from a bitmap
+// and drawing from an <img> of the original file, is the bug this avoids, and
 // it would be invisible on a desktop image and wrong on every phone photo.
 //
 // Sizes are recomputed on every call rather than cached: the backing store
@@ -2354,7 +2410,7 @@ function paintBoxes(r) {
 
 // The display size is an argument to the mapping, so anything that changes it
 // invalidates every box already drawn. The thumbnail slot is a fixed 48 px, so
-// a window resize does not move it — but devicePixelRatio does change when a
+// a window resize does not move it, but devicePixelRatio does change when a
 // window is dragged to a different display, and that changes the backing store
 // this draws into. Repainting on resize is cheap and covers both.
 let repaintTimer = 0;
@@ -2668,6 +2724,24 @@ function renderRow(r) {
     box.className = r.pending ? "shim" : "noimg";
     wrap.appendChild(box);
   }
+  // The picture is the obvious thing to click to see the picture bigger, and
+  // it opens where the code was found: openInspector already pre-draws the
+  // detection as the selection, so a read code opens with a box around it.
+  // The crosshair beside it stays for the keyboard and for rows whose
+  // thumbnail never arrived.
+  if (r.file) {
+    wrap.classList.add("clickable");
+    wrap.setAttribute("role", "button");
+    wrap.tabIndex = 0;
+    wrap.title = t("insp.open");
+    wrap.setAttribute("aria-label", t("insp.open"));
+    wrap.onclick = () => openInspector(r);
+    wrap.onkeydown = (e) => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault();
+      openInspector(r);
+    };
+  }
   li.appendChild(wrap);
 
   const meta = document.createElement("div");
@@ -2686,7 +2760,11 @@ function renderRow(r) {
     // so it looks like one. Elsewhere it is a quiet offer.
     point.className = isUnread(r) ? "point lead" : "point onHover";
     point.type = "button";
-    point.textContent = t("insp.open");
+    // A crosshair says "point at it" without a word, and the row is where
+    // space is scarcest. The word stays as the accessible name.
+    point.innerHTML = SVG(ICON.target);
+    point.title = t("insp.open");
+    point.setAttribute("aria-label", point.title);
     point.onclick = () => openInspector(r);
     r.pointBtn = point;
   }
@@ -2755,8 +2833,8 @@ function renderRow(r) {
       no.textContent = t(found ? "res.detected" : "res.noCode");
       meta.appendChild(no);
       // Only the actionable state gets a second line. "No code found" already
-      // declines to assert the absence — found is a claim about the search, not
-      // about the image — so an advice line under it restated the label in more
+      // declines to assert the absence, found is a claim about the search, not
+      // about the image, so an advice line under it restated the label in more
       // words and offered nothing to do. A row with no action reads quietest.
       if (found) {
         const advice = document.createElement("div");
@@ -3116,7 +3194,7 @@ function rescanSelection() {
 //
 // The result is a normal decoded code: same row, same copy button, same
 // payload recogniser, same exports. Indistinguishable downstream, which is the
-// point — a code the user had to point at is still just a code.
+// point, a code the user had to point at is still just a code.
 function adoptCropResult(r, msg) {
   insp.busy = false;
   $("inspRescan").disabled = false;
@@ -3229,6 +3307,7 @@ I18N.onChange(() => {
   if (rows.length) repaintAll(); else $("emptyText").textContent = t("res.empty");
 });
 I18N.apply();
+paintIcons();
 buildLangMenu();
 applyFilters();   // gives the folder button its label before anything is loaded
 $("emptyText").textContent = t("res.empty");

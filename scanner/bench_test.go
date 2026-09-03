@@ -164,7 +164,7 @@ func TestScanFolderStream(t *testing.T) {
 }
 
 // TestCanonicalRecall measures image-only recall on a split dataset, per folder.
-// with_qr are clean renders, without_qr are degraded — the headroom lives there.
+// with_qr are clean renders, without_qr are degraded, the headroom lives there.
 func TestCanonicalRecall(t *testing.T) {
 	ds, limit := datasetDir(t)
 	var totHit, totN int
@@ -195,7 +195,7 @@ func TestCanonicalRecall(t *testing.T) {
 // TestRasterRecall measures the pure-Go raster path on a flat dataset and
 // cross-tabs it against module density, read from each sample's .npy shape.
 // This is the measurement behind the README's image-only figure, and the one
-// that shows density alone is not what defeats the decoder — distortion is.
+// that shows density alone is not what defeats the decoder, distortion is.
 //
 //	QR_DATASET=/path/to/dataset go test ./scanner -run TestRasterRecall -v
 func TestRasterRecall(t *testing.T) {

@@ -60,7 +60,7 @@ func TestMeasureRanksSharpAboveBlurred(t *testing.T) {
 	sharpLap, _ := measure(sharp)
 	blurLap, _ := measure(blurred)
 	if !(sharpLap > blurLap) {
-		t.Errorf("laplacian variance: sharp %v, blurred %v — sharp must score higher", sharpLap, blurLap)
+		t.Errorf("laplacian variance: sharp %v, blurred %v, sharp must score higher", sharpLap, blurLap)
 	}
 }
 
@@ -80,7 +80,7 @@ func TestEdgeDensityIsLocal(t *testing.T) {
 	_, local := measure(img)
 	_, flat := measure(flatGray(size, size, 255))
 	if !(local > flat) {
-		t.Fatalf("edge density with a busy corner = %v, flat = %v — the patch must register", local, flat)
+		t.Fatalf("edge density with a busy corner = %v, flat = %v, the patch must register", local, flat)
 	}
 
 	// And it must not be diluted to near-nothing by the empty 98% around it.

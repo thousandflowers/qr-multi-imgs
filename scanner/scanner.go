@@ -37,7 +37,7 @@ type ScanResult struct {
 	Contents []string `json:"qr_contents,omitempty"`
 	Error    string   `json:"error,omitempty"`
 	FileSize int64    `json:"file_size"`
-	// Classification is empty for a file that could not be read at all — see
+	// Classification is empty for a file that could not be read at all, see
 	// ScanImageDetail. Every other row carries one.
 	Classification Classification `json:"classification,omitempty"`
 	// Detections is populated only for QRDetectedDecodeFailed.
@@ -91,7 +91,7 @@ var supportedExtensions = map[string]bool{
 // of where zbarimg lives in PATH (not hardcoded to Homebrew).
 var zbarimgPath string
 
-// ponytail: parallel worker pool — numWorkers = min(numCPU, 6). M2 Pro has 8P+4E,
+// ponytail: parallel worker pool, numWorkers = min(numCPU, 6). M2 Pro has 8P+4E,
 // but each worker does PNG encoding + zbarimg exec, so ~6 saturates.
 var scanWorkers = func() int {
 	n := runtime.NumCPU()
@@ -104,7 +104,7 @@ var scanWorkers = func() int {
 func init() {
 	zbarimgPath, _ = exec.LookPath("zbarimg")
 
-	// On macOS the system decodes more than the portable codecs do — every
+	// On macOS the system decodes more than the portable codecs do, every
 	// camera raw ImageIO knows, and whatever a future OS adds. Merging what it
 	// reports beats maintaining a list that goes stale silently.
 	for _, ext := range systemExtensions() {
@@ -158,7 +158,7 @@ func tallySummary(list []ScanResult, start time.Time) *Summary {
 // sortResults puts the images that decoded first, then everything else, and
 // orders by file path within each group.
 //
-// This is deliberately NOT the order the web UI uses — see rowRank in
+// This is deliberately NOT the order the web UI uses, see rowRank in
 // web/order.js, which leads with the images holding a code nobody could read.
 // The two surfaces want different things and each pins its own order in its
 // own test:
@@ -168,13 +168,13 @@ func tallySummary(list []ScanResult, start time.Time) *Summary {
 //     on the row under the cursor, so leading with the failures buys a reader
 //     nothing they can use.
 //   - It also costs them the answer. viewList renders 25 rows from the cursor,
-//     and on a real camera roll — a couple of hundred photos, most with no code
-//     in them — ranking NO_QR_FOUND above the decoded rows pushes every single
+//     and on a real camera roll, a couple of hundred photos, most with no code
+//     in them, ranking NO_QR_FOUND above the decoded rows pushes every single
 //     payload past the first screen. The summary box has already given the
 //     counts by then; the list is where the payloads are read.
 //
-// In the browser the row IS the unit of work — it carries the thumbnail, the
-// rename preview and the filter tab that selects it — which is why triage
+// In the browser the row IS the unit of work, it carries the thumbnail, the
+// rename preview and the filter tab that selects it, which is why triage
 // order is right there and wrong here.
 func sortResults(s *Summary) {
 	sort.Slice(s.Results, func(i, j int) bool {
@@ -189,8 +189,8 @@ func sortResults(s *Summary) {
 // resultRank orders the buckets for the terminal list. See sortResults for why
 // this is two buckets and not four, and why it is not what the web does.
 //
-// Classification still reaches the row — viewList marks a located-but-unread
-// image [QR?] and names the reason — it just does not move it. Saying what a
+// Classification still reaches the row, viewList marks a located-but-unread
+// image [QR?] and names the reason, it just does not move it. Saying what a
 // row is and deciding where it sits are separate jobs.
 func resultRank(r ScanResult) int {
 	if r.HasQR {
@@ -284,7 +284,7 @@ func decodeAttempt(img image.Image, s decodeStrategy) []hit {
 		if r == nil {
 			continue
 		}
-		// Payload is returned exactly as decoded — trimming would corrupt QRs
+		// Payload is returned exactly as decoded, trimming would corrupt QRs
 		// whose payload is or ends with whitespace.
 		hits = append(hits, hit{text: r.GetText(), points: rescalePoints(r.GetResultPoints(), s.scale)})
 	}
@@ -370,8 +370,8 @@ func nearestNeighborScale(src image.Image, factor int) *image.RGBA {
 // (useless on noisy renders) and no upscale past 2x (no marginal recall, ~3x
 // slower). Measured: 25.7% -> 27.3% on the hard set, easy set stays ~100%.
 var strategies = []decodeStrategy{
-	{channel: "lum", scale: 1},               // hybrid, native — clean QRs
-	{channel: "lum", scale: 1, global: true}, // global, native — biggest colored-set winner
+	{channel: "lum", scale: 1},               // hybrid, native, clean QRs
+	{channel: "lum", scale: 1, global: true}, // global, native, biggest colored-set winner
 	{channel: "lum", scale: 2},               // hybrid, 2x
 	{channel: "lum", scale: 2, global: true}, // global, 2x
 	{channel: "r", scale: 1, global: true},   // red channel
@@ -389,7 +389,7 @@ var strategies = []decodeStrategy{
 	//
 	// A transform outputs a two-valued image, so the binarizer after it has
 	// nothing left to decide and the cheapest one is the right one.
-	{channel: "lum", scale: 1, global: true, prep: "sauvola"}, // local threshold — glare, gradients, shadow
+	{channel: "lum", scale: 1, global: true, prep: "sauvola"}, // local threshold, glare, gradients, shadow
 	{channel: "lum", scale: 1, global: true, prep: "otsu"},    // variance-optimal global threshold
 	{channel: "lum", scale: 1, prep: "invert"},                // light-on-dark codes the detector cannot see
 }
@@ -415,8 +415,8 @@ func projectionChannels() []string {
 // It looks across every colour projection the strategies use, not just
 // luminance, and keeps the triples from whichever projection shows the most.
 // That breadth is the whole point: a code whose contrast lives in one channel
-// can be nearly absent from the luminance image — red on green of the same
-// brightness is the extreme case — so a count taken from luminance alone would
+// can be nearly absent from the luminance image, red on green of the same
+// brightness is the extreme case, so a count taken from luminance alone would
 // miss it, and a decode loop trusting that count would stop before the channel
 // strategy that could read it ever ran. Taking the largest set means a
 // projection that hides a code can never lower a target another projection has
@@ -424,7 +424,7 @@ func projectionChannels() []string {
 //
 // The geometry, not only the count, is returned. An image that failed to decode
 // with finder patterns plainly located is a different answer from an image with
-// nothing in it, and these triples are what let a caller tell the two apart —
+// nothing in it, and these triples are what let a caller tell the two apart,
 // see classify.go. Until this returned a bare count, and every box was thrown
 // away the moment it was computed.
 //
@@ -433,7 +433,7 @@ func projectionChannels() []string {
 //
 // Result points are in original-image coordinates: every projection here is
 // unscaled and uncropped, so nothing needs mapping back. A projection that
-// scaled would have to map at capture time — see the contract in hits.go.
+// scaled would have to map at capture time, see the contract in hits.go.
 func detectFinders(img image.Image) []*detector.FinderPatternInfo {
 	hints := map[gozxing.DecodeHintType]interface{}{
 		gozxing.DecodeHintType_TRY_HARDER: true,
@@ -481,8 +481,8 @@ func findIn(src image.Image, hints map[gozxing.DecodeHintType]interface{}) []*de
 			// where it is only fails to stop the loop early.
 			//
 			// The partial centres behind this error are deliberately not used.
-			// FindMulti does populate them before failing — GetPossibleCenters
-			// returns what it had — so they are there for the taking. Measured,
+			// FindMulti does populate them before failing, GetPossibleCenters
+			// returns what it had, so they are there for the taking. Measured,
 			// they also fire where there is nothing: a uniform-noise image with
 			// no code in it yields one. A bucket built on them would promise a
 			// code the image does not contain, which is the failure this whole
@@ -499,7 +499,7 @@ func findIn(src image.Image, hints map[gozxing.DecodeHintType]interface{}) []*de
 // The strategy list is a greedy cover, not a ranking: strategies are
 // complementary, so one finding nothing says nothing about the next. Stopping
 // at the first success would return whichever subset the first working strategy
-// happened to see — a silent under-report, indistinguishable from a frame that
+// happened to see, a silent under-report, indistinguishable from a frame that
 // really held one code. Running all ten instead costs roughly thirty times the
 // old best case on real photos, which is why the loop stops on evidence.
 //
@@ -562,8 +562,8 @@ const maskRenderScale = 10
 // sequential and sets it once.
 var npyMaskEnabled = true
 
-// decodeNPYMask decodes the companion .npy module bitmap — a pristine,
-// pixel-exact QR shipped alongside each image — purely in Go. It recovers the
+// decodeNPYMask decodes the companion .npy module bitmap, a pristine,
+// pixel-exact QR shipped alongside each image, purely in Go. It recovers the
 // dense codes whose modules are sub-pixel in the source raster. Returns "" when
 // no mask is present or it cannot be decoded.
 func decodeNPYMask(path string) string {
@@ -578,7 +578,7 @@ func decodeNPYMask(path string) string {
 	return decodeMaskImage(renderMask(mask, maskRenderScale))
 }
 
-// decodeWithZbarimg shells out to zbarimg on the original image — a
+// decodeWithZbarimg shells out to zbarimg on the original image, a
 // best-effort fallback for real photos that ship no mask, used only when
 // zbarimg is installed. The pure-Go paths mean it is never required.
 //
@@ -634,7 +634,7 @@ func decodeMaskImage(img image.Image) string {
 // payload in it, in reading order, or nil if there are none.
 //
 // It is the path-free half of ScanImage. The companion .npy mask, Apple Vision,
-// and zbarimg all need a file path, so none of them run here — expect lower
+// and zbarimg all need a file path, so none of them run here, expect lower
 // recall than ScanImage on real photos, where on macOS Vision is what rescues
 // the warped and low-contrast ones. This is the entry point for callers holding
 // pixels but no file, such as a wasm build.
@@ -646,7 +646,7 @@ func decodeMaskImage(img image.Image) string {
 // GOOS=js, but at roughly 4.5 minutes per 12MP photo against 0.1s native, so a
 // wasm build should not decode HEIC in Go at all: let the browser do it with
 // createImageBitmap and pass the pixels here. That is this seam's first
-// concrete payoff — a caller holding pixels and no file, exactly as intended.
+// concrete payoff, a caller holding pixels and no file, exactly as intended.
 //
 // The returned error is always nil today. It is in the signature because every
 // decode strategy lives in decodeRaster, which is where allocation-heavy work
@@ -699,8 +699,8 @@ const (
 	ScanFast ScanMode = iota
 
 	// ScanExhaustive runs every stage unconditionally and unions all of them,
-	// with no early exit anywhere. Much slower — Vision alone costs about a
-	// second per image — and meant for building ground truth, where being
+	// with no early exit anywhere. Much slower, Vision alone costs about a
+	// second per image, and meant for building ground truth, where being
 	// right matters more than being quick.
 	ScanExhaustive
 )
@@ -724,7 +724,7 @@ func ScanImageMode(path string, mode ScanMode) ([]string, error) {
 // reported as an image with no code in it.
 //
 // A file that could not be read at all returns an error and no Detail, exactly
-// as before. An unreadable file has no classification — "no QR found" would be
+// as before. An unreadable file has no classification, "no QR found" would be
 // a claim about pixels nobody ever saw.
 func ScanImageDetail(path string, mode ScanMode) (Detail, error) {
 	exhaustive := mode == ScanExhaustive
@@ -732,7 +732,7 @@ func ScanImageDetail(path string, mode ScanMode) (Detail, error) {
 	// A companion .npy mask, when present, is the pixel-exact source QR, and it
 	// decodes faster and more reliably than recovering sub-pixel modules from
 	// the raster. One mask describes one code, so in ScanFast it still short
-	// circuits — that is what keeps dense-code scans quick. ScanExhaustive
+	// circuits, that is what keeps dense-code scans quick. ScanExhaustive
 	// folds it into the union instead and keeps going.
 	var hits []hit
 	meta := &Metadata{}
@@ -764,7 +764,7 @@ func ScanImageDetail(path string, mode ScanMode) (Detail, error) {
 	// This matters well beyond exotic files. Go's image decoders do not cover
 	// HEIC, which every iPhone has shot by default since 2017, so image.Decode
 	// fails on most of a modern camera roll. Apple Vision reads those straight
-	// from the path, so on macOS they decode fine — but only if a failure here
+	// from the path, so on macOS they decode fine, but only if a failure here
 	// lets the scan continue instead of ending it.
 	//
 	// It is also the contract the allocation-heavy cascade stages (CLAHE,
@@ -821,7 +821,7 @@ func ScanImageDetail(path string, mode ScanMode) (Detail, error) {
 
 	// Report the raster failure only if nothing decoded AND no other decoder
 	// managed to read the file. When Vision read it and simply found no code,
-	// "no QR here" is the honest answer — calling that an error would turn a
+	// "no QR here" is the honest answer, calling that an error would turn a
 	// whole HEIC camera roll into a wall of failures.
 	if len(hits) == 0 && rasterErr != nil && !visionReadable {
 		return Detail{}, rasterErr

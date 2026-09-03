@@ -361,7 +361,7 @@ func runServer(addrIn string) error {
 
 	// The token rides in the URL fragment: browsers never put a fragment in a
 	// request, a Referer header or a server log.
-	fmt.Printf("qr-multi-imgs %s — local API on %s\n\n", versionString(), origin)
+	fmt.Printf("qr-multi-imgs %s, local API on %s\n\n", versionString(), origin)
 	fmt.Printf("  Local UI   %s/#t=%s\n", origin, s.token)
 	fmt.Printf("  Hosted UI  %s/qr-multi-imgs/#t=%s&api=%s\n\n", allowedOrigin, s.token, origin)
 	fmt.Println("Anyone holding that URL can scan, move and delete files on this machine.")

@@ -56,7 +56,7 @@
     },
     {
       id: "payment",
-      // EPC069-12 — the SEPA credit transfer QR used across the euro area.
+      // EPC069-12, the SEPA credit transfer QR used across the euro area.
       match: (t) => /^BCD\r?\n/.test(t),
       parse: (t) => {
         const L = t.split(/\r?\n/);
@@ -232,7 +232,7 @@
     return semiFields(t.replace(/^WIFI:/i, ""));
   }
 
-  // `A:one;B:two;;` — the separator is escapable with a backslash, which a
+  // `A:one;B:two;;`, the separator is escapable with a backslash, which a
   // naive split on ";" would trip over whenever a password contains one.
   function semiFields(body) {
     const out = {};

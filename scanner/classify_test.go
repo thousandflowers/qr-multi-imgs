@@ -81,8 +81,8 @@ func TestClassifyNoQRFound(t *testing.T) {
 // there and whose payload cannot be recovered must not be reported as an image
 // with no code in it.
 //
-// The damage is applied to the data area only — the three finder corners are
-// left intact — because that is the real-world failure this bucket names: the
+// The damage is applied to the data area only, the three finder corners are
+// left intact, because that is the real-world failure this bucket names: the
 // code is visible, the payload is gone.
 func TestClassifyDetectedButUndecodable(t *testing.T) {
 	src, ok := qrImage(t, "https://example.com/order/12345678", 256).(*image.Gray)
@@ -94,8 +94,8 @@ func TestClassifyDetectedButUndecodable(t *testing.T) {
 	copy(damaged.Pix, src.Pix)
 
 	// Noise over the data area only. The damaged rectangle starts past every
-	// finder pattern — each of the three sits inside its own corner, within the
-	// first 30% of the frame on at least one axis — and past the timing
+	// finder pattern, each of the three sits inside its own corner, within the
+	// first 30% of the frame on at least one axis, and past the timing
 	// patterns that run between them, so the code stays findable while its
 	// payload is destroyed well beyond what error correction can recover.
 	rng := rand.New(rand.NewSource(7))
@@ -112,7 +112,7 @@ func TestClassifyDetectedButUndecodable(t *testing.T) {
 		t.Fatalf("ScanDecodedImageDetail: %v", err)
 	}
 	if len(d.Codes) != 0 {
-		t.Skipf("the damaged image still decoded (%v) — nothing to classify", d.Codes)
+		t.Skipf("the damaged image still decoded (%v), nothing to classify", d.Codes)
 	}
 	if d.Classification != QRDetectedDecodeFailed {
 		t.Fatalf("classification = %q, want %q", d.Classification, QRDetectedDecodeFailed)
@@ -135,7 +135,7 @@ func TestClassifyDetectedButUndecodable(t *testing.T) {
 		// The box should hug the code. It is checked per axis rather than by
 		// area because the rendered QR carries a four-module quiet zone, so a
 		// correct box covers about two thirds of each side and under half the
-		// frame's area — an area threshold would fail on a right answer.
+		// frame's area, an area threshold would fail on a right answer.
 		if box.W*2 < b.Dx() || box.H*2 < b.Dy() {
 			t.Errorf("detection %d: box %+v is under half the frame %v on an axis",
 				i, box, b)
@@ -150,7 +150,7 @@ func TestDetectionBoxIncludesFinderCorners(t *testing.T) {
 	src := qrImage(t, "PADDING", 200)
 	infos := detectFinders(src)
 	if len(infos) == 0 {
-		t.Skip("detector found no finder patterns in a clean QR — nothing to check")
+		t.Skip("detector found no finder patterns in a clean QR, nothing to check")
 	}
 	dets := detectionsFrom(infos, src.Bounds())
 	if len(dets) == 0 {
@@ -220,7 +220,7 @@ func TestClassificationReasonsAreDistinct(t *testing.T) {
 
 // A scan of a folder must carry the reason all the way out to ScanResult, and
 // the summary must count the located-but-unread images as a subset of the
-// images without a payload — not as a fourth bucket beside them.
+// images without a payload, not as a fourth bucket beside them.
 func TestSummaryCountsDetectedWithinWithoutQR(t *testing.T) {
 	dir := t.TempDir()
 	writeQRToFile(t, dir+"/readable.png", "SUMMARY-OK")
@@ -244,7 +244,7 @@ func TestSummaryCountsDetectedWithinWithoutQR(t *testing.T) {
 // ─── ordering and counting ──────────────────────────────────────────────────
 
 // The terminal list leads with the images that decoded. Nothing in the TUI is
-// per-row — every action works on the whole set — so ordering by what a person
+// per-row (every action works on the whole set)so ordering by what a person
 // could act on buys a reader nothing, while it costs them the payloads: 25 rows
 // are drawn at a time, and on a camera roll of mostly codeless photos putting
 // NO_QR_FOUND above DECODED pushes every payload off the first screen.
@@ -269,7 +269,7 @@ func TestSortResultsPutsDecodedFirst(t *testing.T) {
 	}
 }
 
-// Classification still reaches the row even though it no longer moves it —
+// Classification still reaches the row even though it no longer moves it,
 // viewList marks a located-but-unread image and names the reason. Saying what a
 // row is and deciding where it sits are separate jobs, and this pins that the
 // first one survived the second being reverted.
@@ -320,7 +320,7 @@ func TestSummarySeparatesUnreadFromEmpty(t *testing.T) {
 	if s.Detected != 1 {
 		t.Errorf("Detected = %d, want 1", s.Detected)
 	}
-	// WithoutQR keeps its old meaning — no payload came out — so the organise
+	// WithoutQR keeps its old meaning (no payload came out)so the organise
 	// and delete actions still move the same files they always did. What is new
 	// is that the actionable part of it can be named.
 	if s.WithoutQR != 2 {

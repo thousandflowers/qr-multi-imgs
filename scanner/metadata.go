@@ -39,7 +39,7 @@ type StrategyAttempt struct {
 
 // Metadata is the annotation recorded for every image, whatever the outcome.
 //
-// Width and Height are zero when no raster was ever decoded — an unreadable
+// Width and Height are zero when no raster was ever decoded, an unreadable
 // file, or a HEIC that only Apple Vision could open. The image measures are
 // zero then too, and a zero is not a measurement: consumers must read them
 // beside the dimensions.
@@ -50,8 +50,8 @@ type Metadata struct {
 	// LaplacianVariance is the variance of a 3x3 Laplacian response over the
 	// grayscale image, the standard cheap blur proxy: sharp edges produce a
 	// wide spread of responses, a blurred image a narrow one. It is in squared
-	// 8-bit intensity units and it is scale-dependent — the same photo at half
-	// the resolution scores differently — so it compares images of comparable
+	// 8-bit intensity units and it is scale-dependent, the same photo at half
+	// the resolution scores differently, so it compares images of comparable
 	// size, not any two images.
 	LaplacianVariance float64 `json:"laplacian_variance,omitempty"`
 

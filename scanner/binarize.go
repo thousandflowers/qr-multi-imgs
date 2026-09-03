@@ -6,7 +6,7 @@ package scanner
 // trick: a step that outputs a two-valued image has already made the decision a
 // binarizer would make, so it can be handed to the cheapest binarizer in the
 // library and pass through untouched. That keeps every new rung a pure function
-// over pixels — testable on its own, with no gozxing interface to satisfy and
+// over pixels, testable on its own, with no gozxing interface to satisfy and
 // no decoder state to thread.
 //
 // Each is named in the strategy table and recorded by name in the per-image
@@ -52,7 +52,7 @@ const otsuBins = 256
 //
 // WHY THIS IS NOT WHAT gozxing ALREADY DOES. GlobalHistogramBinarizer is also
 // a global threshold, and the resemblance stops there. It builds a 32-bucket
-// histogram from four sampled rows — `height*y/5` for y in 1..4 — across the
+// histogram from four sampled rows (`height*y/5` for y in 1..4)across the
 // middle 60% of each, finds the tallest peak, finds a second peak weighted by
 // squared distance, and picks a valley between them by a heuristic score. Four
 // differences follow, and each is a case where the two disagree:
@@ -146,7 +146,7 @@ const (
 //
 // where m and s are the local mean and standard deviation. It is the rung
 // aimed at the images whose finder patterns were located and whose payload
-// would not come out — glare across one corner, a gradient fill, a shadow — the
+// would not come out (glare across one corner, a gradient fill, a shadow)the
 // cases where no single global threshold is right for the whole frame.
 //
 // It runs in one pass with two width-sized accumulators rather than the usual

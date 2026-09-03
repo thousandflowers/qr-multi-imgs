@@ -13,12 +13,12 @@ import (
 
 // hit is one decoded QR code together with where it was found.
 //
-// COORDINATE CONTRACT — read this before adding a decode strategy.
+// COORDINATE CONTRACT, read this before adding a decode strategy.
 //
 // points are ALWAYS expressed in the coordinate space of the image handed to
 // decodeRaster: the original image, unscaled and uncropped. A strategy that
 // upscales, crops or tiles the image before decoding MUST map its result
-// points back into that space at capture time, inside decodeAttempt — never
+// points back into that space at capture time, inside decodeAttempt, never
 // at compare time.
 //
 // This is not a style preference. Dedup compares geometry across strategies,
@@ -30,7 +30,7 @@ import (
 // every tile must add its offset back before returning.
 //
 // points may be empty. Decoders that report no geometry at all (zbarimg) are
-// merged by payload instead — see sameCode.
+// merged by payload instead, see sameCode.
 type hit struct {
 	text   string
 	points []gozxing.ResultPoint
@@ -71,7 +71,7 @@ func (h hit) size() float64 {
 // smaller code's own size, to be judged the same physical code.
 //
 // Two flat printed QR codes cannot have centroids closer than roughly 1.0x
-// their own extent — any closer and they physically overlap, which printed
+// their own extent, any closer and they physically overlap, which printed
 // codes in one plane cannot do. Codes butted edge to edge sit at about 1.0.
 // Half of that leaves a 2x margin below the physical floor, while the same
 // code re-found by another strategy or an overlapping tile lands within a few
@@ -84,7 +84,7 @@ const sameCodeFactor = 0.5
 //
 // Geometry decides it whenever both hits have it. Payload is deliberately NOT
 // used in that case: two physically distinct codes can legitimately carry
-// identical content — two copies of the same receipt in one frame — and
+// identical content (two copies of the same receipt in one frame)and
 // merging them by text would silently report one code where there are two.
 //
 // Payload equality is the fallback only when a hit carries no geometry,
@@ -124,8 +124,8 @@ func mergeHits(base, candidates []hit) []hit {
 //
 // Rows are found by quantising the vertical centroid into bands one typical
 // code-height tall, rather than by comparing y values pairwise. Pairwise
-// banding is not transitive — a can share a row with b, and b with c, while a
-// and c do not — which is not a valid ordering and would leave the result
+// banding is not transitive, a can share a row with b, and b with c, while a
+// and c do not, which is not a valid ordering and would leave the result
 // dependent on the input order. Quantising gives a genuine total order, so the
 // manifest is stable no matter which strategy found what first.
 //

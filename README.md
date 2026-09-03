@@ -18,7 +18,7 @@ same Go code running inside your tab - your images are never uploaded.
 ![Windows](https://img.shields.io/badge/Windows-supported-0078D4?logo=windows)
 
 ```bash
-# One command — go, or curl, or brew:
+# One command, go, or curl, or brew:
 go install github.com/thousandflowers/qr-multi-imgs@latest
 qr-multi-imgs ./folder-of-qr-images
 ```
@@ -113,7 +113,7 @@ moved 3.9s to 18.4s. The unbounded strategy union would have cost 122.6s - the
 finder-pattern pre-pass is what keeps it at 18.
 
 ```bash
-# Reproduce — the dataset is generated, not stored in the repo:
+# Reproduce, the dataset is generated, not stored in the repo:
 git clone https://github.com/lovasoa/qrcode-dataset
 cd qrcode-dataset && pipenv install && pipenv run python generate_dataset.py
 qr-multi-imgs ./dataset
@@ -248,11 +248,11 @@ git clone https://github.com/thousandflowers/qr-multi-imgs.git
 cd qr-multi-imgs && go build
 ```
 
-**Requirements:** Go 1.26+, an ANSI terminal.  
+**Requirements:** Go 1.26+, an ANSI terminal.
 **Build:** pure Go on Linux/Windows. The macOS build links Apple's Vision
 framework via cgo (ships with the OS - nothing to install) for photographed,
-perspective-warped QR codes.  
-**Supported formats:** PNG / JPEG / GIF / BMP / WebP / TIFF everywhere. On macOS the list is whatever the system itself can decode - asked at startup via ImageIO rather than hardcoded - which adds HEIC / HEIF, PSD, JXL, AVIF and camera raw from any camera the OS supports (CR2, CR3, ARW, DNG, NEF, RAF, ORF, RW2 and the rest); 70 formats on a current macOS. PDFs are read too, by rendering each page - a multi-page document reports the codes from every page. Elsewhere HEIC needs a `-tags heic` build and raw is unavailable. A folder holding any mix of these scans in a single pass, and several folders or single files can be scanned together.  
+perspective-warped QR codes.
+**Supported formats:** PNG / JPEG / GIF / BMP / WebP / TIFF everywhere. On macOS the list is whatever the system itself can decode - asked at startup via ImageIO rather than hardcoded - which adds HEIC / HEIF, PSD, JXL, AVIF and camera raw from any camera the OS supports (CR2, CR3, ARW, DNG, NEF, RAF, ORF, RW2 and the rest); 70 formats on a current macOS. PDFs are read too, by rendering each page - a multi-page document reports the codes from every page. Elsewhere HEIC needs a `-tags heic` build and raw is unavailable. A folder holding any mix of these scans in a single pass, and several folders or single files can be scanned together.
 **Supported platforms:** macOS, Linux, **Windows** (clipboard via external tool).
 
 ---

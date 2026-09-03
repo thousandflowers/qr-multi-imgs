@@ -42,7 +42,7 @@ the 100% had nothing to do with the decoder.
 ## 4 - the actual finding
 
 ```
-i assumed density killed them — 100+ modules in 256px is <2px per module. wrong.
+i assumed density killed them, 100+ modules in 256px is <2px per module. wrong.
 measured it: a clean 153-module QR at 256px decodes fine from the pixels. it's
 the dataset's distortion that destroys the grid; density only sets how little of
 it is enough. box blur: 61 modules survives r=2, 153 fails at r=1.

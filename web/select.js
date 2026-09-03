@@ -7,7 +7,7 @@
 // silently rescans the wrong region when it is wrong. So it lives here with a
 // test that runs under node in CI.
 //
-// Every rectangle here is in DISPLAY pixels — the canvas the user is dragging
+// Every rectangle here is in DISPLAY pixels, the canvas the user is dragging
 // on. Turning one into source pixels is coords.js's job, and the two are kept
 // apart so that neither has to know how the other scales.
 
@@ -27,8 +27,8 @@
   const num = (n) => typeof n === "number" && Number.isFinite(n);
   const rectOf = (r) => (r && num(r.x) && num(r.y) && num(r.w) && num(r.h) ? { x: r.x, y: r.y, w: r.w, h: r.h } : null);
 
-  // normalise turns a rectangle dragged up or to the left — which has negative
-  // width or height while the pointer is down — into one with positive sides.
+  // normalise turns a rectangle dragged up or to the left, which has negative
+  // width or height while the pointer is down, into one with positive sides.
   function normalise(r) {
     const b = rectOf(r);
     if (!b) return null;
@@ -126,8 +126,8 @@
   // and box it" into "nudge this box", which is roughly the difference between
   // something people use and something they try once.
   //
-  // With no box — an image where nothing was found at all, which is exactly the
-  // case where a person can see a code the tool cannot — it opens with a
+  // With no box, an image where nothing was found at all, which is exactly the
+  // case where a person can see a code the tool cannot, it opens with a
   // centred rectangle over the middle 60%, as a thing to drag rather than a
   // guess about where the code is.
   function initial(box, bounds) {

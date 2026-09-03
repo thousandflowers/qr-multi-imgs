@@ -135,7 +135,7 @@ func TestDecodeWithVisionReadableButEmpty(t *testing.T) {
 }
 
 // HEIC is the default capture format on every iPhone since 2017 and Go's
-// image.Decode cannot read it. Vision can, straight from the path — but only
+// image.Decode cannot read it. Vision can, straight from the path, but only
 // if a raster decode failure lets the scan continue instead of ending it.
 // This is the end-to-end proof of that control flow, through the public API.
 func TestScanImageDecodesHEIC(t *testing.T) {

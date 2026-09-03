@@ -36,8 +36,8 @@
 //
 // Then orientation cancels whatever the browser does with it, because both
 // sides of the mapping inherit the same decision. The failure this avoids is
-// mixing sources — decoding from an ImageBitmap and drawing from an <img>,
-// which always applies orientation — and that failure is invisible on a
+// mixing sources, decoding from an ImageBitmap and drawing from an <img>,
+// which always applies orientation, and that failure is invisible on a
 // desktop screenshot and wrong on every phone photo.
 //
 // There is deliberately no rotation parameter here. Adding one would invite a
@@ -99,7 +99,7 @@
   const naturalOf = (f) => (f ? space({ w: f.naturalW, h: f.naturalH }) : null);
 
   // frameToNatural maps a decoder box into the image's own pixels, undoing the
-  // 1600 cap or the 3000 retry — whichever the decode actually ran at, which is
+  // 1600 cap or the 3000 retry, whichever the decode actually ran at, which is
   // why the frame travels with the boxes instead of being recomputed.
   function frameToNatural(b, frame) {
     const from = frameOf(frame), to = naturalOf(frame), bb = box(b);
@@ -142,7 +142,7 @@
   //
   // Contain rather than cover, and that is a deliberate difference from the
   // row thumbnails elsewhere on the page, which are `object-fit: cover`. A
-  // cover crop throws away the edges of the image — and a code that failed to
+  // cover crop throws away the edges of the image, and a code that failed to
   // decode is very often at an edge, which is part of why it failed. Cropping
   // it away and then drawing a box that points off the visible square is worse
   // than drawing nothing: the box would be correct and useless at the same
@@ -286,8 +286,8 @@
     // A crop travelling back to source pixels on a photo the browser rotated.
     //
     // The file stores 4032x3024 landscape with an EXIF orientation of 6.
-    // createImageBitmap hands back 3024x4032 portrait — measured, see the note
-    // at the top — so NATURAL is the portrait size and the stored landscape
+    // createImageBitmap hands back 3024x4032 portrait, measured, see the note
+    // at the top, so NATURAL is the portrait size and the stored landscape
     // size must never appear in this mapping. A crop mapped against 4032x3024
     // would land rotated ninety degrees and rescan a region the user did not
     // choose, and nothing downstream would report it: the answer would just

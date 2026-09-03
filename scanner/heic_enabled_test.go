@@ -9,7 +9,7 @@ import (
 )
 
 // With -tags heic the raster path itself reads HEIC, which is what Linux and
-// Windows need — macOS gets there through Vision either way. Asserting on
+// Windows need, macOS gets there through Vision either way. Asserting on
 // image.Decode rather than ScanImage keeps this honest: on a macOS test run
 // Vision would decode the file regardless and hide a broken raster path.
 func TestRasterDecodesHEIC(t *testing.T) {

@@ -4,8 +4,8 @@
 // with nothing installed.
 //
 // It deliberately does not decode image *files*. The browser already has
-// decoders for everything it can display — JPEG, PNG, WebP, AVIF, GIF, and on
-// Safari/macOS even HEIC — and they are native code. Go's own decoders would
+// decoders for everything it can display, JPEG, PNG, WebP, AVIF, GIF, and on
+// Safari/macOS even HEIC, and they are native code. Go's own decoders would
 // only add weight, and gen2brain/heic under GOOS=js takes minutes per photo.
 // So JavaScript hands over raw RGBA pixels and this side does the one thing
 // the browser cannot: find and read the codes.
@@ -30,7 +30,7 @@ import (
 // It is synchronous and CPU-bound, which is why the page runs it inside a
 // worker rather than on the thread that has to keep the UI moving.
 //
-// classification is why the answer is what it is — see scanner.Classification.
+// classification is why the answer is what it is, see scanner.Classification.
 // detections carry a box each, and only when a code was located and could not
 // be read. The page does not draw them; they are here because the same shape
 // is what the CLI exports and what the local API returns, and a caller that

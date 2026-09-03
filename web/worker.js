@@ -2,7 +2,7 @@
 //
 // The split of labour matters: the browser turns a file into pixels, because it
 // already ships native decoders for everything it can display (JPEG, PNG, WebP,
-// AVIF, GIF — and HEIC on Safari/macOS), and Go's wasm build does the part the
+// AVIF, GIF, and HEIC on Safari/macOS), and Go's wasm build does the part the
 // browser has no answer for, which is finding and reading the codes.
 //
 // Nothing here uploads anything. The file never leaves the tab.
@@ -11,7 +11,7 @@ importScripts("wasm_exec.js", "result.js", "native.js");
 
 // A photo straight off a phone can be 12 megapixels, and the cost is almost
 // entirely in the pixels: measured on a 3024x4032 photo, decoding at a 3000 px
-// cap took 3826 ms and at 1600 px took 1287 ms — three times faster, same code
+// cap took 3826 ms and at 1600 px took 1287 ms, three times faster, same code
 // found. So the first pass is deliberately small.
 //
 // It is a first pass rather than the only one because failure is the expensive
@@ -134,7 +134,7 @@ async function run(job) {
     // one English string that a script can match on and that means the same
     // thing to whoever opens the file next.
     out.errorKey = "err.unopenable";
-    out.error = "could not be read — unsupported format, or a damaged file";
+    out.error = "could not be read, unsupported format, or a damaged file";
     out.detail = String((e && e.message) || e);
   } finally {
     if (bmp) bmp.close();
@@ -151,8 +151,8 @@ async function run(job) {
 // is a code in that rectangle, and spent their attention saying so. Spending a
 // second of ours in return is the trade they already made.
 //
-// The rectangle arrives in the coordinates of createImageBitmap(blob) — the
-// natural, orientation-applied image — and is handed straight to
+// The rectangle arrives in the coordinates of createImageBitmap(blob), the
+// natural, orientation-applied image, and is handed straight to
 // createImageBitmap's own crop arguments, which are in that same space. No
 // rotation term, for the reason in coords.js: both sides inherit whatever the
 // browser decided about EXIF.
@@ -215,7 +215,7 @@ async function crop(job) {
     out.origin = { x, y, w, h };
   } catch (e) {
     out.errorKey = "err.unopenable";
-    out.error = "could not be read — unsupported format, or a damaged file";
+    out.error = "could not be read, unsupported format, or a damaged file";
     out.detail = String((e && e.message) || e);
   } finally {
     if (cut) cut.close();
