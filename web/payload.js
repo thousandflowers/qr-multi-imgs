@@ -56,7 +56,7 @@
     },
     {
       id: "payment",
-      // EPC069-12 — the SEPA credit transfer QR used across the euro area.
+      // EPC069-12, the SEPA credit transfer QR used across the euro area.
       match: (t) => /^BCD\r?\n/.test(t),
       parse: (t) => {
         const L = t.split(/\r?\n/);
@@ -232,7 +232,7 @@
     return semiFields(t.replace(/^WIFI:/i, ""));
   }
 
-  // `A:one;B:two;;` — the separator is escapable with a backslash, which a
+  // `A:one;B:two;;`, the separator is escapable with a backslash, which a
   // naive split on ";" would trip over whenever a password contains one.
   function semiFields(body) {
     const out = {};
@@ -313,7 +313,11 @@
     };
   }
 
-  global.Payload = { describe, classify, shortValue, selfTest };
+  // The kinds this recogniser knows, for a page that wants to filter by them.
+  const kinds = () => KINDS.map((k) => k.id);
+
+  global.Payload = {
+    kinds, describe, classify, shortValue, selfTest };
 
   // One runnable check for the part that is all edge cases. Run it with
   //   node web/payload.js --test

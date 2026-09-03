@@ -43,7 +43,7 @@ func TestCollectJobs_dedupesFileInsideListedFolder(t *testing.T) {
 	}
 }
 
-// A named file is scanned whatever its extension — the caller asked for it by
+// A named file is scanned whatever its extension, the caller asked for it by
 // name, so guessing from the suffix would be second-guessing them. A folder
 // walk still filters, because there nobody named the file.
 func TestCollectJobs_namedFileIgnoresExtensionFilter(t *testing.T) {

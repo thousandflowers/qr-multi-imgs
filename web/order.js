@@ -1,6 +1,6 @@
 // How the results list orders itself, and the two questions it is built on.
 //
-// This is the WEB's order, and it is deliberately not the terminal's — see
+// This is the WEB's order, and it is deliberately not the terminal's, see
 // resultRank in scanner/scanner.go, which leads with the images that decoded.
 // Here the row is the unit of work: it carries the thumbnail a person looks at,
 // the rename preview, and the filter tab that selects it, so the rows with an
@@ -15,7 +15,7 @@
   "use strict";
 
   // The classification the scanner sends for an image holding a QR code it
-  // located and could not read. The string is the scanner's, not the page's —
+  // located and could not read. The string is the scanner's, not the page's,
   // see scanner.Classification.
   const UNREAD = "QR_DETECTED_DECODE_FAILED";
 

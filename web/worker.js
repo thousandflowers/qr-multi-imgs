@@ -2,16 +2,16 @@
 //
 // The split of labour matters: the browser turns a file into pixels, because it
 // already ships native decoders for everything it can display (JPEG, PNG, WebP,
-// AVIF, GIF — and HEIC on Safari/macOS), and Go's wasm build does the part the
+// AVIF, GIF, and HEIC on Safari/macOS), and Go's wasm build does the part the
 // browser has no answer for, which is finding and reading the codes.
 //
 // Nothing here uploads anything. The file never leaves the tab.
 
-importScripts("wasm_exec.js");
+importScripts("wasm_exec.js", "result.js", "native.js");
 
 // A photo straight off a phone can be 12 megapixels, and the cost is almost
 // entirely in the pixels: measured on a 3024x4032 photo, decoding at a 3000 px
-// cap took 3826 ms and at 1600 px took 1287 ms — three times faster, same code
+// cap took 3826 ms and at 1600 px took 1287 ms, three times faster, same code
 // found. So the first pass is deliberately small.
 //
 // It is a first pass rather than the only one because failure is the expensive
@@ -30,7 +30,7 @@ const pending = [];
 
 self.qrWasmReady = () => {
   ready = true;
-  for (const job of pending.splice(0)) run(job);
+  for (const job of pending.splice(0)) ((job && HANDLERS[job.type]) || run)(job);
   self.postMessage({ type: "ready" });
 };
 
@@ -52,6 +52,10 @@ async function pixelsOf(blob, cap) {
   // Ask for the decode at a bounded size in one step where possible: the
   // browser scales during decode, which is cheaper than decoding then resizing.
   let bmp = await createImageBitmap(blob);
+  // The file's own size, before any cap. Kept because the geometry the decoder
+  // returns is in the coordinates of whatever it was handed, and only this
+  // function still knows what that was relative to the file.
+  const natural = { w: bmp.width, h: bmp.height };
   const limit = cap || MAX_SIDE;
   let shrunk = false;
   if (Math.max(bmp.width, bmp.height) > limit) {
@@ -69,7 +73,7 @@ async function pixelsOf(blob, cap) {
   const canvas = new OffscreenCanvas(bmp.width, bmp.height);
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   ctx.drawImage(bmp, 0, 0);
-  return { data: ctx.getImageData(0, 0, bmp.width, bmp.height), bmp, shrunk };
+  return { data: ctx.getImageData(0, 0, bmp.width, bmp.height), bmp, shrunk, natural };
 }
 
 async function thumbnailOf(bmp) {
@@ -85,24 +89,33 @@ async function run(job) {
   const out = { type: "result", id: job.id, name: job.name, path: job.path, codes: [] };
   let bmp = null;
   try {
-    const fast = await pixelsOf(job.blob, job.cap || MAX_FAST);
-    bmp = fast.bmp;
-    let res = qrDecode(fast.data.width, fast.data.height, fast.data.data);
+    let pass = await pixelsOf(job.blob, job.cap || MAX_FAST);
+    bmp = pass.bmp;
+    let res = qrDecode(pass.data.width, pass.data.height, pass.data.data);
 
     // Only a picture that was actually shrunk can have lost something worth
     // looking at again.
-    if (!job.cap && !(res.codes || []).length && fast.shrunk) {
+    if (!job.cap && !(res.codes || []).length && pass.shrunk) {
       const full = await pixelsOf(job.blob, MAX_SIDE);
       bmp.close();
+      pass = full;
       bmp = full.bmp;
       res = qrDecode(full.data.width, full.data.height, full.data.data);
     }
 
     if (res.error) out.error = res.error;
-    out.codes = res.codes || [];
-    // Why this image ended up where it did. The page turns it into a sentence;
-    // the worker only carries it.
-    out.reason = res.classification || "";
+    // Everything the engine found, including the geometry of the codes it
+    // located and could not read. The mapping is a named function with a test
+    // because this is exactly where the boxes used to be dropped - see
+    // result.js. The frame goes with them: a box means nothing without the
+    // pixel dimensions it was measured in, and after a retry those are the
+    // second pass's, not the first's.
+    Object.assign(out, Result.carry(res, {
+      w: pass.data.width,
+      h: pass.data.height,
+      naturalW: pass.natural.w,
+      naturalH: pass.natural.h,
+    }));
 
     out.thumb = await thumbnailOf(bmp);
   } catch (e) {
@@ -121,7 +134,7 @@ async function run(job) {
     // one English string that a script can match on and that means the same
     // thing to whoever opens the file next.
     out.errorKey = "err.unopenable";
-    out.error = "could not be read — unsupported format, or a damaged file";
+    out.error = "could not be read, unsupported format, or a damaged file";
     out.detail = String((e && e.message) || e);
   } finally {
     if (bmp) bmp.close();
@@ -129,9 +142,165 @@ async function run(job) {
   self.postMessage(out);
 }
 
+// crop re-reads one region the user pointed at, at the source's own
+// resolution.
+//
+// No cap, unlike the first pass. The caps exist because most images in a folder
+// hold nothing and paying full price for all of them makes the page feel slow.
+// This is the opposite case: the user has looked at the picture, decided there
+// is a code in that rectangle, and spent their attention saying so. Spending a
+// second of ours in return is the trade they already made.
+//
+// The rectangle arrives in the coordinates of createImageBitmap(blob), the
+// natural, orientation-applied image, and is handed straight to
+// createImageBitmap's own crop arguments, which are in that same space. No
+// rotation term, for the reason in coords.js: both sides inherit whatever the
+// browser decided about EXIF.
+async function crop(job) {
+  const out = { type: "cropResult", id: job.id, codes: [] };
+  let bmp = null, cut = null;
+  try {
+    bmp = await createImageBitmap(job.blob);
+    const r = job.rect;
+    // Clamp again here rather than trusting the caller. The page clamps to the
+    // image it drew, this clamps to the image it decoded, and a disagreement
+    // between the two would be a crop of a region that does not exist.
+    const x = Math.max(0, Math.min(Math.round(r.x), bmp.width - 1));
+    const y = Math.max(0, Math.min(Math.round(r.y), bmp.height - 1));
+    const w = Math.max(1, Math.min(Math.round(r.w), bmp.width - x));
+    const h = Math.max(1, Math.min(Math.round(r.h), bmp.height - y));
+
+    // Several margins, not one.
+    //
+    // Measured on real photographs of business cards: how much room is left
+    // around a code decides whether it reads, and no single amount wins. On one
+    // card a 10% margin read both codes and 25% read neither; on another 100%
+    // read one that 10% missed, while 100% lost a third card entirely. A QR
+    // needs its quiet zone, and a tight box has none - but too much margin
+    // shrinks the code within the frame until its modules go sub-pixel.
+    //
+    // A crop is small, so trying three costs almost nothing, and the union is
+    // what the user asked for: everything readable in the area they pointed at.
+    const MARGINS = [0.1, 0, 0.35];
+    const seen = new Set();
+    let last = null;
+    for (const m of MARGINS) {
+      const pad = Math.round(Math.max(w, h) * m);
+      const cx = Math.max(0, x - pad), cy = Math.max(0, y - pad);
+      const cw = Math.min(bmp.width - cx, w + pad * 2);
+      const ch = Math.min(bmp.height - cy, h + pad * 2);
+      if (cw < 8 || ch < 8) continue;
+
+      if (cut) cut.close();
+      cut = await createImageBitmap(bmp, cx, cy, cw, ch);
+      const canvas = new OffscreenCanvas(cut.width, cut.height);
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      ctx.drawImage(cut, 0, 0);
+      const data = ctx.getImageData(0, 0, cut.width, cut.height);
+
+      const res = qrDecode(data.width, data.height, data.data);
+      const space = { w: data.width, h: data.height, naturalW: data.width, naturalH: data.height };
+      last = Result.carry(res, space);
+      // The browser's own decoder on the same crop. On a cropped code it is
+      // the one most likely to succeed, which is the whole point of cropping.
+      const nat = await Native.detect(cut);
+      if (nat) for (const c of nat.codes) last.codes.push(c);
+      for (const c of last.codes) seen.add(c);
+      if (res.error) out.error = res.error;
+    }
+    if (last) Object.assign(out, last);
+    out.codes = [...seen];
+    // Where the crop sat in the source, so a caller can put its geometry back
+    // where it came from without remembering what it asked for.
+    out.origin = { x, y, w, h };
+  } catch (e) {
+    out.errorKey = "err.unopenable";
+    out.error = "could not be read, unsupported format, or a damaged file";
+    out.detail = String((e && e.message) || e);
+  } finally {
+    if (cut) cut.close();
+    if (bmp) bmp.close();
+  }
+  self.postMessage(out);
+}
+
+// encode is the other direction: payloads back into module matrices, so the
+// page can write them out as PNG, JPEG, SVG or PDF.
+//
+// It lives here for the same reason decoding does - the engine is in the
+// worker, and the page has no wasm instance of its own. Routing it through the
+// same queue also keeps a batch of a hundred codes off the thread that has to
+// keep the UI moving.
+function encodeBatch(job) {
+  const matrices = (job.texts || []).map((t) => {
+    try {
+      const m = qrEncode(t);
+      return m && !m.error ? m : null;
+    } catch {
+      return null;
+    }
+  });
+  self.postMessage({ type: "encodeResult", id: job.id, matrices });
+}
+
+// frame decodes raw pixels straight, with no image decoding in front of it.
+//
+// The live view sends one of these several times a second, so every step that
+// is not decoding has to go: no blob, no createImageBitmap, no re-encode. The
+// page hands over the buffer it already has and gets back the codes and where
+// they are.
+async function frame(job) {
+  const out = { type: "frameResult", id: job.id, w: job.w, h: job.h };
+  const space = { w: job.w, h: job.h, naturalW: job.natW, naturalH: job.natH };
+  try {
+    const pixels = new Uint8ClampedArray(job.buf);
+    // The viewfinder's own decoder: a short cascade, because another frame is
+    // fifty milliseconds away and a scanner that thinks for a third of a
+    // second cannot be aimed. Measured in scanner/live.go.
+    const res = qrDecodeLive(job.w, job.h, pixels);
+    Object.assign(out, Result.carry(res, space));
+    // And the one the browser already has, which on macOS is the system's own
+    // and reads the small, coloured and branded codes this one cannot. See
+    // native.js. Unioned, because each finds things the other misses.
+    await mergeNative(out, new ImageData(pixels, job.w, job.h), space);
+  } catch (e) {
+    out.error = String((e && e.message) || e);
+    out.codes = out.codes || [];
+    out.detections = out.detections || [];
+  }
+  self.postMessage(out);
+}
+
+// mergeNative folds the browser decoder's answer into one already produced by
+// the wasm engine. Payloads are deduped; a box is kept for a code that had
+// none, because a code with no geometry cannot be drawn or pointed at.
+async function mergeNative(out, source, space) {
+  const nat = await Native.detect(source);
+  if (!nat) return;
+  const have = new Set(out.codes || []);
+  const carried = Result.carry({ codes: nat.codes, detections: nat.detections, classification: "" }, space);
+  for (let i = 0; i < carried.codes.length; i++) {
+    if (have.has(carried.codes[i])) continue;
+    have.add(carried.codes[i]);
+    out.codes.push(carried.codes[i]);
+  }
+  const drawn = new Set((out.detections || []).filter((d) => d.text).map((d) => d.text));
+  for (const d of carried.detections) {
+    if (d.text && !drawn.has(d.text)) {
+      drawn.add(d.text);
+      out.detections.push(d);
+    }
+  }
+  // A code the browser read is a code that was read, whatever the enum said.
+  if (out.codes.length) out.reason = "DECODED";
+}
+
+const HANDLERS = { crop, encode: encodeBatch, frame };
+
 self.onmessage = (e) => {
   const job = e.data;
   if (job && job.type === "module") { boot(job.module); return; }
-  if (ready) run(job);
+  const go = (job && HANDLERS[job.type]) || run;
+  if (ready) go(job);
   else pending.push(job);
 };

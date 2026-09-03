@@ -2,7 +2,7 @@ package scanner
 
 // Why an image ended up where it did.
 //
-// Before this, a scan answered one question — did a code come out? — and three
+// Before this, a scan answered one question (did a code come out?)and three
 // different failures gave the same answer: a receipt whose QR is blown out by
 // glare, a photo of a cat, and an image whose finder patterns are plainly
 // visible but whose payload no strategy could recover. Telling a user "no QR
@@ -25,8 +25,8 @@ import (
 //
 // There are three, deliberately. A finer split built on partial finder
 // centres was measured first and did not survive contact with the detector:
-// those centres fire where there is no code at all — a uniform-noise image
-// yields one — so a bucket built on them would promise a code the image does
+// those centres fire where there is no code at all, a uniform-noise image
+// yields one, so a bucket built on them would promise a code the image does
 // not contain. Three buckets each say something the evidence supports.
 //
 // What the evidence does support is the full triple: FindMulti locating three
@@ -36,17 +36,17 @@ import (
 type Classification string
 
 const (
-	// Decoded — at least one payload came out. It says nothing about whether
+	// Decoded, at least one payload came out. It says nothing about whether
 	// every code in the image was read; an image holding one readable and one
 	// unreadable code is Decoded, because it did decode.
 	Decoded Classification = "DECODED"
 
-	// QRDetectedDecodeFailed — a full finder-pattern triple was located and no
+	// QRDetectedDecodeFailed, a full finder-pattern triple was located and no
 	// strategy could read a payload from it. This is the actionable one: the
 	// tool saw what the user sees.
 	QRDetectedDecodeFailed Classification = "QR_DETECTED_DECODE_FAILED"
 
-	// NoQRFound — nothing decoded and no finder pattern was located by any
+	// NoQRFound, nothing decoded and no finder pattern was located by any
 	// colour projection. It is not proof there is no code: a code invisible to
 	// every projection is invisible to the detector too.
 	NoQRFound Classification = "NO_QR_FOUND"
@@ -67,7 +67,7 @@ func (c Classification) Reason() string {
 	return ""
 }
 
-// Box is an axis-aligned bounding box in ORIGINAL-image pixel coordinates —
+// Box is an axis-aligned bounding box in ORIGINAL-image pixel coordinates,
 // the same space hit.points live in, for the same reason. See the coordinate
 // contract in hits.go. The detector that produces these runs on an unscaled,
 // uncropped projection, so no mapping back is needed today; a future detector
@@ -79,16 +79,27 @@ type Box struct {
 	H int `json:"h"`
 }
 
-// Detection is one located-but-unread QR code: where it is, how big its
-// modules are, and which version it looks like.
+// Detection is one QR code located in an image: where it is, how big its
+// modules are, which version it looks like, and - when it could be read - what
+// it says.
+//
+// Text was added for the live camera view, which draws a box on every code it
+// can see and colours it by whether the payload came out. Before that, boxes
+// were produced only for codes that failed, on the reasoning that a decoded
+// code has its payload and a rectangle adds nothing. That reasoning holds for
+// a list of files and breaks the moment something has to point at a code in a
+// moving picture.
 type Detection struct {
 	Box Box `json:"box"`
+	// Text is the payload when this code was read, empty when it was located
+	// and could not be. It is what tells a viewfinder which colour to draw.
+	Text string `json:"text,omitempty"`
 	// ModuleSize is the detector's estimate in pixels, averaged over the three
 	// finder patterns.
 	ModuleSize float64 `json:"module_size"`
 	// Version is the estimated QR version, 1-40, or 0 when the geometry does
 	// not yield a plausible one. It is an estimate from measured distances,
-	// not a value read out of the code — the code did not decode.
+	// not a value read out of the code, the code did not decode.
 	Version int `json:"version,omitempty"`
 }
 
@@ -100,6 +111,9 @@ type Detail struct {
 	// image the payload is the answer and a box adds nothing; on NoQRFound
 	// there is nothing to box.
 	Detections []Detection `json:"detections,omitempty"`
+	// Metadata is what the image looked like and what was tried on it. It is
+	// annotation and never a filter - see metadata.go.
+	Metadata *Metadata `json:"metadata,omitempty"`
 }
 
 // classify picks the bucket. Order matters: any payload at all wins, because
@@ -148,7 +162,7 @@ func detectionOf(info *detector.FinderPatternInfo, bounds image.Rectangle) (Dete
 		return Detection{}, false
 	}
 
-	// The fourth corner is not detected — a QR has no finder pattern there —
+	// The fourth corner is not detected, a QR has no finder pattern there,
 	// so it is completed as a parallelogram. On a perspective-warped photo this
 	// is an approximation, and an approximation that errs outward is the right
 	// kind: the box is a hint about where to look, and a box slightly too big
@@ -216,4 +230,49 @@ func clampInt(v, lo, hi int) int {
 		return hi
 	}
 	return v
+}
+
+// detectionsFromHits boxes codes that DID decode, from the result points the
+// decoder returned with each one.
+//
+// The points are the finder-pattern centres, which sit 3.5 modules inside the
+// code's own edge, so a box drawn straight through them cuts the corners off.
+// Module size is not known here - the payload came out, so nothing measured
+// it - and it is approximated as a fraction of the code's span. The
+// approximation errs outward for the same reason detectionOf's does: a box
+// slightly too big still contains the code, one slightly too small does not.
+func detectionsFromHits(hits []hit, bounds image.Rectangle) []Detection {
+	var out []Detection
+	for _, h := range hits {
+		if len(h.points) < 2 {
+			continue // zbarimg and the mask decoder report no geometry at all
+		}
+		minX, minY := math.Inf(1), math.Inf(1)
+		maxX, maxY := math.Inf(-1), math.Inf(-1)
+		for _, p := range h.points {
+			minX, maxX = math.Min(minX, p.GetX()), math.Max(maxX, p.GetX())
+			minY, maxY = math.Min(minY, p.GetY()), math.Max(maxY, p.GetY())
+		}
+		if math.IsInf(minX, 0) || math.IsInf(minY, 0) {
+			continue
+		}
+		// The pad is a fraction of the span because the exact answer is not
+		// available here: it is 3.5 modules, and nothing on this path measured
+		// the module size - the payload came out, so no detector ran. The
+		// fraction that would be exact is 3.5/(modules-7), which is 25% for a
+		// version-1 code and 4% for a version-20 one, so any single number is
+		// wrong for most codes. 15% sits between them and errs outward on the
+		// dense ones, which is the harmless direction: the box is a hint about
+		// where a code is, and one slightly too big still contains it.
+		pad := 0.15 * math.Max(maxX-minX, maxY-minY)
+		x0 := clampInt(int(math.Floor(minX-pad)), bounds.Min.X, bounds.Max.X)
+		y0 := clampInt(int(math.Floor(minY-pad)), bounds.Min.Y, bounds.Max.Y)
+		x1 := clampInt(int(math.Ceil(maxX+pad)), bounds.Min.X, bounds.Max.X)
+		y1 := clampInt(int(math.Ceil(maxY+pad)), bounds.Min.Y, bounds.Max.Y)
+		if x1 <= x0 || y1 <= y0 {
+			continue
+		}
+		out = append(out, Detection{Box: Box{X: x0, Y: y0, W: x1 - x0, H: y1 - y0}, Text: h.text})
+	}
+	return out
 }

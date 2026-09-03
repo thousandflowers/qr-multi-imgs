@@ -128,8 +128,8 @@ func statError(path string, err error) error {
 	return fmt.Errorf("cannot access %s: %w", path, err)
 }
 
-// resolveInput turns one line of input — typed, pasted, or several files
-// dropped at once — into validated scan targets. Empty input means the current
+// resolveInput turns one line of input, typed, pasted, or several files
+// dropped at once, into validated scan targets. Empty input means the current
 // directory, which is what Enter on an empty prompt has always done.
 func resolveInput(raw string) ([]string, error) {
 	tokens := splitPaths(raw)
@@ -691,7 +691,7 @@ func (m model) viewResults() string {
 
 func (m model) viewList() string {
 	var b strings.Builder
-	b.WriteString(titleStyle.Render("Results — All Scanned Images"))
+	b.WriteString(titleStyle.Render("Results, All Scanned Images"))
 	b.WriteString("\n\n")
 
 	results := m.summary.Results
@@ -1081,7 +1081,7 @@ func sanitizeFilename(s string, maxLen int) string {
 
 // version is stamped at link time by goreleaser (-X main.version=1.5.0). A
 // plain `go build` or `go install` leaves it empty, so fall back to the module
-// version the toolchain records in the build info — that way `go install
+// version the toolchain records in the build info, that way `go install
 // ...@latest` reports the tag it actually installed instead of a hardcoded
 // string somebody forgot to bump.
 var version string
@@ -1147,7 +1147,7 @@ func parseArgs(args []string) (showHelp, showVersion bool, paths []string) {
 }
 
 func printHelp() {
-	fmt.Println(`qr-multi-imgs — scan folders and images for QR codes
+	fmt.Println(`qr-multi-imgs, scan folders and images for QR codes
 
 Usage:
   qr-multi-imgs                        interactive TUI (type or drag paths)
@@ -1175,12 +1175,12 @@ Input methods:
 
 Supported formats:
   Everywhere      PNG, JPG, JPEG, GIF, BMP, WebP, TIFF
-  macOS adds      every format the system decodes — HEIC, PSD, JXL, AVIF and
+  macOS adds      every format the system decodes, HEIC, PSD, JXL, AVIF and
                   camera raw from any supported camera (CR2, CR3, ARW, DNG,
                   NEF, RAF, ORF, RW2 ...). Asked at startup, not hardcoded.
                   PDF too: every page is rendered and read, so a multi-page
                   document reports the codes from all of them.
-  Mixed formats scan in one pass — no per-format mode.
+  Mixed formats scan in one pass, no per-format mode.
 Project: https://github.com/thousandflowers/qr-multi-imgs`)
 }
 

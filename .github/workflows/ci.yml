@@ -27,6 +27,12 @@ jobs:
       - name: Vet
         run: go vet ./...
 
+      # The corpus harness is behind a build tag, so `go vet ./...` never
+      # compiles it and a break in it would only surface the next time someone
+      # tried to measure something.
+      - name: Vet the corpus harness
+        run: go vet -tags corpus ./scanner
+
       # The browser engine is a separate build target, so nothing else here
       # would notice it breaking until a Pages deploy failed.
       - name: Build the wasm engine
@@ -44,9 +50,16 @@ jobs:
           node web/unzip.js --test
           node web/i18n.js --test
           node web/order.js --test
+          node web/result.js --test
+          node web/coords.js --test
+          node web/select.js --test
+          node web/qrgen.js --test
+          node web/linkcheck.js --test
+          node web/csvin.js --test
+          node web/native.js --test
 
       - name: Test
-        run: go test -v -count=1 -coverprofile=${{ runner.temp }}/coverage.txt . ./exporter ./scanner
+        run: go test -v -count=1 -coverprofile=${{ runner.temp }}/coverage.txt . ./exporter ./scanner ./cmd/...
 
       - name: Upload coverage to Codecov
         if: runner.os != 'Windows'

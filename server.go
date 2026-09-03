@@ -131,7 +131,8 @@ func (s *apiServer) handler() http.Handler {
 
 	sub, err := fs.Sub(webFS, "web")
 	if err == nil {
-		mux.Handle("/", http.FileServer(http.FS(sub)))
+		// Compressed, and cacheable under a fingerprinted path. See webassets.go.
+		mux.Handle("/", newWebAssets(sub))
 	}
 	return s.guard(mux)
 }
@@ -361,7 +362,7 @@ func runServer(addrIn string) error {
 
 	// The token rides in the URL fragment: browsers never put a fragment in a
 	// request, a Referer header or a server log.
-	fmt.Printf("qr-multi-imgs %s — local API on %s\n\n", versionString(), origin)
+	fmt.Printf("qr-multi-imgs %s, local API on %s\n\n", versionString(), origin)
 	fmt.Printf("  Local UI   %s/#t=%s\n", origin, s.token)
 	fmt.Printf("  Hosted UI  %s/qr-multi-imgs/#t=%s&api=%s\n\n", allowedOrigin, s.token, origin)
 	fmt.Println("Anyone holding that URL can scan, move and delete files on this machine.")

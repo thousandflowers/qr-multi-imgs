@@ -3,8 +3,8 @@
 package scanner
 
 // macOS-only QR backend built on Apple's Vision framework. Vision decodes
-// real-world photos — perspective-warped, low-contrast, small-module receipt
-// QRs — that the pure-Go gozxing path and zbarimg both miss. The framework
+// real-world photos, perspective-warped, low-contrast, small-module receipt
+// QRs, that the pure-Go gozxing path and zbarimg both miss. The framework
 // ships with every macOS install, so this adds no runtime dependency for the
 // user (unlike zbarimg, which needs `brew install zbar` and can segfault).
 
@@ -46,7 +46,7 @@ var visionByteOrder = binary.NativeEndian
 // The second return reports whether Vision could read the file at all. Callers
 // use it to tell "this decoder could not open it" apart from "it opened fine
 // and holds no QR", which matters because Core Image reads formats Go's
-// image.Decode does not — HEIC above all.
+// image.Decode does not, HEIC above all.
 func decodeWithVision(path string) ([]hit, bool) {
 	cpath := C.CString(path)
 	defer C.free(unsafe.Pointer(cpath))
@@ -132,3 +132,6 @@ func parseVisionBuffer(b []byte) []hit {
 	}
 	return hits
 }
+
+// visionAvailable reports whether Apple Vision can read files in this build.
+const visionAvailable = true

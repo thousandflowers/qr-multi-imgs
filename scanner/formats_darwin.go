@@ -2,7 +2,7 @@
 
 package scanner
 
-// The raster formats a Mac can read are not a fixed list — Core Image decodes
+// The raster formats a Mac can read are not a fixed list, Core Image decodes
 // every camera raw ImageIO knows, and that set grows with the OS and with each
 // camera Apple adds support for. Hardcoding one would mean a stale list that
 // silently skips a user's files, so the system is asked instead.

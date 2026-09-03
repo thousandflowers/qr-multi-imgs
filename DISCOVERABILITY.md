@@ -28,7 +28,7 @@ Batch QR code scanner with a terminal UI. Point it at a folder of images: it dec
 Shorter fallback if the field renders cramped (116 characters):
 
 ```
-Batch QR code scanner with a TUI — scan a folder, decode, organize, export, regenerate. Pure Go, nothing to install.
+Batch QR code scanner with a TUI, scan a folder, decode, organize, export, regenerate. Pure Go, nothing to install.
 ```
 
 Also set:

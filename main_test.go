@@ -277,7 +277,7 @@ func TestSafeCmd_panicRecovery(t *testing.T) {
 
 func TestScanFolderCmd_success(t *testing.T) {
 	dir := t.TempDir()
-	// Create a dummy image file (not a real image — ScanFolder doesn't validate content at the dir level)
+	// Create a dummy image file (not a real image, ScanFolder doesn't validate content at the dir level)
 	os.WriteFile(filepath.Join(dir, "test.png"), []byte("dummy"), 0644)
 
 	msg := startScan([]string{dir})()
@@ -873,7 +873,7 @@ func TestUpdate_clipboardMsg_onFolderInput(t *testing.T) {
 	m.input.SetValue("")
 	m2, _ := m.Update(clipboardMsg{"/paste/dir"})
 	mm := m2.(model)
-	// clipboard should set value, then auto-submit — if value is invalid dir it goes to error
+	// clipboard should set value, then auto-submit, if value is invalid dir it goes to error
 	_ = mm
 	// Just verify it doesn't panic; the behavior is complex (auto-submit may fail with invalid path)
 }
@@ -1912,7 +1912,7 @@ func TestValidateScanPath_unreadableDir(t *testing.T) {
 	err := validateScanPath(dir)
 	if err == nil {
 		// On some systems running as root, Chmod may not restrict access
-		t.Log("warning: unreadable dir test — dir was still accessible (running as root?)")
+		t.Log("warning: unreadable dir test, dir was still accessible (running as root?)")
 	}
 	os.Chmod(dir, 0755)
 }

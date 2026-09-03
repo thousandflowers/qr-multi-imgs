@@ -24,13 +24,13 @@ Support .tif / .tiff images
 
 ```markdown
 Scanned receipts and documents very often come out as TIFF, and right now
-qr-multi-imgs skips them silently — the file is not counted, not listed,
+qr-multi-imgs skips them silently, the file is not counted, not listed,
 not reported as an error.
 
 The format list lives in one place:
 
-- `scanner/scanner.go:48` — `supportedExtensions`
-- `scanner/scanner.go:19` — the blank imports that register decoders
+- `scanner/scanner.go:48`, `supportedExtensions`
+- `scanner/scanner.go:19`, the blank imports that register decoders
 
 TIFF is already reachable: `golang.org/x/image` is an existing direct
 dependency and ships `golang.org/x/image/tiff`, so this adds **no new
@@ -52,7 +52,7 @@ module** to go.mod.
 `go test -count=1 ./...` passes and a folder holding a `.tiff` QR is
 scanned instead of ignored.
 
-Good first issue — one map entry, one import, one test.
+Good first issue, one map entry, one import, one test.
 ```
 
 ---
@@ -79,7 +79,7 @@ walk the tree instead.
 
 ### What to do
 
-1. Extend `parseArgs` in `main.go:926` — it already handles `-h/--help`
+1. Extend `parseArgs` in `main.go:926`, it already handles `-h/--help`
    and `-v/--version`, so this is the same shape.
 2. Thread the flag down to the scanner. The lazy version: keep
    `os.ReadDir` for the default path and switch to `filepath.WalkDir`
@@ -92,7 +92,7 @@ walk the tree instead.
 ### Careful about
 
 - The organize (`o`) and delete (`d`) actions write next to the source
-  images. Decide and state what recursive means for those — the safe
+  images. Decide and state what recursive means for those, the safe
   answer is to keep writing relative to the root folder.
 - Symlinked directories can loop. `filepath.WalkDir` does not follow
   them by default; keep it that way.
@@ -134,11 +134,11 @@ Two consequences:
 ### What to do
 
 1. Swap `lipgloss.Color` for `lipgloss.AdaptiveColor{Light: …, Dark: …}`
-   on the styles that carry meaning — muted, help, title, cursor. Keep
+   on the styles that carry meaning, muted, help, title, cursor. Keep
    the current hexes as the `Dark` values so the default look is unchanged.
 2. Respect `NO_COLOR`: lipgloss already exposes a renderer whose
    color profile can be forced to `termenv.Ascii`. One check at startup
-   is enough — do not scatter `if noColor` through the views.
+   is enough, do not scatter `if noColor` through the views.
 3. Add a test that the styles resolve without panicking under both
    profiles.
 
@@ -147,7 +147,7 @@ Two consequences:
 The TUI is readable on a light background, and `NO_COLOR=1
 qr-multi-imgs ./folder` renders without escape sequences.
 
-Good first issue — contained to the style block, no scanner logic touched.
+Good first issue, contained to the style block, no scanner logic touched.
 ~~~
 
 ---
@@ -167,7 +167,7 @@ Make TestDecodeWithZbarimg independent of the host's zbarimg
 fails depending on which zbarimg happens to be installed on the machine
 running it. On macOS/arm64, zbar 0.23.93 segfaults on a perfectly valid
 PNG, so the test currently skips with "zbarimg present but unusable on
-this host". That skip is a patch for a broken host, not a fix — on most
+this host". That skip is a patch for a broken host, not a fix, on most
 machines the test now asserts nothing at all.
 
 The fix is to stop calling the real binary.
@@ -177,15 +177,15 @@ The fix is to stop calling the real binary.
 1. Write a fake zbarimg into `t.TempDir()`: a tiny shell script that
    prints a known payload and exits 0. Remember to `chmod +x` it.
 2. Prepend that directory to `PATH` with `t.Setenv("PATH", ...)`.
-3. Assert `decodeWithZbarimg`'s own behaviour against it — argument
-   construction, trailing-newline trimming, and the empty-output path —
+3. Assert `decodeWithZbarimg`'s own behaviour against it, argument
+   construction, trailing-newline trimming, and the empty-output path,
    with no dependency on a real zbar install.
 
 ### Careful about
 
 `zbarimgPath` is resolved once in `init()` (`scanner/scanner.go`) via
 `exec.LookPath`, so a `PATH` override set inside a test will never be
-seen. Making that lookup re-resolvable — or injectable — is the substance
+seen. Making that lookup re-resolvable (or injectable)is the substance
 of this task, not an aside. Keep it small and keep production behaviour
 identical: zbarimg is an optional last-resort fallback and must stay one.
 
@@ -195,7 +195,7 @@ identical: zbarimg is an optional last-resort fallback and must stay one.
 behaviour on a machine with no zbar installed at all, and still passes on
 one with a working zbar.
 
-Good first issue — one fake binary, one seam, no new dependency.
+Good first issue, one fake binary, one seam, no new dependency.
 ~~~
 
 ---
@@ -215,7 +215,7 @@ The results list gives each image one row, but a payload containing
 newlines is written into that row verbatim, so one image takes three
 lines and the alignment of everything under it goes with it.
 
-A vCard is the common case, and it is not exotic — every "add me to your
+A vCard is the common case, and it is not exotic, every "add me to your
 contacts" QR code is one:
 
     [QR] IMG_0412.png  BEGIN:VCARD
@@ -224,8 +224,8 @@ contacts" QR code is one:
     [QR] IMG_0418.png  https://example.com/menu
 
 `truncate` in `main.go` shortens by length only; it has no opinion about
-control characters. The fix is to collapse whitespace — newlines, tabs,
-carriage returns — into single spaces before the length cut, so the row
+control characters. The fix is to collapse whitespace, newlines, tabs,
+carriage returns, into single spaces before the length cut, so the row
 shows `BEGIN:VCARD FN:R. Bianchi END:VCARD` and stays one row.
 
 Do it in `truncate` rather than at the call sites: every caller wants a
@@ -238,4 +238,4 @@ A test builds a `ScanResult` whose content contains `\n` and asserts
 for the whole payload, must keep its line breaks.
 ```
 
-Good first issue — one function, one test, no new dependency.
+Good first issue, one function, one test, no new dependency.

@@ -303,7 +303,7 @@ func TestDecodeMaskImage_noQR(t *testing.T) {
 	}
 }
 
-// TODO(hermetic): this test's result depends on which zbarimg the host has —
+// TODO(hermetic): this test's result depends on which zbarimg the host has,
 // the skip below is a patch for a broken host, not a fix. The real fix is a
 // fake zbarimg injected through PATH, which also means zbarimgPath must stop
 // being resolved once in init(). Written up as task 4 in GOOD_FIRST_ISSUES.md.
@@ -475,7 +475,7 @@ func TestScanImage_BMP_blank(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "blank.bmp")
 	writeBlankBMP(t, path)
 
-	// ponytail: no error even though extension is .bmp — proves codec is registered
+	// ponytail: no error even though extension is .bmp, proves codec is registered
 	got, err := ScanImage(path)
 	if err != nil {
 		t.Fatalf("ScanImage(bmp): %v", err)
@@ -483,7 +483,7 @@ func TestScanImage_BMP_blank(t *testing.T) {
 	_ = got
 }
 
-// ─── WebP helper — Go stdlib can't encode WebP, so we use a known-good vector ─
+// ─── WebP helper, Go stdlib can't encode WebP, so we use a known-good vector ─
 
 func writeStaticWebP(t *testing.T, path string) {
 	t.Helper()
@@ -505,7 +505,7 @@ func TestScanImage_WebP_blank(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "test.webp")
 	writeStaticWebP(t, path)
 
-	// ponytail: no decode error — proves webp codec is registered
+	// ponytail: no decode error, proves webp codec is registered
 	got, err := ScanImage(path)
 	if err != nil {
 		t.Fatalf("ScanImage(webp): %v", err)

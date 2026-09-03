@@ -3,8 +3,11 @@
 **Scan a folder → decode QR → organize, export, recreate - from a clean TUI.**
 
 **Or read your codes with nothing installed: [open the web app](https://thousandflowers.github.io/qr-multi-imgs/)**
-and drop a photo or a folder on it. The decoder is a WebAssembly build of this
-same Go code running inside your tab - your images are never uploaded.
+and drop a photo, a folder or a zip on it, or scan live from the camera. The
+decoder is a WebAssembly build of this same Go code running inside your tab, so
+your images are never uploaded. It reads every code in every image, recreates
+them as PNG, JPEG, SVG or PDF, turns a CSV column into a batch of codes, and
+shows you where a link goes before it opens it. Seven languages.
 
 ![demo](demo.gif)
 
@@ -18,7 +21,7 @@ same Go code running inside your tab - your images are never uploaded.
 ![Windows](https://img.shields.io/badge/Windows-supported-0078D4?logo=windows)
 
 ```bash
-# One command — go, or curl, or brew:
+# One command, go, or curl, or brew:
 go install github.com/thousandflowers/qr-multi-imgs@latest
 qr-multi-imgs ./folder-of-qr-images
 ```
@@ -50,6 +53,12 @@ Plenty of CLI QR scanners exist. None ship a TUI built for batch work.
 | Export (JSON/CSV/TXT) | ✅ | ❌ | ✅ |
 | Drag & drop + clipboard | ✅ | ❌ | ❌ |
 | Photographed QRs (Apple Vision, macOS) | ✅ | ❌ | ❌ |
+| Every code in one image, not just the first | ✅ | ❌ | ❌ |
+| Browser app, nothing uploaded | ✅ | ❌ | ❌ |
+| Live camera, several codes at once | ✅ | ❌ | ❌ |
+| Point at a code the scan missed | ✅ | ❌ | ❌ |
+| CSV column to a batch of codes | ✅ | ❌ | ❌ |
+| Shows where a link goes before opening | ✅ | ❌ | ❌ |
 | Nothing to install (no runtime deps) | ✅ | ❌ (Node) | ✅ |
 
 ---
@@ -58,18 +67,29 @@ Plenty of CLI QR scanners exist. None ship a TUI built for batch work.
 
 Dataset: [lovasoa/qrcode-dataset](https://github.com/lovasoa/qrcode-dataset) - **3332 damaged & distorted QR images** built to stress-test scanners. Each sample ships three files: the distorted `NNN.png`, the decoded `NNN.txt`, and `NNN.npy` - the generator's **source bit-matrix**.
 
-| | image pixels only | with the companion `.npy` |
-|---|---|---|
-| **Detection** | ~57% | **3332/3332 (100%)** |
-| **Time** | ~7m30s (v1.0, serial) | **~7s** |
-| **Throughput** | ~7 img/s | **~475 img/s** |
+**The headline is the image-only number**, because it is the only one that
+describes decoding:
 
-**Read that 100% honestly.** It is not image decoding. It is decoding the answer
-key this dataset happens to ship beside every image: when a `.npy` sits next to
-the file, qr-multi-imgs decodes that bit-matrix first, in pure Go. That is
-exactly what you want on this dataset and it never happens on your own photos.
+| | |
+|---|---|
+| **Recall, image pixels only** | **59.2%** (1972 / 3332) |
+| **Time** | 137 s |
+| **Throughput** | 24 img/s |
 
-**On pixels alone the same dataset scores ~57%**, and that number splits hard:
+Pure Go, no Apple Vision, no `zbarimg`, companion masks ignored. Reproduce with
+`go test -tags corpus ./scanner -run TestCorpus` after building the manifest
+with `corpusgen -truth .txt`; the harness ignores the masks by default and says
+so in its output.
+
+The other number this dataset can produce is **3332/3332 (100%) at ~475 img/s**,
+and it is not a decoding result. It is the speed of reading the answer key the
+dataset ships beside every image: when a `.npy` sits next to the file,
+qr-multi-imgs decodes that bit-matrix first, in pure Go. That is exactly what
+you want on this dataset and it never happens on your own photos, so it is not
+the headline. Run it with `-corpus.masks` when you want to check that path has
+not regressed.
+
+**On pixels alone the dataset splits hard:**
 
 | subset | what it holds | image-only |
 |---|---|---|
@@ -89,13 +109,20 @@ dataset's *distortion*; density only decides how little of it is enough. Under a
 box blur, 61 modules survives radius 2 and fails at 3, 97 and 125 fail at 2, and
 153 fails already at 1. In every one of those failures the `.npy` still decodes.
 
+**Known limits.** `zbarimg`, the last-resort fallback, **segfaults** on some
+real photographs - exit 139 on a 3024x4032 iPhone JPEG here, with no output.
+The scan survives it: the exit status is treated as "found nothing" and the
+other decoders still run. It does mean `zbarimg` cannot be relied on as an
+independent second opinion on exactly the files where a second opinion would be
+worth most.
+
 **Since v1.5.0 a scan is slower on purpose.** Earlier versions stopped at the
 first code in an image; v1.5.0 returns every code in it. On 40 real photos that
 moved 3.9s to 18.4s. The unbounded strategy union would have cost 122.6s - the
 finder-pattern pre-pass is what keeps it at 18.
 
 ```bash
-# Reproduce — the dataset is generated, not stored in the repo:
+# Reproduce, the dataset is generated, not stored in the repo:
 git clone https://github.com/lovasoa/qrcode-dataset
 cd qrcode-dataset && pipenv install && pipenv run python generate_dataset.py
 qr-multi-imgs ./dataset
@@ -122,34 +149,94 @@ Measured on an Apple M2 Pro (10 cores, 16 GB).
 
 ---
 
-## Web app - nothing to install
+## Web app: nothing to install
 
 **<https://thousandflowers.github.io/qr-multi-imgs/>**
 
-Drop a single photo, a folder, or several folders - most scanners take one
-picture at a time, which is the point of this one. You can also paste a
-screenshot, or read codes live through the camera.
+Drop a single photo, a folder, several folders, or a zip. Most scanners take
+one picture at a time, which is the point of this one: every QR code in every
+image comes back with the file it came from, and every code in an image, not
+just the first.
 
-Every QR code in every image comes back with a thumbnail, a copy button, and a
-link when the payload is one. Filter to the images that had a code, or the ones
-that did not, and download the lot as JSON, CSV or plain text.
+### What it does in a browser
 
-**Nothing is uploaded, and that is enforced rather than promised.** The page
-carries a `Content-Security-Policy` whose `connect-src` allows only its own
-origin and the loopback, so it *cannot* send a filename or a payload anywhere
-else even if the page were tampered with. It loads no font, script or image from
-any third party. Your files never leave the tab.
+**Read**
 
-How the work is split matters. The browser turns each file into pixels - it
-already ships native decoders for everything it can display, JPEG through AVIF
-and HEIC on Safari - and a WebAssembly build of the same Go decoder does the
-part a browser has no answer for: finding and reading the codes. That is why the
-engine is 4.6 MB (1.4 MB over the wire) instead of carrying image decoders it
-would only duplicate. Decoding runs in a pool of Web Workers, one per core up to
-three, so a folder of photos does not freeze the page.
+- A folder, several folders, a zip, a single photo, a pasted screenshot, or a
+  live camera.
+- The camera reads several codes in the same frame at once and keeps counting
+  as you move. When it sees a code it cannot quite read it takes a copy of the
+  frame and looks at that properly, without freezing what you are looking at.
+- Codes it finds but cannot read are not a dead end. The thumbnail shows where
+  the code is; clicking the picture opens it with a box already drawn around
+  the code, which you adjust and read on its own. That crop goes back through
+  the full ladder of strategies, tried at three margins.
+- On a browser with `BarcodeDetector` (Chrome and Edge; on macOS it is backed
+  by Apple Vision) the page uses it alongside the WebAssembly decoder and takes
+  whatever either one finds.
+
+**Then do something with them**
+
+- Filter by what happened: has a code, still to read, no code at all. Or by
+  what the code *is*: link, Wi-Fi, contact, payment, event, and the rest.
+- Search inside the payloads and the filenames.
+- Count each distinct payload once, so ten photos of one poster are one row.
+- Flag a row to come back to.
+- Export as CSV, JSON or plain text.
+- Rename the files after the code they contain, with a live preview of the
+  resulting name, and download them as a zip.
+- Recreate any code as **PNG, JPEG, SVG or PDF**. The PDF and the SVG are
+  written by hand, so a printed code is vector, not a blown-up bitmap.
+- Turn a **column of a CSV** into a batch of codes: the separator is sniffed,
+  the header row is detected, and empty rows are counted rather than encoded.
+
+**Before you click a link**
+
+A QR code is the one place a phishing link can hide in plain sight, because
+nobody can read a QR code with their eyes. So the page never opens a link
+straight from a code. It shows the whole host first and names what is wrong
+with it when something is: an address that hides the real site before an `@`,
+a name written in a coded form that imitates another letter for letter, an
+unencrypted connection, a bare IP, a chain of labels, an address too long to
+see the ends of at once. `javascript:`, `data:` and `file:` are never openable
+at all.
+
+**In your language**
+
+English, Italian, Spanish, French, German, Portuguese and Simplified Chinese.
+The page picks one from the browser's own preference list, and when it speaks
+none of them it asks the machine's time zone, which is on the device and costs
+no permission and no request to anybody's server.
+
+### Nothing is uploaded, and that is enforced rather than promised
+
+The page carries a `Content-Security-Policy` whose `connect-src` allows only
+its own origin and the loopback, so it *cannot* send a filename or a payload
+anywhere else even if the page were tampered with. It loads no font, script or
+image from any third party. There is no account and no analytics. Your files
+never leave the tab.
+
+### How the work is split, and what it costs
+
+The browser turns each file into pixels: it already ships native decoders for
+everything it can display, JPEG through AVIF, and HEIC on Safari. A WebAssembly
+build of the same Go decoder does the part a browser has no answer for, which
+is finding and reading the codes. That is why the engine carries no image
+decoders of its own.
+
+Decoding runs in a pool of Web Workers, one per core up to six, so a folder of
+photos does not freeze the page. The module is compiled once and handed to
+every worker rather than fetched by each.
+
+The engine is 5.3 MB of WebAssembly, 1.9 MB over the wire, and it is not
+fetched while the page is still drawing: it starts after the page is usable, or
+the moment a pointer goes down or a file enters the window, whichever comes
+first. The page itself is 154 KB, 56 KB compressed. `--serve` compresses
+everything and serves the scripts and the engine from a fingerprinted path,
+cacheable for a year, so a reload after the first costs a single 304.
 
 What the browser cannot do is touch your disk. It reads the files you hand it
-and nothing else - no moving, no deleting. For that, run the program.
+and nothing else: no moving, no deleting. For that, run the program.
 
 ## Driving the local program from a browser
 
@@ -230,11 +317,11 @@ git clone https://github.com/thousandflowers/qr-multi-imgs.git
 cd qr-multi-imgs && go build
 ```
 
-**Requirements:** Go 1.26+, an ANSI terminal.  
+**Requirements:** Go 1.26+, an ANSI terminal.
 **Build:** pure Go on Linux/Windows. The macOS build links Apple's Vision
 framework via cgo (ships with the OS - nothing to install) for photographed,
-perspective-warped QR codes.  
-**Supported formats:** PNG / JPEG / GIF / BMP / WebP / TIFF everywhere. On macOS the list is whatever the system itself can decode - asked at startup via ImageIO rather than hardcoded - which adds HEIC / HEIF, PSD, JXL, AVIF and camera raw from any camera the OS supports (CR2, CR3, ARW, DNG, NEF, RAF, ORF, RW2 and the rest); 70 formats on a current macOS. PDFs are read too, by rendering each page - a multi-page document reports the codes from every page. Elsewhere HEIC needs a `-tags heic` build and raw is unavailable. A folder holding any mix of these scans in a single pass, and several folders or single files can be scanned together.  
+perspective-warped QR codes.
+**Supported formats:** PNG / JPEG / GIF / BMP / WebP / TIFF everywhere. On macOS the list is whatever the system itself can decode - asked at startup via ImageIO rather than hardcoded - which adds HEIC / HEIF, PSD, JXL, AVIF and camera raw from any camera the OS supports (CR2, CR3, ARW, DNG, NEF, RAF, ORF, RW2 and the rest); 70 formats on a current macOS. PDFs are read too, by rendering each page - a multi-page document reports the codes from every page. Elsewhere HEIC needs a `-tags heic` build and raw is unavailable. A folder holding any mix of these scans in a single pass, and several folders or single files can be scanned together.
 **Supported platforms:** macOS, Linux, **Windows** (clipboard via external tool).
 
 ---

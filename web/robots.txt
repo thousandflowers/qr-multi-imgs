@@ -1,0 +1,8 @@
+# Everything here is one page and its engine. Crawl all of it.
+User-agent: *
+Allow: /
+
+# The decoder itself is 5 MB of WebAssembly with nothing to index in it.
+Disallow: /qr.wasm
+
+Sitemap: https://thousandflowers.github.io/qr-multi-imgs/sitemap.xml
