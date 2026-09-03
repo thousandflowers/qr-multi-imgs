@@ -116,6 +116,13 @@ other decoders still run. It does mean `zbarimg` cannot be relied on as an
 independent second opinion on exactly the files where a second opinion would be
 worth most.
 
+Apple Vision has crashed once too, inside cgo, on a macOS CI runner during the
+corpusgen suite. It has not reproduced: the same commit passed on `main`, and
+seven local runs of that suite were clean. It is recorded here rather than
+explained, because an intermittent segfault in a decoder is worth writing down
+even when the cause is not yet known. If it happens to you, the scan of that
+one file is what dies; every other decoder still runs.
+
 **Since v1.5.0 a scan is slower on purpose.** Earlier versions stopped at the
 first code in an image; v1.5.0 returns every code in it. On 40 real photos that
 moved 3.9s to 18.4s. The unbounded strategy union would have cost 122.6s - the
