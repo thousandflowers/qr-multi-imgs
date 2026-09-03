@@ -75,7 +75,7 @@
   "author": { "@type": "Person", "name": "thousandflowers", "url": "https://github.com/thousandflowers" },
   "codeRepository": "https://github.com/thousandflowers/qr-multi-imgs",
   "programmingLanguage": ["Go", "JavaScript", "WebAssembly"],
-  "inLanguage": ["en", "it", "es", "fr", "de", "pt", "zh"]
+  "inLanguage": ["en", "it", "es", "fr", "de", "pt", "zh-Hans", "zh-Hant"]
 }
 </script>
 <script type="application/ld+json">
@@ -243,7 +243,12 @@ header { position:sticky; top:0; z-index:20; background:var(--panel);
 .bar nav a:hover { color:var(--fg); }
 /* The mark, not the word: everyone recognises it, and it reads the same in
    every one of the six languages. The accessible name still says "source". */
+/* The icon is 20px because that is the size it reads well at; the target
+   around it is 28, because a target is not a picture. WCAG 2.2 asks for 24. */
+.ghlink { display:inline-flex; align-items:center; justify-content:center;
+  width:28px; height:28px; border-radius:6px; }
 .ghlink svg { width:20px; height:20px; }
+footer a { display:inline-block; padding:4px 2px; min-height:24px; }
 .lang { font-size:var(--fs-2); padding:4px 8px; border-radius:7px;
   border:1px solid var(--line); background:var(--panel); color:var(--dim); }
 
@@ -540,6 +545,9 @@ footer { border-top:1px solid var(--line); background:var(--panel); }
 
 /* the statistics double as filters */
 .stats div { cursor:pointer; user-select:none; transition:background .12s; }
+/* They are role=button and reachable by keyboard, and nothing on screen said
+   which one had the focus. */
+.stats div:focus-visible { outline:2px solid var(--brand); outline-offset:-2px; }
 .stats div:hover { background:var(--soft); }
 .stats div[aria-pressed="true"] { background:var(--brand-soft); box-shadow:inset 0 -2px 0 var(--brand); }
 
@@ -848,6 +856,10 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
           <span id="count" role="status" aria-live="polite"></span>
           <span class="grow"></span>
           <button id="pause" class="hide" data-t="work.pause"></button>
+          <!-- Stop is not Clear. Clear throws away everything that was read;
+               stop keeps it and only declines to read the rest. Pausing was
+               the only way out of a long scan, and a pause is not an exit. -->
+          <button id="stop" class="hide" data-t="work.stop"></button>
           <button id="clear" class="danger" data-t="act.clear"></button>
         </div>
         <div id="nowFile"></div>
@@ -875,12 +887,12 @@ li .shim { width:72px; height:72px; border-radius:9px; background:var(--soft);
              of them. What a person wants from a glance is how much there is,
              how much came out, and how much is left to deal with. -->
         <div class="stats">
-          <div id="fAll" role="button" aria-pressed="true"><b id="sTotal">0</b><span data-t="stat.images"></span></div>
-          <div id="fWith" class="hit" role="button" aria-pressed="false"><b id="sWith">0</b><span data-t="stat.with"></span></div>
-          <div id="fUnread" class="warn" role="button" aria-pressed="false"><b id="sUnread">0</b><span data-t="stat.toRead"></span></div>
+          <div id="fAll" tabindex="0" role="button" aria-pressed="true"><b id="sTotal">0</b><span data-t="stat.images"></span></div>
+          <div id="fWith" tabindex="0" class="hit" role="button" aria-pressed="false"><b id="sWith">0</b><span data-t="stat.with"></span></div>
+          <div id="fUnread" tabindex="0" class="warn" role="button" aria-pressed="false"><b id="sUnread">0</b><span data-t="stat.toRead"></span></div>
           <!-- The images that hold nothing. Without it the three tiles never
                add up to the total and the missing ones look like a bug. -->
-          <div id="fWithout" class="mute" role="button" aria-pressed="false"><b id="sWithout">0</b><span data-t="stat.without"></span></div>
+          <div id="fWithout" tabindex="0" class="mute" role="button" aria-pressed="false"><b id="sWithout">0</b><span data-t="stat.without"></span></div>
         </div>
 
         <!-- Filters on their own line, exports on another. They were mixed
@@ -1233,6 +1245,34 @@ function pump() {
   paintProgress();
 }
 
+// stopScan gives up on what has not started, and keeps everything already
+// read. What is in flight is left to finish: a worker cannot be interrupted
+// mid-image without killing it, and a row that spins forever is worse than one
+// more image than you asked for.
+function stopScan() {
+  const dropped = [];
+  const queued = new Set(queue.map((j) => j.id));
+  queue.length = 0;
+  paused = false;
+  for (const r of rows) {
+    if (r.pending && queued.has(r.id)) dropped.push(r);
+  }
+  for (const r of dropped) {
+    if (r.thumbURL) URL.revokeObjectURL(r.thumbURL);
+    byId.delete(r.id);
+    if (r.el) r.el.remove();
+    const at = rows.indexOf(r);
+    if (at >= 0) rows.splice(at, 1);
+  }
+  expected = done + inFlight.size;
+  stopped = dropped.length;
+  paintProgress();
+  paintStats();
+  applyFilters();
+}
+
+let stopped = 0;
+
 function togglePause() {
   paused = !paused;
   $("pause").textContent = t(paused ? "work.resume" : "work.pause");
@@ -1402,6 +1442,7 @@ function enqueue(items, label) {
   // paste handled elsewhere, a test. Whatever the route, work has arrived and
   // the engine is needed now.
   startEngine();
+  stopped = 0;
   if (!items.length) { $("emptyText").textContent = t("res.nothing"); return; }
   const batch = { label: label || "", total: items.length, done: 0 };
   batches.push(batch);
@@ -1526,7 +1567,11 @@ async function switchCamera(id) {
 
 async function openScanner() {
   startEngine();
+  rememberFocus();
   $("scan").hidden = false;
+  // The dialog takes the keyboard with it. Without this the camera opened in
+  // front of someone whose focus was still on the button behind it.
+  $("scanClose").focus();
   $("camMsg").textContent = "";
   $("scanFound").replaceChildren();
   live.found.clear();
@@ -1556,6 +1601,7 @@ async function openScanner() {
 
 function closeScanner() {
   $("scan").hidden = true;
+  restoreFocus();
   cancelAnimationFrame(live.raf);
   live.raf = 0;
   if (live.frozen) { live.frozen.close(); live.frozen = null; }
@@ -2133,13 +2179,14 @@ function paintProgress() {
   const finished = expected > 0 && done === expected;
   $("bar").classList.toggle("done", finished);
   $("pause").classList.toggle("hide", finished || !expected);
+  $("stop").classList.toggle("hide", finished || !expected);
 
   // In words, not just a bar. "34 of 210" is the answer to the question a bar
   // only gestures at, and it is the text a screen reader announces.
   $("count").textContent = paused
     ? t("work.paused", { left: Math.max(0, expected - done) })
     : finished
-      ? t("work.done", { n: done })
+      ? (stopped ? t("work.stopped", { n: done, left: stopped }) : t("work.done", { n: done }))
       : t("work.progress", { done, total: expected });
 
   // What is being read right now, and whether it has been on it too long.
@@ -2609,6 +2656,7 @@ const setSelFromDisp = (d) => { const n = d && Coords.displayToNatural(d, inspFr
 
 async function openInspector(r) {
   if (!r.file) return;
+  rememberFocus();
   insp.row = r;
   insp.busy = false;
   insp.zoom = 1;
@@ -2830,8 +2878,24 @@ function paintLoupe(ctx, canvas, at) {
   ctx.strokeRect(left, top, size, size);
 }
 
+// Where the keyboard was when a dialog opened, so it can be put back. Without
+// this, closing one dropped focus on the body and a keyboard user restarted
+// from the top of the page.
+let focusBeforeDialog = null;
+
+function rememberFocus() {
+  focusBeforeDialog = document.activeElement;
+}
+
+function restoreFocus() {
+  const el = focusBeforeDialog;
+  focusBeforeDialog = null;
+  if (el && el.isConnected && typeof el.focus === "function") el.focus();
+}
+
 function closeInspector() {
   $("insp").hidden = true;
+  restoreFocus();
   if (insp.bmp) insp.bmp.close();
   insp.bmp = null;
   insp.row = null;
@@ -3174,7 +3238,18 @@ $("camshot").onchange = () => fromInput($("camshot"));
 
 for (const id in FILTERS) {
   // Clicking the tile that is already on goes back to everything.
-  $(id).onclick = () => { activeTile = id === activeTile ? "fAll" : id; applyFilters(); };
+  const toggle = () => { activeTile = id === activeTile ? "fAll" : id; applyFilters(); };
+  $(id).onclick = toggle;
+  // The tiles say role="button" and were reachable only with a pointer. A
+  // button a keyboard cannot reach is a button that lies about what it is.
+  // Real <button> elements do this themselves; a div has to be told.
+  if ($(id).tagName === "DIV") {
+    $(id).onkeydown = (e) => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault();
+      toggle();
+    };
+  }
 }
 $("search").oninput = applyFilters;
 $("qrSave").onclick = downloadRecreated;
@@ -3417,6 +3492,7 @@ document.addEventListener("keydown", (e) => {
   e.preventDefault();
   $("save").click();
 });
+$("stop").onclick = stopScan;
 $("clearNo").onclick = () => $("clearPop").classList.add("hide");
 document.addEventListener("click", (e) => {
   if (!$("clearPop").contains(e.target) && e.target !== $("clear")) $("clearPop").classList.add("hide");

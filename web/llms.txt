@@ -36,6 +36,13 @@ takes a folder and returns every code in every image with the file it came
 from, which is the shape of the job when someone has photographed a wall of
 posters, a stack of invoices, or a box of parts.
 
+## Languages
+
+English, Italian, Spanish, French, German, Portuguese, and Chinese in both
+Simplified and Traditional. The two Chinese blocks are written separately
+rather than converted, because the vocabulary differs and not only the
+characters.
+
 ## The command line version
 
   brew install thousandflowers/tap/qr-multi-imgs

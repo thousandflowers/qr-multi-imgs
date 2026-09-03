@@ -12,6 +12,23 @@
   const STORE = "qmi.lang";
   const listeners = [];
 
+  // Regions that write Chinese in the traditional script. Browsers still send
+  // zh-TW and zh-HK far more often than zh-Hant, and the base subtag alone
+  // cannot tell the two scripts apart, so the region has to be read.
+  const HANT_REGIONS = new Set(["tw", "hk", "mo"]);
+
+  // normalize turns a browser tag into one of this page's language codes.
+  // Everything but Chinese answers on its base subtag; Chinese needs the
+  // script, explicit when it is there and inferred from the region when it is
+  // not.
+  function normalize(tag) {
+    const parts = String(tag).toLowerCase().split("-");
+    if (parts[0] !== "zh") return parts[0];
+    if (parts.includes("hans")) return "zh";
+    if (parts.includes("hant")) return "zh-Hant";
+    return parts.some((p) => HANT_REGIONS.has(p)) ? "zh-Hant" : "zh";
+  }
+
   function pick() {
     try {
       const saved = localStorage.getItem(STORE);
@@ -21,8 +38,8 @@
     // navigator.languages is in the user's own order of preference, so the
     // first one the page speaks is the right answer.
     for (const tag of navigator.languages || [navigator.language || "en"]) {
-      const base = String(tag).toLowerCase().split("-")[0];
-      if (STRINGS[base]) return base;
+      const code = normalize(tag);
+      if (STRINGS[code]) return code;
     }
     // Nothing the browser is set to is a language this page speaks. Before
     // falling back to English, ask where the machine thinks it is.
@@ -52,12 +69,11 @@
     "Europe/Berlin": "de", "Europe/Vienna": "de", "Europe/Zurich": "de",
     "Europe/Lisbon": "pt", "Atlantic/Azores": "pt", "Atlantic/Madeira": "pt",
     "America/Sao_Paulo": "pt", "America/Bahia": "pt", "America/Fortaleza": "pt",
-    // Simplified Chinese is the only Chinese block here, so Hong Kong, Macau
-    // and Taipei map to it too: the wrong script beats a language the reader
-    // does not speak. Adding zh-Hant is what actually fixes those three.
+    // Both scripts are here now, so the three traditional-script zones get the
+    // traditional block rather than the wrong script as a consolation.
     "Asia/Shanghai": "zh", "Asia/Chongqing": "zh", "Asia/Harbin": "zh",
-    "Asia/Urumqi": "zh", "Asia/Hong_Kong": "zh", "Asia/Macau": "zh",
-    "Asia/Taipei": "zh", "Asia/Singapore": "zh",
+    "Asia/Urumqi": "zh", "Asia/Singapore": "zh",
+    "Asia/Hong_Kong": "zh-Hant", "Asia/Macau": "zh-Hant", "Asia/Taipei": "zh-Hant",
   };
 
   function fromTimeZone() {
@@ -149,6 +165,7 @@
 
   global.I18N = {
     t, setLang, apply, onChange, languages, selfTest, keysUsedIn, fromTimeZone, ZONE_LANG,
+    normalize,
     // Which language is showing. The page needs it for <html lang>, which is
     // what a search engine and a screen reader both read to know what
     // language the words are in.
@@ -163,6 +180,24 @@
     if (bad.length) throw new Error("zones point at languages that do not exist: " + JSON.stringify(bad));
     return Object.keys(ZONE_LANG).length + " time zones mapped to " +
       new Set(Object.values(ZONE_LANG)).size + " languages";
+  }
+
+  // A browser tag has to reach the right language AND the right script. The
+  // base subtag alone cannot do it for Chinese, and a page that gets this
+  // wrong shows a Taiwanese reader the mainland script, which is the failure
+  // this table exists to prevent.
+  function checkTags() {
+    const want = {
+      "zh-TW": "zh-Hant", "zh-HK": "zh-Hant", "zh-MO": "zh-Hant",
+      "zh-Hant-TW": "zh-Hant", "zh-CN": "zh", "zh-Hans-CN": "zh",
+      "zh": "zh", "zh-SG": "zh",
+      "it-IT": "it", "en-GB": "en", "pt-BR": "pt", "de-AT": "de",
+    };
+    for (const [tag, code] of Object.entries(want)) {
+      const got = normalize(tag);
+      if (got !== code) throw new Error(`normalize(${tag}) gave ${got}, wanted ${code}`);
+    }
+    return Object.keys(want).length + " browser tags resolved to the right language and script";
   }
 
   function checkMarkup() {
@@ -184,5 +219,6 @@
     console.log(selfTest());
     console.log(checkMarkup());
     console.log(checkZones());
+    console.log(checkTags());
   }
 })(typeof globalThis !== "undefined" ? globalThis : this);
