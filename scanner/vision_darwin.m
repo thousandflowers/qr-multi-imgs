@@ -201,6 +201,58 @@ static char *serialize(NSArray<QRRecord *> *records, int *outLen) {
 // appends whatever it finds. It stops at the first stage that yields records:
 // the stages are ordered cheapest-first and a later one only ever re-finds the
 // same codes more expensively.
+// One CIContext for the process, not one per image.
+//
+// Apple's guidance is that creating a context is expensive and that one should
+// be reused; it is documented thread-safe. A context is GPU-backed, and
+// corpusgen runs this from as many goroutines as there are cores, so a context
+// per image meant that many live GPU contexts at once.
+//
+// WHAT THIS DOES NOT DO. macOS CI segfaulted inside cgo in this path once,
+// intermittently, and the resource ceiling above was the suspicion. It is not
+// supported by measurement: over six concurrent 4000x3000 images with no code
+// in them, which walks the whole ladder including the 3x upscale, peak RSS was
+// 2748 MB before this change and 2790 MB after. So this is a correctness and
+// tidiness change, not a fix for that crash, and the crash is still
+// unexplained. Payloads are unchanged on every image available to test with.
+static CIContext *sharedCIContext(void) {
+    static CIContext *ctx = nil;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        ctx = [CIContext contextWithOptions:nil];
+    });
+    return ctx;
+}
+
+// tryRung builds a variant, tries it, and lets everything it allocated go
+// before the next one starts.
+//
+// The ladder used to build all five enhanced variants up front and then all
+// six upscaled ones, and nothing they autoreleased could drain until the pool
+// at the top of decodeQRVisionAll did, which is after the whole ladder. A
+// variant now lives for one attempt.
+//
+// This bounds when memory is released, not how much is held at the peak: see
+// the numbers above, which did not move. It is worth keeping because the old
+// shape held eleven full-size images alive for the duration of a decode with
+// no reason to, not because it was shown to fix anything.
+//
+// Records already appended to `found` are retained by that array and survive
+// the pool draining, which is what makes this safe.
+typedef CIImage *(^VariantBlock)(void);
+
+static BOOL tryRung(VariantBlock make, double scale, BOOL keepGeometry,
+                    NSMutableArray<QRRecord *> *found, NSUInteger before) {
+    @autoreleasepool {
+        CIImage *variant = make();
+        if (variant == nil) {
+            return NO;
+        }
+        collectQR(variant, sharedCIContext(), scale, keepGeometry, found);
+    }
+    return found.count > before;
+}
+
 static void decodeLadder(CIImage *base, BOOL keepGeometry,
                          NSMutableArray<QRRecord *> *found) {
     // Normalize the long side so module size lands in the detector's sweet
@@ -212,35 +264,41 @@ static void decodeLadder(CIImage *base, BOOL keepGeometry,
         base = scaleImage(base, normalizeScale);
     }
 
-    CIContext *ctx = [CIContext contextWithOptions:nil];
     NSUInteger before = found.count;
 
     // Fast path: normalized native resolution.
-    collectQR(base, ctx, normalizeScale, keepGeometry, found);
-    if (found.count > before) {
+    if (tryRung(^{ return base; }, normalizeScale, keepGeometry, found, before)) {
         return;
     }
 
-    // Enhancement ladder at native size.
-    CIImage *globals[] = {
-        documentEnhance(base), otsuThreshold(base), contrastGray(base, 2.5),
-        gammaAdjust(base, 0.6), sharpen(base),
+    // Enhancement ladder at native size. Same order as before: the cheapest
+    // and most often decisive first.
+    VariantBlock globals[] = {
+        ^{ return documentEnhance(base); },
+        ^{ return otsuThreshold(base); },
+        ^{ return contrastGray(base, 2.5); },
+        ^{ return gammaAdjust(base, 0.6); },
+        ^{ return sharpen(base); },
     };
     for (int i = 0; i < 5; i++) {
-        collectQR(globals[i], ctx, normalizeScale, keepGeometry, found);
-        if (found.count > before) {
+        if (tryRung(globals[i], normalizeScale, keepGeometry, found, before)) {
             return;
         }
     }
 
-    // Upscale ladder: plain, document-cleaned, and contrast-stretched.
+    // Upscale ladder: plain, document-cleaned, and contrast-stretched. The
+    // upscale happens inside each rung, so a 6600px bitmap is alive for one
+    // attempt rather than for six.
     const double scales[] = {2.0, 3.0};
     for (int s = 0; s < 2; s++) {
-        CIImage *up = scaleImage(base, scales[s]);
-        CIImage *variants[] = {up, documentEnhance(up), contrastGray(up, 2.0)};
+        const double scale = scales[s];
+        VariantBlock variants[] = {
+            ^{ return scaleImage(base, scale); },
+            ^{ return documentEnhance(scaleImage(base, scale)); },
+            ^{ return contrastGray(scaleImage(base, scale), 2.0); },
+        };
         for (int v = 0; v < 3; v++) {
-            collectQR(variants[v], ctx, normalizeScale * scales[s], keepGeometry, found);
-            if (found.count > before) {
+            if (tryRung(variants[v], normalizeScale * scale, keepGeometry, found, before)) {
                 return;
             }
         }
