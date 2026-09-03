@@ -7,7 +7,7 @@ and drop a photo, a folder or a zip on it, or scan live from the camera. The
 decoder is a WebAssembly build of this same Go code running inside your tab, so
 your images are never uploaded. It reads every code in every image, recreates
 them as PNG, JPEG, SVG or PDF, turns a CSV column into a batch of codes, and
-shows you where a link goes before it opens it. Seven languages.
+shows you where a link goes before it opens it. Eight languages.
 
 ![demo](demo.gif)
 
@@ -210,10 +210,16 @@ at all.
 
 **In your language**
 
-English, Italian, Spanish, French, German, Portuguese and Simplified Chinese.
-The page picks one from the browser's own preference list, and when it speaks
-none of them it asks the machine's time zone, which is on the device and costs
-no permission and no request to anybody's server.
+English, Italian, Spanish, French, German, Portuguese, and Chinese in both
+scripts: Simplified and Traditional, which are two blocks rather than one
+converted, because the words differ too and not only the characters.
+
+The page picks one from the browser's own preference list. For Chinese it
+reads the script, and where the tag does not carry one it reads the region,
+because browsers still send `zh-TW` far more often than `zh-Hant` and the base
+subtag alone cannot tell the two apart. When the browser speaks none of the
+eight, the machine's time zone decides, which is on the device and costs no
+permission and no request to anybody's server.
 
 ### Nothing is uploaded, and that is enforced rather than promised
 
