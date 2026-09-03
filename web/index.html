@@ -1576,6 +1576,10 @@ function paintIcons() {
     const el = $(id);
     if (el && !el.querySelector("svg")) el.insertAdjacentHTML("afterbegin", SVG(icon));
   }
+  // Freeze got its icon from setFreezeLabel, which only runs once the scanner
+  // is open: until then the button was empty. Invisible inside a closed
+  // dialog, but an empty button is not a state worth having.
+  setFreezeLabel(false);
 }
 
 function paintFound() {
